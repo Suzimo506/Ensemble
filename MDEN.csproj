@@ -13,6 +13,7 @@
 
   <Target Name="CopyDLLs" AfterTargets="Build">
     <Copy SourceFiles="$(TargetDir)$(AssemblyName).dll" DestinationFolder="$(MD_NET6_DIRECTORY)\Mods" />
+    <Copy SourceFiles="$(TargetDir)MDEN.Protocol.dll" DestinationFolder="$(MD_NET6_DIRECTORY)\UserLibs" />
     <Message Text="Copied DLL -&gt; $(MD_NET6_DIRECTORY)\Mods\$(AssemblyName).dll" Importance="High" />
   </Target>
 
@@ -23,9 +24,9 @@
     <Compile Remove="inspect_cs\**" />
     <EmbeddedResource Remove="inspect_cs\**" />
     <None Remove="inspect_cs\**" />
-    <Compile Remove="MDME.Protocol\**" />
-    <EmbeddedResource Remove="MDME.Protocol\**" />
-    <None Remove="MDME.Protocol\**" />
+    <Compile Remove="MDEN.Protocol\**" />
+    <EmbeddedResource Remove="MDEN.Protocol\**" />
+    <None Remove="MDEN.Protocol\**" />
   </ItemGroup>
 
   <ItemGroup>
@@ -122,7 +123,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="MDME.Protocol\MDME.Protocol.csproj" />
+    <ProjectReference Include="MDEN.Protocol\MDEN.Protocol.csproj" />
   </ItemGroup>
 
 </Project>

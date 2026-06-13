@@ -11,6 +11,8 @@ namespace MDEN.Protocol
         public const ushort Ping = 0x0001;
         public const ushort Pong = 0x0002;
         public const ushort Disconnect = 0x0003;
+        public const ushort ServerInfoReq = 0x0004;
+        public const ushort ServerInfoResp = 0x0005;
 
         // === 认证 (0x0100 ~ 0x01FF) ===
         public const ushort LoginReq = 0x0100;
@@ -65,7 +67,7 @@ namespace MDEN.Protocol
         public const ushort GetFriendsResp = 0x0703;
         public const ushort FriendNotifyPush = 0x0704;
 
-        // === 房间状态推�?(0x0800 ~ 0x08FF) ===
+        // === 房间状态推送 (0x0800 ~ 0x08FF) ===
         public const ushort LobbySyncPush = 0x0800;
         public const ushort LobbyAllReturnedPush = 0x0801;
         public const ushort LobbyKickedPush = 0x0802;
