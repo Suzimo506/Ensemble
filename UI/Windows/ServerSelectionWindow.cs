@@ -123,7 +123,7 @@ namespace MDEN.UI.Windows
             }
             catch (Exception e)
             {
-                MelonLogger.Error($"Failed to fetch nodes: {e}");
+                MelonLogger.Warning($"获取官方节点失败: {e.Message}");
                 _officialServerData = new List<MDEN.Network.ApiServerEntry>();
             }
             
@@ -143,16 +143,20 @@ namespace MDEN.UI.Windows
                     else if (info.NodeId == "test") displayName = "内测节点";
                     else displayName = info.NodeId;
 
-                    desc = $"当前在线: <color=#FFFF00>{info.PlayerCount}</color> 人\n房间数量: <color=#00FFFF>{info.RoomCount}</color> 个";
+                    desc = $"当前在线: <color={Constants.ColorYellow}>{info.PlayerCount}</color> 人\n房间数量: <color={Constants.ColorCyan}>{info.RoomCount}</color> 个";
                 }
 
                 // 官方节点名字显示黄色
-                displayName = $"<color=#fff700ff>{displayName}</color>";
+                displayName = $"<color={Constants.ColorYellow}>{displayName}</color>";
 
                 _officialNodeDisplayData.Add(new Tuple<string, string>(displayName, desc));
             }
 
-            RebuildWindow();
+            // 【重点修复】：从异步网络线程切换回 Unity 主线程执行 UI 构建！
+            MainThreadDispatcher.Enqueue(() =>
+            {
+                RebuildWindow();
+            });
         }
 
         private void RebuildCustomNodes()
@@ -162,8 +166,8 @@ namespace MDEN.UI.Windows
             for (int i = 0; i < ModConfigManager.CustomServers.Count; i++)
             {
                 var cs = ModConfigManager.CustomServers[i];
-                var fo = new ForumObject(new LocalString(cs.Name), new LocalString($"IP地址: {cs.Address}\n如需重命名或修改请直接编辑 Ensemble.json"));
-                fo.Texture = ResourceManager.GetSprite("HomePanel.png")?.texture;
+                var fo = new ForumObject(new LocalString($"<color={Constants.ColorBlue}>{cs.Name}</color>"), new LocalString($"IP地址: {cs.Address}\n如需重命名或修改请直接编辑 Ensemble.json"));
+                fo.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("HomePanel.png")?.texture;
                 _customNodes.Add(fo);
             }
         }
@@ -197,18 +201,18 @@ namespace MDEN.UI.Windows
             _lastSelectedIndex = -1; // 重建时清除选中状态
 
             _btnBack = new ForumObject(new LocalString("返回"), new LocalString("回到上一个窗口"));
-            _btnBack.Texture = ResourceManager.GetSprite("OptionsPanel.png")?.texture;
+            _btnBack.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("OptionsPanel.png")?.texture;
             _window.ForumObjects.Add(_btnBack);
 
             _btnRefresh = new ForumObject(new LocalString("刷新"), new LocalString("重新获取最新的服务器节点"));
-            _btnRefresh.Texture = ResourceManager.GetSprite("RoomList.png")?.texture;
+            _btnRefresh.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("RoomList.png")?.texture;
             _window.ForumObjects.Add(_btnRefresh);
 
             _officialNodes.Clear();
             foreach (var data in _officialNodeDisplayData)
             {
                 var fo = new ForumObject(new LocalString(data.Item1), new LocalString(data.Item2));
-                fo.Texture = ResourceManager.GetSprite("PlayerCard.png")?.texture;
+                fo.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("PlayerCard.png")?.texture;
                 _officialNodes.Add(fo);
             }
 
@@ -223,11 +227,11 @@ namespace MDEN.UI.Windows
             }
 
             _btnAddServer = new ForumObject(new LocalString("添加服务器"), new LocalString("添加私人服务器长期到列表"));
-            _btnAddServer.Texture = ResourceManager.GetSprite("OptionsPanel.png")?.texture;
+            _btnAddServer.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("OptionsPanel.png")?.texture;
             _window.ForumObjects.Add(_btnAddServer);
 
             _btnJoinServer = new ForumObject(new LocalString("加入服务器"), new LocalString("临时加入私人服务器"));
-            _btnJoinServer.Texture = ResourceManager.GetSprite("SocialNetwork.png")?.texture;
+            _btnJoinServer.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("SocialNetwork.png")?.texture;
             _window.ForumObjects.Add(_btnJoinServer);
         }
 

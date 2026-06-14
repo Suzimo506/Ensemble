@@ -31,6 +31,11 @@ namespace MDEN
             }
         }
 
+        public override void OnUpdate()
+        {
+            MainThreadDispatcher.ProcessQueue();
+        }
+
         public override void OnDeinitializeMelon()
         {
             NetworkClient.Instance.Disconnect();

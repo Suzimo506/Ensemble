@@ -53,7 +53,7 @@ namespace MDEN.Network
             }
             catch (Exception ex)
             {
-                MelonLogger.Error($"Failed to fetch official server list: {ex.Message}");
+                MelonLogger.Warning($"获取官方服务器节点列表超时或失败: {ex.Message}");
                 return new List<ApiServerEntry>();
             }
         }

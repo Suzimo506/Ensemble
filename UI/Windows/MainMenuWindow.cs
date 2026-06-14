@@ -24,23 +24,24 @@ namespace MDEN.UI.Windows
             _window.AutoReset = true;
             
             _btnProfile = new ForumObject(new LocalString("个人信息"), new LocalString("更改自己的名字、个人简介、以及个性化修改"));
-            _btnProfile.Texture = ResourceManager.GetSprite("PlayerCard.png")?.texture;
+            _btnProfile.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("PlayerCard.png")?.texture;
             _window.ForumObjects.Add(_btnProfile);
 
             _btnFriends = new ForumObject(new LocalString("好友列表"), new LocalString("查看自己的好友，与好友一起玩吧！"));
-            _btnFriends.Texture = ResourceManager.GetSprite("SocialNetwork.png")?.texture;
+            _btnFriends.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("SocialNetwork.png")?.texture;
             _window.ForumObjects.Add(_btnFriends);
 
             _btnLobbies = new ForumObject(new LocalString("联机大厅"), new LocalString("加入服务器，与服务器的其他人一起愉快的组队吧！"));
-            _btnLobbies.Texture = ResourceManager.GetSprite("RoomList.png")?.texture;
+            _btnLobbies.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("RoomList.png")?.texture;
             _window.ForumObjects.Add(_btnLobbies);
 
             _btnSettings = new ForumObject(new LocalString("设置"), new LocalString("更改游戏的各种设置喵"));
-            _btnSettings.Texture = ResourceManager.GetSprite("OptionsPanel.png")?.texture;
+            _btnSettings.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("OptionsPanel.png")?.texture;
             _window.ForumObjects.Add(_btnSettings);
 
-            _btnAbout = new ForumObject(new LocalString("关于"), new LocalString("来看看这个模组的前世今生吧"));
-            _btnAbout.Texture = ResourceManager.GetSprite("HomePanel.png")?.texture;
+            _btnAbout = new ForumObject(new LocalString("关于"), new LocalString(Constants.CreditsText));
+            
+            _btnAbout.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("HomePanel.png")?.texture;
             _window.ForumObjects.Add(_btnAbout);
 
             _window.OnSelectionChanged += OnSelectionChanged;
