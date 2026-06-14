@@ -63,10 +63,15 @@ namespace MDEN.Managers
 
         public static async Task StartLobbyAsync()
         {
+            await PlaylistManager.StartPrepareAsync();
+        }
+
+        public static async Task SetReadyAsync(bool ready)
+        {
             EnsureReady();
-            await NetworkClient.Instance.SendRequestAsync<LobbyLockRequest, LobbyLockResponse>(
-                OpCodes.LobbyLockReq,
-                new LobbyLockRequest { Locked = true });
+            await NetworkClient.Instance.SendRequestAsync<LobbyReadyRequest, LobbyReadyResponse>(
+                OpCodes.LobbyReadyReq,
+                new LobbyReadyRequest { Ready = ready });
         }
 
         public static async Task KickPlayerAsync(string targetUid)

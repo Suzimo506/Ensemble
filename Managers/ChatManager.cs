@@ -31,10 +31,7 @@ namespace MDEN.Managers
 
         private static void OnChatPush(ChatPushMsg message)
         {
-            MainThreadDispatcher.Enqueue(() =>
-            {
-                MessageReceived?.Invoke(message);
-            });
+            MessageReceived?.Invoke(message);
         }
     }
 }

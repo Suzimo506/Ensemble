@@ -16,6 +16,7 @@ namespace MDEN.UI.Core
 {
     public static class RoomCharacterDisplay
     {
+        private const int PirateRinGirlIndex = 32;
         private const float PageButtonGap = 8.7f;
 
         private static GameObject _originalMuseShow;
@@ -226,11 +227,90 @@ namespace MDEN.UI.Core
             }
 
             var newShow = UnityEngine.Object.Instantiate(charApply.gameObject, prefabTransform);
-            var renderer = newShow.GetComponent<MeshRenderer>();
-            if (renderer != null) renderer.sortingOrder = 0;
+            NormalizeCharacterVisibility(newShow, girlIndex);
+            RemoveSpecialCharacterExtras(newShow, girlIndex);
 
             var museComponent = prefabTransform.gameObject.GetComponent<MuseShow>();
             if (museComponent != null) museComponent.m_MuseShow = newShow;
+
+            MelonLogger.Msg($"Room character replaced: girlIndex={girlIndex}, name={charInfo.characterName}, cos={charInfo.cosName}");
+        }
+
+        private static void NormalizeCharacterVisibility(GameObject root, int girlIndex)
+        {
+            if (root == null) return;
+
+            root.SetActive(true);
+            if (girlIndex == PirateRinGirlIndex)
+            {
+                ActivateHierarchy(root.transform);
+            }
+
+            var renderers = root.GetComponentsInChildren<Renderer>(true);
+            if (renderers == null || renderers.Length == 0)
+            {
+                MelonLogger.Warning($"Character has no renderer after clone. girlIndex={girlIndex}");
+            }
+            else
+            {
+                foreach (var renderer in renderers)
+                {
+                    if (renderer == null) continue;
+                    renderer.enabled = true;
+                    renderer.sortingOrder = 0;
+                    renderer.gameObject.SetActive(true);
+                }
+            }
+
+            var canvasGroups = root.GetComponentsInChildren<CanvasGroup>(true);
+            if (canvasGroups != null)
+            {
+                foreach (var canvasGroup in canvasGroups)
+                {
+                    if (canvasGroup == null) continue;
+                    canvasGroup.alpha = 1f;
+                    canvasGroup.gameObject.SetActive(true);
+                }
+            }
+
+            if (girlIndex == PirateRinGirlIndex)
+            {
+                MelonLogger.Msg("Applied pirate Rin visibility normalization.");
+            }
+        }
+
+        private static void ActivateHierarchy(Transform transform)
+        {
+            if (transform == null) return;
+
+            transform.gameObject.SetActive(true);
+            for (var i = 0; i < transform.childCount; i++)
+            {
+                ActivateHierarchy(transform.GetChild(i));
+            }
+        }
+
+        private static void RemoveSpecialCharacterExtras(GameObject newShow, int girlIndex)
+        {
+            if (newShow == null) return;
+
+            switch (girlIndex)
+            {
+                case 31:
+                    var bloodheirHandler = newShow.GetComponent<Il2CppAssets.Scripts.UI.Specials.BloodheirTransformGenerator>();
+                    if (bloodheirHandler != null && bloodheirHandler.m_BloodheirTransformObj != null)
+                    {
+                        UnityEngine.Object.Destroy(bloodheirHandler.m_BloodheirTransformObj);
+                    }
+                    break;
+                case 33:
+                    var diverHandler = newShow.GetComponent<Il2CppAssets.Scripts.UI.Specials.DiverBuroHandler>();
+                    if (diverHandler != null && diverHandler.m_PnlDaveFishViewObj != null)
+                    {
+                        UnityEngine.Object.Destroy(diverHandler.m_PnlDaveFishViewObj);
+                    }
+                    break;
+            }
         }
 
         private static void CreatePageButtons()

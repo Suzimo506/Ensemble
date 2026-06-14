@@ -2,7 +2,7 @@ using System;
 using System.Collections.Concurrent;
 using MelonLoader;
 
-namespace MDEN.Managers
+namespace MDEN.UI.Core
 {
     public static class MainThreadDispatcher
     {
@@ -16,7 +16,8 @@ namespace MDEN.Managers
 
         internal static void ProcessQueue()
         {
-            while (_executionQueue.TryDequeue(out var action))
+            var count = _executionQueue.Count;
+            for (var i = 0; i < count && _executionQueue.TryDequeue(out var action); i++)
             {
                 try
                 {

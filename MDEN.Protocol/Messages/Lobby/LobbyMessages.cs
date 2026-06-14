@@ -40,6 +40,10 @@ namespace MDEN.Protocol.Messages.Lobby
         public bool Ready { get; set; }
     }
 
+    public class LobbyReadyResponse
+    {
+    }
+
     public class LobbyKickRequest
     {
         public string TargetUid { get; set; }

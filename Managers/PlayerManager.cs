@@ -1,4 +1,7 @@
 using System.Threading.Tasks;
+using System.Collections.Generic;
+using System.Linq;
+using CustomAlbums.Managers;
 using MDEN.Network;
 using MDEN.Protocol;
 using MDEN.Protocol.Enums;
@@ -54,6 +57,21 @@ namespace MDEN.Managers
                 FavGirlIndex = selection.GirlIndex,
                 FavElfinIndex = selection.ElfinIndex
             });
+        }
+
+        public static Task SyncCustomChartsAsync()
+        {
+            var customs = new List<string>();
+            foreach (var pair in AlbumManager.LoadedAlbums)
+            {
+                var md5 = ChartManager.GetCustomChartMd5(pair.Value?.Uid);
+                if (!string.IsNullOrEmpty(md5))
+                {
+                    customs.Add(md5);
+                }
+            }
+
+            return UpdateMyProfileAsync(new UpdatePlayerRequest { Customs = customs.Distinct().ToArray() });
         }
 
         public static async Task UpdateMyProfileAsync(UpdatePlayerRequest request)

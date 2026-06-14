@@ -18,6 +18,7 @@ namespace MDEN
             ReconnectionManager.Instance.Init();
             LobbyManager.Init();
             ChatManager.Init();
+            BattleManager.Init();
             RoomHudController.Initialize();
             MelonLogger.Msg("Initialization complete.");
         }
@@ -43,6 +44,7 @@ namespace MDEN
 
         public override void OnDeinitializeMelon()
         {
+            RoomHudController.Deinitialize();
             ConnectionManager.Disconnect();
         }
     }

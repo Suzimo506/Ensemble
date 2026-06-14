@@ -16,6 +16,8 @@ namespace MDEN.UI.Displays
         private const float EntryHeight = 24f;
         private const float InputHeight = 38f;
         private const float Padding = 14f;
+        private static readonly Vector2 CollapsedSize = new Vector2(500f, 220f);
+        private static readonly Vector2 ExpandedSize = new Vector2(560f, 392f);
 
         private readonly List<ChatPushMsg> _messages = new List<ChatPushMsg>();
         private readonly List<Text> _messageTexts = new List<Text>();
@@ -30,6 +32,8 @@ namespace MDEN.UI.Displays
         private Text _inputText;
         private Text _placeholderText;
         private bool _lastFocusState;
+
+        public bool IsCreated => _root != null;
 
         public void CreateEmpty()
         {
@@ -77,21 +81,21 @@ namespace MDEN.UI.Displays
         {
             if (_root != null) return;
 
-            var parent = GameObject.Find("UI/Standerd/PnlNavigation")?.transform;
+            var parent = FindChatParent();
             if (parent == null)
             {
-                MelonLogger.Warning("Cannot create room chat: PnlNavigation not found.");
+                MelonLogger.Warning("Cannot create room chat: no usable UI parent found.");
                 return;
             }
 
             _root = new GameObject("MDENRoomChat");
             _rootRect = _root.AddComponent<RectTransform>();
-            _rootRect.SetParent(parent);
+            _rootRect.SetParent(parent, false);
             _rootRect.localScale = Vector3.one;
-            _rootRect.anchorMin = new Vector2(1f, 0f);
-            _rootRect.anchorMax = new Vector2(1f, 0f);
-            _rootRect.pivot = new Vector2(1f, 0f);
-            _rootRect.anchoredPosition = new Vector2(-34f, 54f);
+            _rootRect.anchorMin = new Vector2(0f, 0f);
+            _rootRect.anchorMax = new Vector2(0f, 0f);
+            _rootRect.pivot = new Vector2(0f, 0f);
+            _rootRect.anchoredPosition = new Vector2(24f, 32f);
             _root.transform.SetAsLastSibling();
 
             _background = _root.AddComponent<Image>();
@@ -100,7 +104,7 @@ namespace MDEN.UI.Displays
             CreateScrollArea();
             CreateInputField();
             RefreshLayout();
-            MelonLogger.Msg("Room chat display created.");
+            MelonLogger.Msg($"Room chat display created under {GetHierarchyPath(parent)}.");
         }
 
         private void CreateScrollArea()
@@ -245,7 +249,7 @@ namespace MDEN.UI.Displays
                 return;
             }
 
-            _rootRect.sizeDelta = focused ? new Vector2(560f, 392f) : new Vector2(500f, 220f);
+            _rootRect.sizeDelta = focused ? ExpandedSize : CollapsedSize;
             _background.color = GetBackgroundColor(focused);
         }
 
@@ -273,6 +277,29 @@ namespace MDEN.UI.Displays
             return focused
                 ? new Color(0.08f, 0.03f, 0.16f, 0.72f)
                 : new Color(0.08f, 0.03f, 0.16f, 0.56f);
+        }
+
+        private static Transform FindChatParent()
+        {
+            return GameObject.Find("UI/Standerd")?.transform
+                ?? GameObject.Find("UI/Standerd/PnlNavigation")?.transform
+                ?? GameObject.Find("UI")?.transform;
+        }
+
+        private static string GetHierarchyPath(Transform transform)
+        {
+            if (transform == null) return "<null>";
+
+            var names = new List<string>();
+            var current = transform;
+            while (current != null)
+            {
+                names.Add(current.name);
+                current = current.parent;
+            }
+
+            names.Reverse();
+            return string.Join("/", names);
         }
 
         private static string FormatMessage(ChatPushMsg message)

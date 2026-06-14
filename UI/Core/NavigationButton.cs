@@ -158,7 +158,7 @@ namespace MDEN.UI.Core
 
             if (_startBtn == null)
             {
-                _startBtn = CreateTopActionButton("BtnMDENStartGame", 2, "开始游戏", async () =>
+                _startBtn = CreateTopActionButton("BtnMDENStartGame", 2, "开始游戏", () =>
                 {
                     if (LobbyManager.CurrentLobby?.HostUid != PlayerManager.CurrentUid)
                     {
@@ -166,14 +166,7 @@ namespace MDEN.UI.Core
                         return;
                     }
 
-                    try
-                    {
-                        await LobbyManager.StartLobbyAsync();
-                    }
-                    catch (Exception ex)
-                    {
-                        MelonLogger.Warning($"Start lobby failed: {ex.Message}");
-                    }
+                    UIManager.OpenWindow(new RoomReadyWindow());
                 });
             }
         }

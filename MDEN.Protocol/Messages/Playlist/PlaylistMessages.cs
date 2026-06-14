@@ -14,4 +14,16 @@ namespace MDEN.Protocol.Messages.Playlist
     {
         public string Entry { get; set; }
     }
+
+    public class PlaylistRemoveResponse
+    {
+    }
+
+    public class PlaylistContinueRequest
+    {
+    }
+
+    public class PlaylistContinueResponse
+    {
+    }
 }

@@ -1,6 +1,7 @@
 using LocalizeLib;
 using MDEN.Managers;
 using MDEN.UI.Core;
+using MelonLoader;
 using PopupLib.UI.Components;
 using PopupLib.UI.Windows;
 using UnityEngine;
@@ -10,6 +11,7 @@ namespace MDEN.UI.Windows
     public class RoomPlaylistWindow : MDENWindowBase
     {
         private ForumWindow _window;
+        private PlaylistEntryViewModel[] _items = new PlaylistEntryViewModel[0];
         private int _lastSelectedIndex = -1;
 
         public override void Show()
@@ -36,15 +38,17 @@ namespace MDEN.UI.Windows
             _window.ForumObjects.Clear();
 
             var lobby = LobbyManager.CurrentLobby;
-            if (lobby?.Playlist == null || lobby.Playlist.Length == 0)
+            _items = PlaylistManager.GetPlaylistItems();
+            if (lobby?.Playlist == null || _items.Length == 0)
             {
-                AddButton("暂无歌曲", "后续会接入选谱和添加歌曲逻辑");
+                AddButton("暂无歌曲", "在选歌界面点击 Start 可加入歌曲列表");
                 return;
             }
 
-            for (var i = 0; i < lobby.Playlist.Length; i++)
+            for (var i = 0; i < _items.Length; i++)
             {
-                AddButton($"#{i + 1}", lobby.Playlist[i]);
+                var item = _items[i];
+                AddButton($"#{i + 1} {item.DisplayName}", $"难度: {item.Difficulty}\n添加者: {item.OwnerName}");
             }
         }
 
@@ -56,7 +60,7 @@ namespace MDEN.UI.Windows
             return obj;
         }
 
-        private void OnSelectionChanged(PopupLib.UI.Windows.Interfaces.IListWindow window, int objectIndex)
+        private async void OnSelectionChanged(PopupLib.UI.Windows.Interfaces.IListWindow window, int objectIndex)
         {
             if (_window == null || objectIndex < 0 || objectIndex >= _window.ForumObjects.Count) return;
             if (_lastSelectedIndex != objectIndex)
@@ -65,6 +69,18 @@ namespace MDEN.UI.Windows
                 return;
             }
 
+            if (!PlaylistManager.CanChangePlaylist || objectIndex >= _items.Length) return;
+
+            using var _ = UIManager.LockUI("Removing playlist entry...");
+            try
+            {
+                await PlaylistManager.RemoveAsync(_items[objectIndex].Entry);
+                RebuildWindow();
+            }
+            catch (System.Exception ex)
+            {
+                MelonLogger.Warning($"Remove playlist entry failed: {ex.Message}");
+            }
         }
 
         private void OnInternalShowInjectTitle(PopupLib.UI.Windows.Abstract.BaseWindow w)
@@ -101,6 +117,21 @@ namespace MDEN.UI.Windows
                 _window.ForceClose();
                 _window = null;
             }
+        }
+
+        private void RebuildWindow()
+        {
+            if (_window == null) return;
+            _window.OnSelectionChanged -= OnSelectionChanged;
+            _window.OnInternalShow -= OnInternalShowInjectTitle;
+            _window.ForceClose();
+            _window = new ForumWindow();
+            _window.AutoReset = true;
+            BuildList();
+            _window.OnSelectionChanged += OnSelectionChanged;
+            _window.OnInternalShow += OnInternalShowInjectTitle;
+            _window.Show();
+            _lastSelectedIndex = -1;
         }
     }
 }
