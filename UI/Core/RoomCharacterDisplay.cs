@@ -5,8 +5,10 @@ using Il2CppAssets.Scripts.Database;
 using Il2CppAssets.Scripts.UI;
 using Il2CppAssets.Scripts.UI.Panels.PnlRole;
 using MDEN.Managers;
+using MDEN.Protocol.Enums;
 using MDEN.Protocol.Messages.Lobby;
 using MDEN.Protocol.Models;
+using MDEN.UI.Windows;
 using MelonLoader;
 using UnityEngine;
 using UnityEngine.Events;
@@ -29,6 +31,9 @@ namespace MDEN.UI.Core
         private static GameObject _rightSlotB;
         private static GameObject _leftButton;
         private static GameObject _rightButton;
+        private static SlotLabels _localLabels;
+        private static SlotLabels _rightLabelsA;
+        private static SlotLabels _rightLabelsB;
         private static int _localGirlIndex = -1;
         private static int _rightGirlIndexA = -1;
         private static int _rightGirlIndexB = -1;
@@ -42,6 +47,14 @@ namespace MDEN.UI.Core
         private static readonly Vector3 RightPositionB = new Vector3(6.9f, -1.18f, 100f);
         private static readonly Vector3 LocalScale = new Vector3(0.82f, 0.82f, 0.82f);
         private static readonly Vector3 OtherScale = new Vector3(0.58f, 0.58f, 0.58f);
+        private static readonly Vector3 LocalTitlePosition = new Vector3(-3.8f, 3.18f, 100f);
+        private static readonly Vector3 LocalNamePosition = new Vector3(-3.8f, 2.86f, 100f);
+        private static readonly Vector3 RightTitlePositionA = new Vector3(2.6f, 2.46f, 100f);
+        private static readonly Vector3 RightNamePositionA = new Vector3(2.6f, 2.16f, 100f);
+        private static readonly Vector3 RightTitlePositionB = new Vector3(6.9f, 2.46f, 100f);
+        private static readonly Vector3 RightNamePositionB = new Vector3(6.9f, 2.16f, 100f);
+        private static readonly Vector2 LocalLabelSize = new Vector2(420f, 58f);
+        private static readonly Vector2 OtherLabelSize = new Vector2(360f, 52f);
 
         public static void Refresh(LobbySyncPush lobby)
         {
@@ -76,6 +89,9 @@ namespace MDEN.UI.Core
             DestroyObject(_rightSlotB);
             DestroyObject(_leftButton);
             DestroyObject(_rightButton);
+            _localLabels?.Destroy();
+            _rightLabelsA?.Destroy();
+            _rightLabelsB?.Destroy();
 
             _originalMuseShow = null;
             _originalElfinShow = null;
@@ -86,6 +102,9 @@ namespace MDEN.UI.Core
             _rightSlotB = null;
             _leftButton = null;
             _rightButton = null;
+            _localLabels = null;
+            _rightLabelsA = null;
+            _rightLabelsB = null;
             _localGirlIndex = -1;
             _rightGirlIndexA = -1;
             _rightGirlIndexB = -1;
@@ -132,6 +151,7 @@ namespace MDEN.UI.Core
             PrepareMuseShow(_rightSlotA);
             PrepareMuseShow(_rightSlotB);
             CreatePageButtons();
+            CreateLabels();
             if (_originalElfinShow != null) _originalElfinShow.SetActive(false);
             return true;
         }
@@ -152,12 +172,14 @@ namespace MDEN.UI.Core
             slot.SetActive(player != null);
             if (player == null)
             {
+                SetLabelsVisible(slot, false);
                 SetCachedGirl(slot, -1);
                 return;
             }
 
             slot.transform.position = local ? LocalPosition : (slot == _rightSlotA ? RightPositionA : RightPositionB);
             slot.transform.localScale = local ? LocalScale : OtherScale;
+            ApplyLabels(slot, player);
 
             var girlIndex = local
                 ? GameAccountManager.GetCurrentSelection().GirlIndex
@@ -360,6 +382,122 @@ namespace MDEN.UI.Core
             if (_rightButton != null) _rightButton.SetActive(visible);
         }
 
+        private static void CreateLabels()
+        {
+            var parent = _originalMuseShow.transform.parent;
+            _localLabels = CreateSlotLabels(parent, "MDENRoomLocal", LocalTitlePosition, LocalNamePosition, LocalLabelSize, 24, 32);
+            _rightLabelsA = CreateSlotLabels(parent, "MDENRoomRightA", RightTitlePositionA, RightNamePositionA, OtherLabelSize, 20, 28);
+            _rightLabelsB = CreateSlotLabels(parent, "MDENRoomRightB", RightTitlePositionB, RightNamePositionB, OtherLabelSize, 20, 28);
+        }
+
+        private static SlotLabels CreateSlotLabels(
+            Transform parent,
+            string prefix,
+            Vector3 titlePosition,
+            Vector3 namePosition,
+            Vector2 size,
+            int titleFontSize,
+            int nameFontSize)
+        {
+            var titleText = CreateLabelText(parent, prefix + "Title", titlePosition, size, titleFontSize, false);
+            var nameText = CreateLabelText(parent, prefix + "Name", namePosition, size, nameFontSize, true);
+            return new SlotLabels(titleText, nameText);
+        }
+
+        private static Text CreateLabelText(
+            Transform parent,
+            string name,
+            Vector3 position,
+            Vector2 size,
+            int fontSize,
+            bool clickable)
+        {
+            var obj = new GameObject(name);
+            var rect = obj.AddComponent<RectTransform>();
+            rect.SetParent(parent);
+            rect.position = position;
+            rect.localScale = Vector3.one;
+            rect.sizeDelta = size;
+
+            var text = obj.AddComponent<Text>();
+            text.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
+            text.fontSize = fontSize;
+            text.alignment = TextAnchor.MiddleCenter;
+            text.horizontalOverflow = HorizontalWrapMode.Overflow;
+            text.verticalOverflow = VerticalWrapMode.Overflow;
+            text.raycastTarget = clickable;
+            text.supportRichText = true;
+
+            if (clickable)
+            {
+                var button = obj.AddComponent<Button>();
+                button.targetGraphic = text;
+                button.transition = Selectable.Transition.ColorTint;
+            }
+
+            obj.SetActive(false);
+            return text;
+        }
+
+        private static void ApplyLabels(GameObject slot, RoomCharacterPlayer player)
+        {
+            var labels = GetLabels(slot);
+            if (labels == null) return;
+
+            labels.SetVisible(true);
+            labels.Title.text = FormatTitle(player.Title);
+            labels.Name.text = FormatName(player.Name);
+
+            var entry = ToPlayerSyncEntry(player);
+            labels.Button.onClick = new Button.ButtonClickedEvent();
+            labels.Button.onClick.AddListener((UnityAction)(() => UIManager.OpenWindow(new RoomPlayerProfileWindow(entry))));
+        }
+
+        private static void SetLabelsVisible(GameObject slot, bool visible)
+        {
+            var labels = GetLabels(slot);
+            labels?.SetVisible(visible);
+        }
+
+        private static SlotLabels GetLabels(GameObject slot)
+        {
+            if (slot == _localSlot) return _localLabels;
+            if (slot == _rightSlotA) return _rightLabelsA;
+            if (slot == _rightSlotB) return _rightLabelsB;
+            return null;
+        }
+
+        private static string FormatTitle(string title)
+        {
+            return string.IsNullOrWhiteSpace(title)
+                ? "<color=#ffffff66>　</color>"
+                : $"<color=#{Constants.ColorYellow}>[{EscapeRichText(title)}]</color>";
+        }
+
+        private static string FormatName(string name)
+        {
+            return string.IsNullOrWhiteSpace(name)
+                ? "<color=#ffffffff>Unknown</color>"
+                : $"<color=#ffffffff>{EscapeRichText(name)}</color>";
+        }
+
+        private static string EscapeRichText(string value)
+        {
+            return value?.Replace("<", "＜").Replace(">", "＞") ?? string.Empty;
+        }
+
+        private static PlayerSyncEntry ToPlayerSyncEntry(RoomCharacterPlayer player)
+        {
+            return new PlayerSyncEntry
+            {
+                Uid = player.Uid,
+                Name = player.Name,
+                Title = player.Title,
+                PingMS = player.PingMS,
+                Status = player.Status
+            };
+        }
+
         private static RoomCharacterPlayer GetLocalPlayer(LobbySyncPush lobby)
         {
             var uid = PlayerManager.CurrentUid;
@@ -368,8 +506,10 @@ namespace MDEN.UI.Core
                 {
                     Uid = uid,
                     Name = PlayerManager.CurrentProfile?.Name ?? uid,
+                    Title = PlayerManager.CurrentProfile?.Title,
                     GirlIndex = GameAccountManager.GetCurrentSelection().GirlIndex,
-                    ElfinIndex = GameAccountManager.GetCurrentSelection().ElfinIndex
+                    ElfinIndex = GameAccountManager.GetCurrentSelection().ElfinIndex,
+                    Status = (byte)PlayerStatus.InLobby
                 };
         }
 
@@ -399,6 +539,9 @@ namespace MDEN.UI.Core
                     {
                         Uid = player.Uid,
                         Name = string.IsNullOrEmpty(player.Name) ? player.Uid : player.Name,
+                        Title = GetDisplayTitle(player),
+                        PingMS = player.PingMS,
+                        Status = player.Status,
                         GirlIndex = GetGirlIndex(player.Uid, character),
                         ElfinIndex = GetElfinIndex(player.Uid, character)
                     };
@@ -416,8 +559,10 @@ namespace MDEN.UI.Core
                 {
                     Uid = uid,
                     Name = uid,
+                    Title = uid == PlayerManager.CurrentUid ? PlayerManager.CurrentProfile?.Title : null,
                     GirlIndex = GetGirlIndex(uid, character),
-                    ElfinIndex = GetElfinIndex(uid, character)
+                    ElfinIndex = GetElfinIndex(uid, character),
+                    Status = (byte)(uid == PlayerManager.CurrentUid ? PlayerStatus.InLobby : PlayerStatus.Offline)
                 };
             }
         }
@@ -470,6 +615,16 @@ namespace MDEN.UI.Core
             return character;
         }
 
+        private static string GetDisplayTitle(PlayerSyncEntry player)
+        {
+            if (player?.Uid == PlayerManager.CurrentUid && !string.IsNullOrEmpty(PlayerManager.CurrentProfile?.Title))
+            {
+                return PlayerManager.CurrentProfile.Title;
+            }
+
+            return player?.Title;
+        }
+
         private static void RestoreOriginal()
         {
             if (_originalMuseShow != null)
@@ -498,8 +653,37 @@ namespace MDEN.UI.Core
         {
             public string Uid { get; set; }
             public string Name { get; set; }
+            public string Title { get; set; }
+            public ushort PingMS { get; set; }
+            public byte Status { get; set; }
             public int GirlIndex { get; set; }
             public int ElfinIndex { get; set; }
+        }
+
+        private sealed class SlotLabels
+        {
+            public SlotLabels(Text title, Text name)
+            {
+                Title = title;
+                Name = name;
+                Button = name.GetComponent<Button>();
+            }
+
+            public Text Title { get; }
+            public Text Name { get; }
+            public Button Button { get; }
+
+            public void SetVisible(bool visible)
+            {
+                if (Title != null) Title.gameObject.SetActive(visible);
+                if (Name != null) Name.gameObject.SetActive(visible);
+            }
+
+            public void Destroy()
+            {
+                if (Title != null) UnityEngine.Object.Destroy(Title.gameObject);
+                if (Name != null) UnityEngine.Object.Destroy(Name.gameObject);
+            }
         }
     }
 }

@@ -2,6 +2,7 @@ using System;
 using System.Threading.Tasks;
 using MDEN.Network;
 using MDEN.Protocol;
+using MDEN.Protocol.Enums;
 using MDEN.Protocol.Messages.Lobby;
 using MDEN.Protocol.Models;
 using MelonLoader;
@@ -147,8 +148,9 @@ namespace MDEN.Managers
                         {
                             Uid = currentUid,
                             Name = string.IsNullOrEmpty(currentName) ? currentUid : currentName,
+                            Title = PlayerManager.CurrentProfile?.Title,
                             PingMS = 0,
-                            Status = 2
+                            Status = (byte)PlayerStatus.InLobby
                         }
                     }
             };

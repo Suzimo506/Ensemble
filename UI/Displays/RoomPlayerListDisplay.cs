@@ -65,6 +65,7 @@ namespace MDEN.UI.Displays
                     {
                         Uid = player.Uid,
                         Name = string.IsNullOrEmpty(player.Name) ? player.Uid : player.Name,
+                        Title = GetDisplayTitle(player),
                         PingMS = player.PingMS,
                         Status = player.Status
                     };
@@ -82,9 +83,20 @@ namespace MDEN.UI.Displays
                     Uid = uid,
                     Name = uid == PlayerManager.CurrentUid && !string.IsNullOrEmpty(PlayerManager.CurrentProfile?.Name)
                         ? PlayerManager.CurrentProfile.Name
-                        : uid
+                        : uid,
+                    Title = uid == PlayerManager.CurrentUid ? PlayerManager.CurrentProfile?.Title : null
                 };
             }
+        }
+
+        private static string GetDisplayTitle(PlayerSyncEntry player)
+        {
+            if (player?.Uid == PlayerManager.CurrentUid && !string.IsNullOrEmpty(PlayerManager.CurrentProfile?.Title))
+            {
+                return PlayerManager.CurrentProfile.Title;
+            }
+
+            return player?.Title;
         }
     }
 }
