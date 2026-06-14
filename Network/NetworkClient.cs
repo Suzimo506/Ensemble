@@ -1,5 +1,8 @@
 using System;
+using System.Collections.Concurrent;
 using System.Net.Sockets;
+using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 using MDEN.Protocol;
 using MDEN.Protocol.Envelopes;
@@ -7,21 +10,22 @@ using MelonLoader;
 
 namespace MDEN.Network
 {
-    // TCP长连接客户端，负责与服务端通信
     public class NetworkClient
     {
         private static NetworkClient _instance;
         public static NetworkClient Instance => _instance ??= new NetworkClient();
 
+        private readonly PacketFramer _framer = new PacketFramer();
+        private readonly ConcurrentDictionary<uint, PendingRequest> _pendingRequests = new ConcurrentDictionary<uint, PendingRequest>();
+        private readonly SemaphoreSlim _sendSemaphore = new SemaphoreSlim(1, 1);
         private TcpClient _tcpClient;
         private NetworkStream _stream;
         private bool _isConnected;
-        private readonly PacketFramer _framer = new PacketFramer();
+        private uint _nextReqId;
 
-        // 当收到服务端的推送消息时触发
-        public event Action<ushort, System.Text.Json.JsonElement> OnPushReceived;
-        
-        // 当断开连接时触发
+        public bool IsConnected => _isConnected;
+
+        public event Action<ushort, JsonElement> OnPushReceived;
         public event Action OnDisconnected;
 
         public async Task<bool> ConnectAsync(string host, int port)
@@ -32,39 +36,111 @@ namespace MDEN.Network
                 await _tcpClient.ConnectAsync(host, port);
                 _stream = _tcpClient.GetStream();
                 _isConnected = true;
-                
-                // 启动后台接收循环
                 _ = ReceiveLoopAsync();
                 return true;
             }
             catch (Exception ex)
             {
                 MelonLogger.Error($"Failed to connect to server: {ex.Message}");
+                CleanupConnection();
                 return false;
             }
         }
 
         public void Disconnect()
         {
-            _isConnected = false;
-            _stream?.Close();
-            _tcpClient?.Close();
-            OnDisconnected?.Invoke();
+            Disconnect(false);
         }
 
-        // 发送封包到服务端
+        public void Disconnect(bool notifyDisconnected)
+        {
+            if (!_isConnected && _stream == null && _tcpClient == null) return;
+
+            CleanupConnection();
+
+            foreach (var pending in _pendingRequests.Values)
+            {
+                pending.TrySetException(new InvalidOperationException("Connection closed."));
+            }
+            _pendingRequests.Clear();
+
+            if (notifyDisconnected)
+            {
+                OnDisconnected?.Invoke();
+            }
+        }
+
+        public async Task<TResp> SendRequestAsync<TReq, TResp>(ushort opCode, TReq request, int timeoutMs = 15000)
+        {
+            if (!_isConnected || _stream == null)
+            {
+                throw new InvalidOperationException("Not connected to server.");
+            }
+
+            var reqId = unchecked(++_nextReqId);
+            if (reqId == 0) reqId = unchecked(++_nextReqId);
+
+            var pending = new PendingRequest(typeof(TResp));
+            if (!_pendingRequests.TryAdd(reqId, pending))
+            {
+                throw new InvalidOperationException("Request id collision.");
+            }
+
+            using var timeout = new CancellationTokenSource(timeoutMs);
+            using var registration = timeout.Token.Register(() =>
+            {
+                if (_pendingRequests.TryRemove(reqId, out var removed))
+                {
+                    removed.TrySetException(new TimeoutException("Request timed out."));
+                }
+            });
+
+            try
+            {
+                await SendAsync(new ClientEnvelope
+                {
+                    Op = opCode,
+                    ReqId = reqId,
+                    Payload = request
+                });
+
+                var result = await pending.Task;
+                return result == null ? default : (TResp)result;
+            }
+            finally
+            {
+                _pendingRequests.TryRemove(reqId, out _);
+            }
+        }
+
+        public async Task SendNotifyAsync<T>(ushort opCode, T message)
+        {
+            await SendAsync(new ClientEnvelope
+            {
+                Op = opCode,
+                Payload = message
+            });
+        }
+
         public async Task SendAsync(ClientEnvelope envelope)
         {
             if (!_isConnected || _stream == null) return;
+
+            await _sendSemaphore.WaitAsync();
             try
             {
                 var bytes = _framer.Encode(envelope);
                 await _stream.WriteAsync(bytes, 0, bytes.Length);
+                await _stream.FlushAsync();
             }
             catch (Exception ex)
             {
                 MelonLogger.Error($"Failed to send data: {ex.Message}");
                 Disconnect();
+            }
+            finally
+            {
+                _sendSemaphore.Release();
             }
         }
 
@@ -73,27 +149,29 @@ namespace MDEN.Network
             var buffer = new byte[4096];
             try
             {
-                while (_isConnected)
+                while (_isConnected && _stream != null)
                 {
                     int bytesRead = await _stream.ReadAsync(buffer, 0, buffer.Length);
                     if (bytesRead == 0)
                     {
                         MelonLogger.Msg("Server disconnected.");
-                        Disconnect();
+                        Disconnect(true);
                         break;
                     }
+
                     _framer.AppendData(buffer, 0, bytesRead);
-                    
                     while (_framer.TryDecode(out ServerEnvelope envelope))
                     {
                         if (envelope.ReqId == null)
                         {
-                            OnPushReceived?.Invoke(envelope.Op, (System.Text.Json.JsonElement)envelope.Payload);
+                            if (envelope.Payload is JsonElement pushPayload)
+                            {
+                                OnPushReceived?.Invoke(envelope.Op, pushPayload);
+                            }
+                            continue;
                         }
-                        else
-                        {
-                            // 处理常规响应
-                        }
+
+                        HandleResponse(envelope);
                     }
                 }
             }
@@ -102,9 +180,77 @@ namespace MDEN.Network
                 if (_isConnected)
                 {
                     MelonLogger.Error($"Receive loop exception: {ex.Message}");
-                    Disconnect();
+                    Disconnect(true);
                 }
             }
+        }
+
+        private void CleanupConnection()
+        {
+            _isConnected = false;
+            try { _stream?.Close(); } catch { }
+            try { _tcpClient?.Close(); } catch { }
+            _stream = null;
+            _tcpClient = null;
+        }
+
+        private void HandleResponse(ServerEnvelope envelope)
+        {
+            if (!envelope.ReqId.HasValue) return;
+            if (!_pendingRequests.TryRemove(envelope.ReqId.Value, out var pending)) return;
+
+            if (!envelope.Success)
+            {
+                pending.TrySetException(new ProtocolException(ReadReason(envelope.Payload)));
+                return;
+            }
+
+            try
+            {
+                if (pending.ResponseType == typeof(object) || envelope.Payload == null)
+                {
+                    pending.TrySetResult(null);
+                    return;
+                }
+
+                if (envelope.Payload is JsonElement element)
+                {
+                    var result = element.Deserialize(pending.ResponseType, ProtocolJson.Options);
+                    pending.TrySetResult(result);
+                    return;
+                }
+
+                pending.TrySetResult(envelope.Payload);
+            }
+            catch (Exception ex)
+            {
+                pending.TrySetException(ex);
+            }
+        }
+
+        private static string ReadReason(object payload)
+        {
+            if (payload is JsonElement element && element.TryGetProperty("Reason", out var reason))
+            {
+                return reason.GetString() ?? "Request failed.";
+            }
+
+            return "Request failed.";
+        }
+
+        private class PendingRequest
+        {
+            private readonly TaskCompletionSource<object> _tcs = new TaskCompletionSource<object>(TaskCreationOptions.RunContinuationsAsynchronously);
+
+            public PendingRequest(Type responseType)
+            {
+                ResponseType = responseType;
+            }
+
+            public Type ResponseType { get; }
+            public Task<object> Task => _tcs.Task;
+            public void TrySetResult(object result) => _tcs.TrySetResult(result);
+            public void TrySetException(Exception ex) => _tcs.TrySetException(ex);
         }
     }
 }

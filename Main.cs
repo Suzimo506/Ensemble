@@ -16,6 +16,7 @@ namespace MDEN
             MelonLogger.Msg("Mod is initializing...");
             PushDispatcher.Instance.Init();
             ReconnectionManager.Instance.Init();
+            LobbyManager.Init();
             MelonLogger.Msg("Initialization complete.");
         }
 
@@ -38,7 +39,7 @@ namespace MDEN
 
         public override void OnDeinitializeMelon()
         {
-            NetworkClient.Instance.Disconnect();
+            ConnectionManager.Disconnect();
         }
     }
 }

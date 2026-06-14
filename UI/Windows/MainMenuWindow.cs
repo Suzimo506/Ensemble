@@ -16,6 +16,7 @@ namespace MDEN.UI.Windows
         private ForumObject _btnFriends;
         private ForumObject _btnLobbies;
         private ForumObject _btnSettings;
+        private ForumObject _btnSupportUs;
         private ForumObject _btnAbout;
 
         public override void Show()
@@ -38,6 +39,10 @@ namespace MDEN.UI.Windows
             _btnSettings = new ForumObject(new LocalString("设置"), new LocalString("更改游戏的各种设置喵"));
             _btnSettings.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("OptionsPanel.png")?.texture;
             _window.ForumObjects.Add(_btnSettings);
+
+            _btnSupportUs = new ForumObject(new LocalString("支持我们"), new LocalString("支持 MDEN 继续开发"));
+            _btnSupportUs.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("HomePanel.png")?.texture;
+            _window.ForumObjects.Add(_btnSupportUs);
 
             _btnAbout = new ForumObject(new LocalString("关于"), new LocalString(Constants.CreditsText));
             
@@ -136,10 +141,19 @@ namespace MDEN.UI.Windows
 
             var button = _window.ForumObjects[objectIndex];
 
-            if (button == _btnLobbies)
+            if (button == _btnProfile)
+            {
+                Close();
+                UIManager.OpenWindow(new ProfileWindow());
+            }
+            else if (button == _btnLobbies)
             {
                 Close();
                 UIManager.OpenWindow(new ServerSelectionWindow());
+            }
+            else if (button == _btnSupportUs)
+            {
+                MelonLoader.MelonLogger.Msg("Support us button selected.");
             }
         }
 

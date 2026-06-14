@@ -12,6 +12,7 @@ namespace MDEN.UI.Core
     public static class NavigationButton
     {
         private static GameObject _multiplayerBtn;
+        private static GameObject _myRoomBtn;
         // 绑定到原生 UI 生命周期中调用
         public static void Create()
         {
@@ -75,6 +76,66 @@ namespace MDEN.UI.Core
             }
             
             MelonLogger.Msg("Lobby entrance button injected successfully.");
+            RefreshRoomButton();
+        }
+
+        public static void RefreshRoomButton()
+        {
+            if (_multiplayerBtn == null)
+            {
+                return;
+            }
+
+            if (LobbyManager.IsInLobby)
+            {
+                CreateRoomButton();
+            }
+            else
+            {
+                DestroyRoomButton();
+            }
+        }
+
+        private static void CreateRoomButton()
+        {
+            if (_myRoomBtn != null) return;
+
+            var topPanelObj = GameObject.Find("UI/Standerd/PnlNavigation/Top");
+            if (topPanelObj == null) return;
+
+            _myRoomBtn = GameObject.Instantiate(_multiplayerBtn, topPanelObj.transform);
+            _myRoomBtn.name = "BtnMDENMyRoom";
+            _myRoomBtn.SetActive(true);
+
+            var rect = _myRoomBtn.GetComponent<RectTransform>();
+            if (rect != null)
+            {
+                rect.anchoredPosition = new Vector2(rect.anchoredPosition.x - 132f, rect.anchoredPosition.y);
+            }
+
+            var img = _myRoomBtn.GetComponent<Image>();
+            if (img != null)
+            {
+                img.sprite = ResourceManager.GetSprite("PcSprButton_Img.png");
+                img.color = new Color(0.52f, 0.25f, 0.95f, 1f);
+            }
+
+            var button = _myRoomBtn.GetComponent<Button>();
+            if (button != null)
+            {
+                button.onClick = new Button.ButtonClickedEvent();
+                button.onClick.AddListener((UnityAction)new Action(() =>
+                {
+                    UIManager.OpenWindow(new MyRoomWindow());
+                }));
+            }
+        }
+
+        private static void DestroyRoomButton()
+        {
+            if (_myRoomBtn == null) return;
+            GameObject.Destroy(_myRoomBtn);
+            _myRoomBtn = null;
         }
     }
 }

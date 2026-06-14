@@ -1,10 +1,8 @@
+using System.Collections.Generic;
 using System.Text.Json.Serialization;
 
 namespace MDEN.Protocol.Messages.Player
 {
-    /// <summary>
-    /// 更新玩家信息 (合并更新，只发需要改的字�?
-    /// </summary>
     public class UpdatePlayerRequest
     {
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -15,6 +13,12 @@ namespace MDEN.Protocol.Messages.Player
 
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public string ChatColor { get; set; }
+
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public string EntranceMessage { get; set; }
+
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public string Title { get; set; }
 
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public string AvatarName { get; set; }
@@ -41,6 +45,10 @@ namespace MDEN.Protocol.Messages.Player
         public string[] Hiddens { get; set; }
     }
 
+    public class UpdatePlayerResponse
+    {
+    }
+
     public class GetPlayerRequest
     {
         public string TargetUid { get; set; }
@@ -53,6 +61,8 @@ namespace MDEN.Protocol.Messages.Player
         public byte Status { get; set; }
         public string Bio { get; set; }
         public string ChatColor { get; set; }
+        public string EntranceMessage { get; set; }
+        public string Title { get; set; }
         public string AvatarName { get; set; }
         public int Level { get; set; }
         public ushort ELO { get; set; }

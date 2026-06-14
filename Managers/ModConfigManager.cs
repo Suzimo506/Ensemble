@@ -12,12 +12,21 @@ namespace MDEN.Managers
         public string Address { get; set; }
     }
 
+    public class ModConfigData
+    {
+        public List<CustomServerInfo> CustomServers { get; set; } = new List<CustomServerInfo>();
+        public string ClientUid { get; set; }
+        public string PlayerName { get; set; }
+    }
+
     public static class ModConfigManager
     {
 #pragma warning disable CS0618
         private static readonly string ConfigPath = Path.Combine(MelonUtils.UserDataDirectory, "Ensemble.json");
 #pragma warning restore CS0618
         public static List<CustomServerInfo> CustomServers { get; private set; } = new List<CustomServerInfo>();
+        public static string ClientUid { get; private set; }
+        public static string PlayerName { get; private set; }
 
         public static void LoadConfig()
         {
@@ -26,7 +35,7 @@ namespace MDEN.Managers
                 try
                 {
                     var json = File.ReadAllText(ConfigPath);
-                    CustomServers = JsonSerializer.Deserialize<List<CustomServerInfo>>(json) ?? new List<CustomServerInfo>();
+                    LoadConfigFromJson(json);
                 }
                 catch (System.Exception ex)
                 {
@@ -34,13 +43,21 @@ namespace MDEN.Managers
                     CustomServers = new List<CustomServerInfo>();
                 }
             }
+
+            EnsureIdentity();
         }
 
         public static void SaveConfig()
         {
             try
             {
-                var json = JsonSerializer.Serialize(CustomServers, new JsonSerializerOptions { WriteIndented = true });
+                var data = new ModConfigData
+                {
+                    CustomServers = CustomServers,
+                    ClientUid = ClientUid,
+                    PlayerName = PlayerName
+                };
+                var json = JsonSerializer.Serialize(data, new JsonSerializerOptions { WriteIndented = true });
                 File.WriteAllText(ConfigPath, json);
             }
             catch (System.Exception ex)
@@ -64,6 +81,60 @@ namespace MDEN.Managers
             if (index >= 0 && index < CustomServers.Count)
             {
                 CustomServers[index].Name = newName;
+                SaveConfig();
+            }
+        }
+
+        public static void DeleteCustomServer(int index)
+        {
+            if (index >= 0 && index < CustomServers.Count)
+            {
+                CustomServers.RemoveAt(index);
+                SaveConfig();
+            }
+        }
+
+        public static void SetPlayerName(string playerName)
+        {
+            if (!string.IsNullOrWhiteSpace(playerName))
+            {
+                PlayerName = playerName;
+                SaveConfig();
+            }
+        }
+
+        private static void LoadConfigFromJson(string json)
+        {
+            if (string.IsNullOrWhiteSpace(json))
+            {
+                CustomServers = new List<CustomServerInfo>();
+                return;
+            }
+
+            if (json.TrimStart().StartsWith("["))
+            {
+                CustomServers = JsonSerializer.Deserialize<List<CustomServerInfo>>(json) ?? new List<CustomServerInfo>();
+                return;
+            }
+
+            var data = JsonSerializer.Deserialize<ModConfigData>(json);
+            CustomServers = data?.CustomServers ?? new List<CustomServerInfo>();
+            ClientUid = data?.ClientUid;
+            PlayerName = data?.PlayerName;
+        }
+
+        private static void EnsureIdentity()
+        {
+            var changed = false;
+
+            if (string.IsNullOrWhiteSpace(PlayerName))
+            {
+                PlayerName = "Player";
+                changed = true;
+            }
+
+            if (changed)
+            {
                 SaveConfig();
             }
         }

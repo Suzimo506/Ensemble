@@ -45,12 +45,12 @@ namespace MDEN.Network
                 }
                 else
                 {
-                    MelonLogger.Warning($"[MDMC API] 无法获取用户信息，UID: {mdmcUid}，状态码: {response.StatusCode}");
+                    MelonLogger.Warning($"[MDMC API] Failed to fetch user info. Uid: {mdmcUid}, status: {response.StatusCode}");
                 }
             }
             catch (Exception ex)
             {
-                MelonLogger.Error($"[MDMC API] 请求异常: {ex}");
+                MelonLogger.Error($"[MDMC API] Request exception: {ex}");
             }
             
             return null;

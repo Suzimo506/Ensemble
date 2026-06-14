@@ -60,13 +60,12 @@ namespace MDEN.Protocol.Messages.Lobby
         public LobbyListEntry[] Lobbies { get; set; }
     }
 
-    /// <summary>
-    /// 服务端推送的房间完整状�?    /// </summary>
     public class LobbySyncPush
     {
         public int Id { get; set; }
         public string Name { get; set; }
         public string HostUid { get; set; }
+        public string HostName { get; set; }
         public byte PlayType { get; set; }
         public byte ChartSelection { get; set; }
         public byte Goal { get; set; }

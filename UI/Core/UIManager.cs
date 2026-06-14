@@ -11,7 +11,7 @@ namespace MDEN.UI.Core
         private static int _lockCount = 0;
 
         // 获取防抖锁。配合 using 使用，Token被Dispose时解锁
-        public static IDisposable LockUI(string message = "正在加载...")
+        public static IDisposable LockUI(string message = "Loading...")
         {
             _lockCount++;
             if (_lockCount == 1)
