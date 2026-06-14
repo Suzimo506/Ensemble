@@ -126,6 +126,14 @@ namespace MDEN.UI.Windows
                 MelonLogger.Warning($"获取官方节点失败: {e.Message}");
                 _officialServerData = new List<MDEN.Network.ApiServerEntry>();
             }
+
+            // 临时硬编码测试节点
+            _officialServerData.Insert(0, new ApiServerEntry 
+            { 
+                Id = "test_hardcoded",
+                Name = "测试硬编码节点",
+                Address = "mdcn2.xmjjs.top:30110"
+            });
             
             _officialNodeDisplayData.Clear();
             foreach (var server in _officialServerData)
