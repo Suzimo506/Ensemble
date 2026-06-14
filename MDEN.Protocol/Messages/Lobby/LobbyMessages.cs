@@ -45,6 +45,39 @@ namespace MDEN.Protocol.Messages.Lobby
         public string TargetUid { get; set; }
     }
 
+    public class LobbyKickResponse
+    {
+    }
+
+    public class LobbyTransferHostRequest
+    {
+        public string TargetUid { get; set; }
+    }
+
+    public class LobbyTransferHostResponse
+    {
+    }
+
+    public class LobbyMuteRequest
+    {
+        public string TargetUid { get; set; }
+        public bool Muted { get; set; }
+    }
+
+    public class LobbyMuteResponse
+    {
+    }
+
+    public class LobbyBanChartSelectRequest
+    {
+        public string TargetUid { get; set; }
+        public bool Banned { get; set; }
+    }
+
+    public class LobbyBanChartSelectResponse
+    {
+    }
+
     public class LobbyLockRequest
     {
         public bool Locked { get; set; }
@@ -79,6 +112,16 @@ namespace MDEN.Protocol.Messages.Lobby
         public string[] ReadyPlayers { get; set; }
         public string[] Playlist { get; set; }
         public PlayerSyncEntry[] PlayerDetails { get; set; }
+        public LobbyPlayerCharacterEntry[] PlayerCharacters { get; set; }
+    }
+
+    public class LobbyPlayerCharacterEntry
+    {
+        public string Uid { get; set; }
+        public int GirlIndex { get; set; }
+        public int ElfinIndex { get; set; }
+        public int FavGirlIndex { get; set; }
+        public int FavElfinIndex { get; set; }
     }
 
     public class LobbyKickedPush

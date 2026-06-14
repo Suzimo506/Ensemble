@@ -1,0 +1,106 @@
+using LocalizeLib;
+using MDEN.Managers;
+using MDEN.UI.Core;
+using PopupLib.UI.Components;
+using PopupLib.UI.Windows;
+using UnityEngine;
+
+namespace MDEN.UI.Windows
+{
+    public class RoomPlaylistWindow : MDENWindowBase
+    {
+        private ForumWindow _window;
+        private int _lastSelectedIndex = -1;
+
+        public override void Show()
+        {
+            _window = new ForumWindow();
+            _window.AutoReset = true;
+            BuildList();
+            _window.OnSelectionChanged += OnSelectionChanged;
+            _window.OnInternalShow += OnInternalShowInjectTitle;
+            _window.Show();
+
+            RegisterEventCleanup(() =>
+            {
+                if (_window != null)
+                {
+                    _window.OnSelectionChanged -= OnSelectionChanged;
+                    _window.OnInternalShow -= OnInternalShowInjectTitle;
+                }
+            });
+        }
+
+        private void BuildList()
+        {
+            _window.ForumObjects.Clear();
+
+            var lobby = LobbyManager.CurrentLobby;
+            if (lobby?.Playlist == null || lobby.Playlist.Length == 0)
+            {
+                AddButton("暂无歌曲", "后续会接入选谱和添加歌曲逻辑");
+                return;
+            }
+
+            for (var i = 0; i < lobby.Playlist.Length; i++)
+            {
+                AddButton($"#{i + 1}", lobby.Playlist[i]);
+            }
+        }
+
+        private ForumObject AddButton(string title, string desc)
+        {
+            var obj = new ForumObject(new LocalString(title), new LocalString(desc));
+            obj.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("RoomList.png")?.texture;
+            _window.ForumObjects.Add(obj);
+            return obj;
+        }
+
+        private void OnSelectionChanged(PopupLib.UI.Windows.Interfaces.IListWindow window, int objectIndex)
+        {
+            if (_window == null || objectIndex < 0 || objectIndex >= _window.ForumObjects.Count) return;
+            if (_lastSelectedIndex != objectIndex)
+            {
+                _lastSelectedIndex = objectIndex;
+                return;
+            }
+
+        }
+
+        private void OnInternalShowInjectTitle(PopupLib.UI.Windows.Abstract.BaseWindow w)
+        {
+            var uiForward = GameObject.Find("UI/Forward");
+            var pnlBulletin = uiForward?.transform.Find("Tips/PnlBulletinNew");
+            var imgBase = pnlBulletin?.Find("ImgBase");
+            var txtTitleObj = pnlBulletin?.Find("TxtTittle");
+            if (imgBase == null || txtTitleObj == null) return;
+
+            var oldTitle = imgBase.Find("MDENTitle");
+            if (oldTitle != null) UnityEngine.Object.Destroy(oldTitle.gameObject);
+
+            var newTitle = GameObject.Instantiate(txtTitleObj.gameObject, imgBase);
+            newTitle.name = "MDENTitle";
+            newTitle.SetActive(true);
+
+            var loc = newTitle.GetComponent<Il2CppAssets.Scripts.PeroTools.GeneralLocalization.Localization>();
+            if (loc != null) UnityEngine.Object.Destroy(loc);
+
+            var text = newTitle.GetComponent<UnityEngine.UI.Text>();
+            if (text != null)
+            {
+                text.text = "歌曲列表";
+                text.alignment = TextAnchor.MiddleCenter;
+            }
+        }
+
+        public override void Close()
+        {
+            _lastSelectedIndex = -1;
+            if (_window != null)
+            {
+                _window.ForceClose();
+                _window = null;
+            }
+        }
+    }
+}

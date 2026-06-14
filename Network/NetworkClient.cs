@@ -22,6 +22,7 @@ namespace MDEN.Network
         private NetworkStream _stream;
         private bool _isConnected;
         private uint _nextReqId;
+        private CancellationTokenSource _heartbeatCts;
 
         public bool IsConnected => _isConnected;
 
@@ -37,6 +38,7 @@ namespace MDEN.Network
                 _stream = _tcpClient.GetStream();
                 _isConnected = true;
                 _ = ReceiveLoopAsync();
+                StartHeartbeat();
                 return true;
             }
             catch (Exception ex)
@@ -188,10 +190,47 @@ namespace MDEN.Network
         private void CleanupConnection()
         {
             _isConnected = false;
+            StopHeartbeat();
             try { _stream?.Close(); } catch { }
             try { _tcpClient?.Close(); } catch { }
             _stream = null;
             _tcpClient = null;
+        }
+
+        private void StartHeartbeat()
+        {
+            StopHeartbeat();
+            _heartbeatCts = new CancellationTokenSource();
+            _ = HeartbeatLoopAsync(_heartbeatCts.Token);
+        }
+
+        private void StopHeartbeat()
+        {
+            try { _heartbeatCts?.Cancel(); } catch { }
+            try { _heartbeatCts?.Dispose(); } catch { }
+            _heartbeatCts = null;
+        }
+
+        private async Task HeartbeatLoopAsync(CancellationToken cancellationToken)
+        {
+            while (!cancellationToken.IsCancellationRequested)
+            {
+                try
+                {
+                    await Task.Delay(15000, cancellationToken);
+                    if (!_isConnected || _stream == null) continue;
+
+                    await SendAsync(new ClientEnvelope { Op = OpCodes.Ping });
+                }
+                catch (OperationCanceledException)
+                {
+                    break;
+                }
+                catch (Exception ex)
+                {
+                    MelonLogger.Warning($"Heartbeat failed: {ex.Message}");
+                }
+            }
         }
 
         private void HandleResponse(ServerEnvelope envelope)

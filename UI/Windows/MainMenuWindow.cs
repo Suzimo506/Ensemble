@@ -149,7 +149,9 @@ namespace MDEN.UI.Windows
             else if (button == _btnLobbies)
             {
                 Close();
-                UIManager.OpenWindow(new ServerSelectionWindow());
+                UIManager.OpenWindow(LobbyManager.IsInLobby
+                    ? new RoomListWindow()
+                    : new ServerSelectionWindow());
             }
             else if (button == _btnSupportUs)
             {

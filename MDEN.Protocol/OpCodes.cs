@@ -41,6 +41,12 @@ namespace MDEN.Protocol
         public const ushort LobbyLockResp = 0x030D;
         public const ushort LobbyStopReq = 0x030E;
         public const ushort LobbyStopResp = 0x030F;
+        public const ushort LobbyTransferHostReq = 0x0310;
+        public const ushort LobbyTransferHostResp = 0x0311;
+        public const ushort LobbyMuteReq = 0x0312;
+        public const ushort LobbyMuteResp = 0x0313;
+        public const ushort LobbyBanChartSelectReq = 0x0314;
+        public const ushort LobbyBanChartSelectResp = 0x0315;
 
         // === 播放列表 (0x0400 ~ 0x04FF) ===
         public const ushort PlaylistAddReq = 0x0400;

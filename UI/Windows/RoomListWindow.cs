@@ -147,7 +147,9 @@ namespace MDEN.UI.Windows
             if (button == _btnBack)
             {
                 Close();
-                UIManager.OpenWindow(new ServerSelectionWindow());
+                UIManager.OpenWindow(LobbyManager.IsInLobby
+                    ? new MyRoomWindow()
+                    : new ServerSelectionWindow());
             }
             else if (button == _btnRefresh)
             {
@@ -167,7 +169,23 @@ namespace MDEN.UI.Windows
                 var lobbyIndex = objectIndex - 3;
                 if (lobbyIndex >= 0 && lobbyIndex < _lobbies.Length)
                 {
-                    await JoinLobbyAsync(_lobbies[lobbyIndex]);
+                    var selectedLobby = _lobbies[lobbyIndex];
+                    if (LobbyManager.IsInLobby && LobbyManager.CurrentLobby?.Id != selectedLobby.Id)
+                    {
+                        NativeConfirmDialog.Show(
+                            "切换房间",
+                            $"确认离开当前房间并加入「{selectedLobby.Name}」吗？",
+                            confirmed =>
+                            {
+                                if (confirmed)
+                                {
+                                    _ = JoinLobbyAsync(selectedLobby);
+                                }
+                            });
+                        return;
+                    }
+
+                    await JoinLobbyAsync(selectedLobby);
                 }
             }
         }

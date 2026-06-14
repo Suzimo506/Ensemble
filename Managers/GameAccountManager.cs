@@ -51,6 +51,35 @@ namespace MDEN.Managers
                 return null;
             }
         }
+
+        public static GameSelectionInfo GetCurrentSelection()
+        {
+            return new GameSelectionInfo(ReadSelectedRoleIndex(), ReadSelectedElfinIndex());
+        }
+
+        private static int ReadSelectedRoleIndex()
+        {
+            try
+            {
+                return DataHelper.selectedRoleIndex;
+            }
+            catch
+            {
+                return 0;
+            }
+        }
+
+        private static int ReadSelectedElfinIndex()
+        {
+            try
+            {
+                return DataHelper.selectedElfinIndex;
+            }
+            catch
+            {
+                return -1;
+            }
+        }
     }
 
     public readonly struct GameAccountInfo
@@ -63,5 +92,17 @@ namespace MDEN.Managers
 
         public string Uid { get; }
         public string Nickname { get; }
+    }
+
+    public readonly struct GameSelectionInfo
+    {
+        public GameSelectionInfo(int girlIndex, int elfinIndex)
+        {
+            GirlIndex = girlIndex;
+            ElfinIndex = elfinIndex;
+        }
+
+        public int GirlIndex { get; }
+        public int ElfinIndex { get; }
     }
 }

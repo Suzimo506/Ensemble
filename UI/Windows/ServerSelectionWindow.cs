@@ -132,6 +132,7 @@ namespace MDEN.UI.Windows
 
             _isRefreshingNodes = true;
             using var _ = UIManager.LockUI("Fetching server nodes...");
+            CloudSyncIndicator.Start("正在获取节点...");
 
             try
             {
@@ -174,6 +175,7 @@ namespace MDEN.UI.Windows
 
                 _officialServerData = servers;
                 _officialNodeDisplayData = displayData;
+                CloudSyncIndicator.Finish(true);
 
             }
             catch (Exception e)
@@ -181,6 +183,7 @@ namespace MDEN.UI.Windows
                 MelonLogger.Warning($"Fetch official nodes failed: {e.Message}");
                 _officialServerData = new List<ApiServerEntry>();
                 _officialNodeDisplayData = new List<Tuple<string, string>>();
+                CloudSyncIndicator.Finish(false);
             }
             finally
             {

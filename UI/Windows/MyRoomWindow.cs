@@ -11,7 +11,6 @@ namespace MDEN.UI.Windows
     public class MyRoomWindow : MDENWindowBase
     {
         private ForumWindow _window;
-        private ForumObject _btnBack;
         private ForumObject _btnLeave;
         private int _lastSelectedIndex = -1;
 
@@ -47,11 +46,7 @@ namespace MDEN.UI.Windows
                 ? "Not in lobby."
                 : $"房主: {lobby.HostName ?? lobby.HostUid}\n人数: {lobby.Players?.Length ?? 0}/{lobby.MaxPlayers}\n状态: {(lobby.IsPlaying ? "游戏中" : "等待中")}";
 
-            _btnBack = new ForumObject(new LocalString("返回"), new LocalString("关闭房间窗口"));
-            _btnBack.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("OptionsPanel.png")?.texture;
-            _window.ForumObjects.Add(_btnBack);
-
-            _btnLeave = new ForumObject(new LocalString("退出房间"), new LocalString("暂未接确认弹窗，后续接入"));
+            _btnLeave = new ForumObject(new LocalString("退出房间"), new LocalString("离开当前联机房间"));
             _btnLeave.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("HomePanel.png")?.texture;
             _window.ForumObjects.Add(_btnLeave);
 
@@ -59,13 +54,14 @@ namespace MDEN.UI.Windows
             info.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("RoomList.png")?.texture;
             _window.ForumObjects.Add(info);
 
-            if (lobby?.PlayerDetails != null)
+            if (lobby?.PlayerDetails != null && lobby.PlayerDetails.Length > 0)
             {
                 foreach (var player in lobby.PlayerDetails)
                 {
+                    var displayName = string.IsNullOrEmpty(player.Name) ? player.Uid : player.Name;
                     var name = player.Uid == lobby.HostUid
-                        ? $"<color=ff66cc>{player.Name}</color>"
-                        : player.Name;
+                        ? $"<color={Constants.ColorPink}>{displayName}</color>"
+                        : displayName;
                     var item = new ForumObject(new LocalString(name), new LocalString($"UID: {player.Uid}"));
                     item.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("PlayerCard.png")?.texture;
                     _window.ForumObjects.Add(item);
@@ -75,7 +71,10 @@ namespace MDEN.UI.Windows
             {
                 foreach (var uid in lobby.Players.Where(uid => !string.IsNullOrEmpty(uid)))
                 {
-                    var name = uid == lobby.HostUid ? $"<color=ff66cc>{uid}</color>" : uid;
+                    var displayName = uid == PlayerManager.CurrentUid && !string.IsNullOrEmpty(PlayerManager.CurrentProfile?.Name)
+                        ? PlayerManager.CurrentProfile.Name
+                        : uid;
+                    var name = uid == lobby.HostUid ? $"<color={Constants.ColorPink}>{displayName}</color>" : displayName;
                     var item = new ForumObject(new LocalString(name), new LocalString($"UID: {uid}"));
                     item.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("PlayerCard.png")?.texture;
                     _window.ForumObjects.Add(item);
@@ -83,7 +82,7 @@ namespace MDEN.UI.Windows
             }
         }
 
-        private void OnSelectionChanged(PopupLib.UI.Windows.Interfaces.IListWindow window, int objectIndex)
+        private async void OnSelectionChanged(PopupLib.UI.Windows.Interfaces.IListWindow window, int objectIndex)
         {
             if (_window == null || objectIndex < 0 || objectIndex >= _window.ForumObjects.Count) return;
 
@@ -94,13 +93,29 @@ namespace MDEN.UI.Windows
             }
 
             var button = _window.ForumObjects[objectIndex];
-            if (button == _btnBack)
+            if (button == _btnLeave)
             {
-                Close();
+                await LeaveLobbyAsync();
             }
-            else if (button == _btnLeave)
+        }
+
+        private async System.Threading.Tasks.Task LeaveLobbyAsync()
+        {
+            using var _ = UIManager.LockUI("Leaving lobby...");
+
+            try
             {
-                MelonLoader.MelonLogger.Msg("Leave lobby selected. Confirm dialog is not implemented yet.");
+                await LobbyManager.LeaveLobbyAsync();
+                MainThreadDispatcher.Enqueue(() =>
+                {
+                    Close();
+                    NavigationButton.RefreshRoomButton();
+                    UIManager.OpenWindow(new RoomListWindow());
+                });
+            }
+            catch (System.Exception ex)
+            {
+                MelonLoader.MelonLogger.Warning($"Leave lobby failed: {ex.Message}");
             }
         }
 

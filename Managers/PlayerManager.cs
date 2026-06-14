@@ -1,6 +1,7 @@
 using System.Threading.Tasks;
 using MDEN.Network;
 using MDEN.Protocol;
+using MDEN.Protocol.Enums;
 using MDEN.Protocol.Messages.Player;
 
 namespace MDEN.Managers
@@ -13,6 +14,17 @@ namespace MDEN.Managers
         public static void SetCurrentUid(string uid)
         {
             CurrentUid = uid;
+        }
+
+        public static void SetCurrentIdentity(string uid, string name)
+        {
+            CurrentUid = uid;
+            CurrentProfile = new GetPlayerResponse
+            {
+                Uid = uid,
+                Name = name,
+                Status = (byte)PlayerStatus.Online
+            };
         }
 
         public static void ClearSession()
@@ -30,6 +42,18 @@ namespace MDEN.Managers
                 new GetPlayerRequest { TargetUid = CurrentUid });
 
             return CurrentProfile;
+        }
+
+        public static Task SyncCurrentSelectionAsync()
+        {
+            var selection = GameAccountManager.GetCurrentSelection();
+            return UpdateMyProfileAsync(new UpdatePlayerRequest
+            {
+                GirlIndex = selection.GirlIndex,
+                ElfinIndex = selection.ElfinIndex,
+                FavGirlIndex = selection.GirlIndex,
+                FavElfinIndex = selection.ElfinIndex
+            });
         }
 
         public static async Task UpdateMyProfileAsync(UpdatePlayerRequest request)
@@ -96,6 +120,10 @@ namespace MDEN.Managers
             if (request.ChatColor != null) profile.ChatColor = request.ChatColor;
             if (request.EntranceMessage != null) profile.EntranceMessage = request.EntranceMessage;
             if (request.Title != null) profile.Title = request.Title;
+            if (request.GirlIndex.HasValue) profile.GirlIndex = request.GirlIndex.Value;
+            if (request.ElfinIndex.HasValue) profile.ElfinIndex = request.ElfinIndex.Value;
+            if (request.FavGirlIndex.HasValue) profile.FavGirlIndex = request.FavGirlIndex.Value;
+            if (request.FavElfinIndex.HasValue) profile.FavElfinIndex = request.FavElfinIndex.Value;
         }
     }
 }

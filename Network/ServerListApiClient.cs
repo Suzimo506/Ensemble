@@ -40,7 +40,7 @@ namespace MDEN.Network
 
         static ServerListApiClient()
         {
-            _httpClient.DefaultRequestHeaders.Add("User-Agent", "MuseDashEnsemble-Network/1.0");
+            _httpClient.DefaultRequestHeaders.Add("User-Agent", "MDEN-Network/1.0");
         }
 
         public static async Task<List<ApiServerEntry>> FetchOfficialServersAsync()

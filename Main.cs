@@ -17,6 +17,8 @@ namespace MDEN
             PushDispatcher.Instance.Init();
             ReconnectionManager.Instance.Init();
             LobbyManager.Init();
+            ChatManager.Init();
+            RoomHudController.Initialize();
             MelonLogger.Msg("Initialization complete.");
         }
 
@@ -28,7 +30,9 @@ namespace MDEN
                 ResourceManager.Initialize(bundlePath);
                 
                 // 增加场景加载时的注入时机，确保和原版模组一致
+                CloudSyncIndicator.Initialize();
                 NavigationButton.Create();
+                RoomHudController.Refresh();
             }
         }
 

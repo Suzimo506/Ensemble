@@ -3,6 +3,7 @@ using System.Threading.Tasks;
 using MDEN.Network;
 using MDEN.Protocol;
 using MDEN.Protocol.Messages.Auth;
+using MelonLoader;
 
 namespace MDEN.Managers
 {
@@ -38,10 +39,12 @@ namespace MDEN.Managers
                     IsReconnect = false
                 });
 
-            PlayerManager.SetCurrentUid(account.Uid);
+            PlayerManager.SetCurrentIdentity(account.Uid, account.Nickname);
             SessionToken = response.Token;
             IsLoggedIn = true;
             CurrentServerAddress = $"{endpoint.Host}:{endpoint.Port}";
+            _ = LoadCurrentProfileAsync();
+            _ = PlayerManager.SyncCurrentSelectionAsync();
             return response;
         }
 
@@ -86,6 +89,18 @@ namespace MDEN.Managers
             }
 
             return new ServerEndpoint(host, port);
+        }
+
+        private static async Task LoadCurrentProfileAsync()
+        {
+            try
+            {
+                await PlayerManager.GetMyProfileAsync();
+            }
+            catch (Exception ex)
+            {
+                MelonLogger.Warning($"Failed to load player profile: {ex.Message}");
+            }
         }
 
         private readonly struct ServerEndpoint

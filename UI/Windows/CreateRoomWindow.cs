@@ -75,7 +75,7 @@ namespace MDEN.UI.Windows
             _btnGoal.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("SocialNetwork.png")?.texture;
             _window.ForumObjects.Add(_btnGoal);
 
-            _btnCreate = new ForumObject(new LocalString("确认创建"), new LocalString(BuildSummary()));
+            _btnCreate = new ForumObject(new LocalString($"<color={Constants.ColorYellow}>确认创建</color>"), new LocalString(BuildSummary()));
             _btnCreate.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("RoomList.png")?.texture;
             _window.ForumObjects.Add(_btnCreate);
         }
@@ -213,7 +213,7 @@ namespace MDEN.UI.Windows
 
         private string BuildSummary()
         {
-            return $"名称: {_roomName}\n人数: {_maxPlayers}\n歌曲列表长度: {_playlistSize}\n获胜方式: {GetGoalName()}";
+            return $"名称: {_roomName}\n人数: <color={Constants.ColorYellow}>{_maxPlayers}</color>\n歌曲列表长度: {_playlistSize}\n获胜方式: {GetGoalName()}";
         }
 
         private string GetGoalName()
