@@ -11,7 +11,11 @@ namespace MDEN.UI.Displays
 {
     public sealed class RoomReadyDisplay
     {
+        private static readonly Vector2 VisiblePosition = new Vector2(-28f, -80f);
+        private static readonly Vector2 HiddenPosition = new Vector2(430f, -80f);
+
         private GameObject _root;
+        private RectTransform _rect;
         private Text _title;
         private Text _status;
         private Text _buttonText;
@@ -39,9 +43,25 @@ namespace MDEN.UI.Displays
             _button.enabled = !_busy && !lobby.IsPlaying;
         }
 
+        public void Update()
+        {
+            if (_root == null || _rect == null || !_root.activeSelf) return;
+
+            _rect.anchoredPosition = Vector2.Lerp(
+                _rect.anchoredPosition,
+                VisiblePosition,
+                Mathf.Clamp01(Time.unscaledDeltaTime * 9f));
+
+            if (Vector2.Distance(_rect.anchoredPosition, VisiblePosition) < 0.5f)
+            {
+                _rect.anchoredPosition = VisiblePosition;
+            }
+        }
+
         public void Destroy()
         {
             _busy = false;
+            _rect = null;
             _title = null;
             _status = null;
             _buttonText = null;
@@ -62,21 +82,41 @@ namespace MDEN.UI.Displays
             if (parent == null) return;
 
             _root = new GameObject("MDENRoomReadyDisplay");
-            var rect = _root.AddComponent<RectTransform>();
-            rect.SetParent(parent, false);
-            rect.localScale = Vector3.one;
-            rect.anchorMin = new Vector2(1f, 0.5f);
-            rect.anchorMax = new Vector2(1f, 0.5f);
-            rect.pivot = new Vector2(1f, 0.5f);
-            rect.anchoredPosition = new Vector2(-28f, -80f);
-            rect.sizeDelta = new Vector2(360f, 168f);
+            _rect = _root.AddComponent<RectTransform>();
+            _rect.SetParent(parent, false);
+            _rect.localScale = Vector3.one;
+            _rect.anchorMin = new Vector2(1f, 0.5f);
+            _rect.anchorMax = new Vector2(1f, 0.5f);
+            _rect.pivot = new Vector2(1f, 0.5f);
+            _rect.anchoredPosition = HiddenPosition;
+            _rect.sizeDelta = new Vector2(380f, 184f);
 
             var image = _root.AddComponent<Image>();
-            image.color = new Color(0.10f, 0.03f, 0.20f, 0.76f);
+            image.color = new Color(0.16f, 0.04f, 0.34f, 0.92f);
 
-            _title = CreateText(_root.transform, "Title", new Vector2(0f, 42f), new Vector2(320f, 54f), 22, TextAnchor.MiddleCenter);
-            _status = CreateText(_root.transform, "Status", new Vector2(0f, 4f), new Vector2(320f, 34f), 20, TextAnchor.MiddleCenter);
+            CreateAccent("TopAccent", new Vector2(0f, 88f), new Vector2(380f, 6f), new Color(0.98f, 0.22f, 0.92f, 1f));
+            CreateAccent("SideAccent", new Vector2(-186f, 0f), new Vector2(8f, 184f), new Color(0.34f, 0.88f, 1f, 0.9f));
+
+            _title = CreateText(_root.transform, "Title", new Vector2(8f, 44f), new Vector2(320f, 54f), 22, TextAnchor.MiddleCenter);
+            _status = CreateText(_root.transform, "Status", new Vector2(8f, 4f), new Vector2(320f, 34f), 20, TextAnchor.MiddleCenter);
             CreateButton();
+        }
+
+        private void CreateAccent(string name, Vector2 position, Vector2 size, Color color)
+        {
+            var obj = new GameObject(name);
+            var rect = obj.AddComponent<RectTransform>();
+            rect.SetParent(_root.transform, false);
+            rect.localScale = Vector3.one;
+            rect.anchorMin = new Vector2(0.5f, 0.5f);
+            rect.anchorMax = new Vector2(0.5f, 0.5f);
+            rect.pivot = new Vector2(0.5f, 0.5f);
+            rect.anchoredPosition = position;
+            rect.sizeDelta = size;
+
+            var image = obj.AddComponent<Image>();
+            image.color = color;
+            image.raycastTarget = false;
         }
 
         private Text CreateText(Transform parent, string name, Vector2 position, Vector2 size, int fontSize, TextAnchor anchor)
@@ -111,16 +151,16 @@ namespace MDEN.UI.Displays
             rect.anchorMin = new Vector2(0.5f, 0.5f);
             rect.anchorMax = new Vector2(0.5f, 0.5f);
             rect.pivot = new Vector2(0.5f, 0.5f);
-            rect.anchoredPosition = new Vector2(0f, -52f);
-            rect.sizeDelta = new Vector2(260f, 46f);
+            rect.anchoredPosition = new Vector2(8f, -56f);
+            rect.sizeDelta = new Vector2(270f, 48f);
 
             var image = obj.AddComponent<Image>();
-            image.color = new Color(1f, 0.92f, 0.08f, 0.92f);
+            image.color = new Color(0.92f, 0.18f, 0.95f, 0.96f);
 
             _button = obj.AddComponent<Button>();
             _button.onClick.AddListener((UnityAction)new Action(OnReadyClicked));
             _buttonText = CreateText(obj.transform, "ReadyText", Vector2.zero, new Vector2(250f, 42f), 22, TextAnchor.MiddleCenter);
-            _buttonText.color = new Color(0.18f, 0.04f, 0.34f, 1f);
+            _buttonText.color = Color.white;
         }
 
         private async void OnReadyClicked()

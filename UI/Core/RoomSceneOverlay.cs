@@ -15,6 +15,8 @@ namespace MDEN.UI.Core
         private static Text _status;
         private static Text _players;
 
+        public static bool IsCreated => _frame != null;
+
         private static readonly string[] HiddenObjectPaths =
         {
             "UI/Standerd/PnlHome/PnlBgSwitchFsv",

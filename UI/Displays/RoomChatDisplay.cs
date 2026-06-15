@@ -1,7 +1,9 @@
 using System.Collections.Generic;
 using System.Linq;
+using Il2CppAssets.Scripts.PeroTools.Commons;
 using MDEN.Managers;
 using MDEN.Protocol.Messages.Chat;
+using MDEN.UI.Core;
 using MelonLoader;
 using UnityEngine;
 using UnityEngine.Events;
@@ -16,8 +18,8 @@ namespace MDEN.UI.Displays
         private const float EntryHeight = 24f;
         private const float InputHeight = 38f;
         private const float Padding = 14f;
-        private static readonly Vector2 CollapsedSize = new Vector2(500f, 220f);
-        private static readonly Vector2 ExpandedSize = new Vector2(560f, 392f);
+        private static readonly Vector2 CollapsedSize = new Vector2(500f, 190f);
+        private static readonly Vector2 ExpandedSize = new Vector2(560f, 360f);
 
         private readonly List<ChatPushMsg> _messages = new List<ChatPushMsg>();
         private readonly List<Text> _messageTexts = new List<Text>();
@@ -32,8 +34,14 @@ namespace MDEN.UI.Displays
         private Text _inputText;
         private Text _placeholderText;
         private bool _lastFocusState;
+        private bool _lastInputBlocked;
+        private bool _suppressSubmit;
+        private bool _sendInProgress;
+        private int _suppressGameInputUntilFrame = -1;
 
         public bool IsCreated => _root != null;
+        public bool IsInputFocused => _inputField != null && _inputField.isFocused;
+        public bool IsConsumingInput => IsInputFocused || _sendInProgress || Time.frameCount <= _suppressGameInputUntilFrame;
 
         public void CreateEmpty()
         {
@@ -69,6 +77,11 @@ namespace MDEN.UI.Displays
             _inputText = null;
             _placeholderText = null;
             _lastFocusState = false;
+            _lastInputBlocked = false;
+            _suppressSubmit = false;
+            _sendInProgress = false;
+            _suppressGameInputUntilFrame = -1;
+            SetGameInputBlocked(false);
 
             if (_root != null)
             {
@@ -92,10 +105,10 @@ namespace MDEN.UI.Displays
             _rootRect = _root.AddComponent<RectTransform>();
             _rootRect.SetParent(parent, false);
             _rootRect.localScale = Vector3.one;
-            _rootRect.anchorMin = new Vector2(0f, 0f);
-            _rootRect.anchorMax = new Vector2(0f, 0f);
-            _rootRect.pivot = new Vector2(0f, 0f);
-            _rootRect.anchoredPosition = new Vector2(24f, 32f);
+            _rootRect.anchorMin = new Vector2(0f, 1f);
+            _rootRect.anchorMax = new Vector2(0f, 1f);
+            _rootRect.pivot = new Vector2(0f, 1f);
+            _rootRect.anchoredPosition = new Vector2(10f, -80f);
             _root.transform.SetAsLastSibling();
 
             _background = _root.AddComponent<Image>();
@@ -154,7 +167,10 @@ namespace MDEN.UI.Displays
             _inputField.lineType = InputField.LineType.SingleLine;
             _inputField.characterLimit = 120;
             _inputField.onEndEdit.AddListener((UnityAction<string>)OnSubmit);
-            _inputField.onValueChanged.AddListener((UnityAction<string>)(_ => RefreshLayout()));
+            _inputField.onValueChanged.AddListener((UnityAction<string>)(_ =>
+            {
+                if (RefreshLayout()) RedrawMessages();
+            }));
 
             var placeholderObj = UnityEngine.Object.Instantiate(_inputText.gameObject, _inputText.transform.parent);
             placeholderObj.name = "Placeholder";
@@ -191,7 +207,10 @@ namespace MDEN.UI.Displays
         {
             if (_root == null) return;
 
+            _messageTexts.RemoveAll(text => text == null);
             RefreshLayout();
+            if (_root == null || _contentRect == null) return;
+
             var visibleMessages = _messages
                 .Skip(System.Math.Max(0, _messages.Count - GetVisibleLimit()))
                 .ToArray();
@@ -199,6 +218,8 @@ namespace MDEN.UI.Displays
             EnsureMessageTextCount(visibleMessages.Length);
             for (var i = 0; i < _messageTexts.Count; i++)
             {
+                if (_messageTexts[i] == null) continue;
+
                 var active = i < visibleMessages.Length;
                 _messageTexts[i].gameObject.SetActive(active);
                 if (!active) continue;
@@ -212,6 +233,8 @@ namespace MDEN.UI.Displays
         {
             while (_messageTexts.Count < count)
             {
+                if (_contentRect == null) return;
+
                 var text = CreateText($"Message{_messageTexts.Count}", _contentRect, 18, TextAnchor.UpperLeft);
                 var rect = text.GetComponent<RectTransform>();
                 rect.anchorMin = new Vector2(0f, 1f);
@@ -224,10 +247,14 @@ namespace MDEN.UI.Displays
 
         private void PositionMessages(int count)
         {
+            if (_contentRect == null) return;
+
             var y = 0f;
             for (var i = 0; i < count; i++)
             {
                 var text = _messageTexts[i];
+                if (text == null) continue;
+
                 var rect = text.GetComponent<RectTransform>();
                 rect.anchoredPosition = new Vector2(0f, -y);
                 rect.sizeDelta = new Vector2(0f, EntryHeight);
@@ -237,20 +264,23 @@ namespace MDEN.UI.Displays
             _contentRect.sizeDelta = new Vector2(0f, System.Math.Max(y, GetViewportHeight()));
         }
 
-        private void RefreshLayout()
+        private bool RefreshLayout()
         {
-            if (_root == null) return;
+            if (_root == null || _rootRect == null || _background == null) return false;
 
             var focused = _inputField != null && _inputField.isFocused;
-            if (focused != _lastFocusState)
+            var focusChanged = focused != _lastFocusState;
+            var shouldBlockInput = IsConsumingInput;
+            _lastFocusState = focused;
+            if (shouldBlockInput || shouldBlockInput != _lastInputBlocked)
             {
-                _lastFocusState = focused;
-                RedrawMessages();
-                return;
+                _lastInputBlocked = shouldBlockInput;
+                SetGameInputBlocked(shouldBlockInput);
             }
 
             _rootRect.sizeDelta = focused ? ExpandedSize : CollapsedSize;
             _background.color = GetBackgroundColor(focused);
+            return focusChanged;
         }
 
         private void ScrollToBottom()
@@ -281,8 +311,8 @@ namespace MDEN.UI.Displays
 
         private static Transform FindChatParent()
         {
-            return GameObject.Find("UI/Standerd")?.transform
-                ?? GameObject.Find("UI/Standerd/PnlNavigation")?.transform
+            return GameObject.Find("UI/Standerd/PnlNavigation")?.transform
+                ?? GameObject.Find("UI/Standerd")?.transform
                 ?? GameObject.Find("UI")?.transform;
         }
 
@@ -313,24 +343,79 @@ namespace MDEN.UI.Displays
             return $"<color=#{Constants.ColorCyan}>【{author}】</color>: {message.Message}";
         }
 
-        private async void OnSubmit(string value)
+        private static void SetGameInputBlocked(bool blocked)
         {
-            RefreshLayout();
-            if (string.IsNullOrWhiteSpace(value)) return;
-
             try
             {
-                await ChatManager.SendAsync(value.Trim());
-                if (_inputField != null)
-                {
-                    _inputField.text = string.Empty;
-                    _inputField.DeactivateInputField();
-                }
+                var manager = Singleton<Il2CppAssets.Scripts.PeroTools.Managers.InputManager>.instance;
+                if (manager != null) manager.isStopKeyAction = blocked;
+            }
+            catch (System.Exception ex)
+            {
+                MelonLogger.Warning($"Set game input block failed: {ex.Message}");
+            }
+        }
+
+        public void Update()
+        {
+            if (_root == null) return;
+            if (RefreshLayout()) RedrawMessages();
+        }
+
+        private async void OnSubmit(string value)
+        {
+            if (_suppressSubmit || _sendInProgress) return;
+
+            _suppressGameInputUntilFrame = Time.frameCount + 2;
+            var message = SanitizeMessage(value);
+            if (string.IsNullOrEmpty(message))
+            {
+                RefreshLayout();
+                return;
+            }
+
+            _sendInProgress = true;
+            try
+            {
+                await ChatManager.SendAsync(message);
+                MainThreadDispatcher.Enqueue(ClearSubmittedInput);
             }
             catch (System.Exception ex)
             {
                 MelonLogger.Warning($"Send chat failed: {ex.Message}");
+                MainThreadDispatcher.Enqueue(FinishFailedSubmit);
             }
+        }
+
+        private void ClearSubmittedInput()
+        {
+            if (_inputField == null)
+            {
+                _sendInProgress = false;
+                SetGameInputBlocked(false);
+                return;
+            }
+
+            _suppressSubmit = true;
+            _inputField.text = string.Empty;
+            _inputField.DeactivateInputField();
+            _suppressSubmit = false;
+            _sendInProgress = false;
+            _suppressGameInputUntilFrame = Time.frameCount + 1;
+            RedrawMessages();
+        }
+
+        private void FinishFailedSubmit()
+        {
+            _sendInProgress = false;
+            RefreshLayout();
+        }
+
+        private static string SanitizeMessage(string value)
+        {
+            return string.IsNullOrWhiteSpace(value)
+                ? string.Empty
+                : value.Trim().Replace("\r", string.Empty).Replace("\n", string.Empty);
         }
     }
 }

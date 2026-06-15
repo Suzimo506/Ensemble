@@ -47,14 +47,14 @@ namespace MDEN.UI.Core
         private static readonly Vector3 RightPositionB = new Vector3(6.9f, -1.18f, 100f);
         private static readonly Vector3 LocalScale = new Vector3(0.82f, 0.82f, 0.82f);
         private static readonly Vector3 OtherScale = new Vector3(0.58f, 0.58f, 0.58f);
-        private static readonly Vector3 LocalTitlePosition = new Vector3(-3.8f, 3.18f, 100f);
-        private static readonly Vector3 LocalNamePosition = new Vector3(-3.8f, 2.86f, 100f);
-        private static readonly Vector3 RightTitlePositionA = new Vector3(2.6f, 2.46f, 100f);
-        private static readonly Vector3 RightNamePositionA = new Vector3(2.6f, 2.16f, 100f);
-        private static readonly Vector3 RightTitlePositionB = new Vector3(6.9f, 2.46f, 100f);
-        private static readonly Vector3 RightNamePositionB = new Vector3(6.9f, 2.16f, 100f);
+        private static readonly Vector3 LocalTitleOffset = new Vector3(0f, 4.02f, 0f);
+        private static readonly Vector3 LocalNameOffset = new Vector3(0f, 3.68f, 0f);
+        private static readonly Vector3 OtherTitleOffset = new Vector3(0f, 3.55f, 0f);
+        private static readonly Vector3 OtherNameOffset = new Vector3(0f, 3.24f, 0f);
         private static readonly Vector2 LocalLabelSize = new Vector2(420f, 58f);
         private static readonly Vector2 OtherLabelSize = new Vector2(360f, 52f);
+
+        public static bool IsCreated => _localSlot != null;
 
         public static void Refresh(LobbySyncPush lobby)
         {
@@ -179,7 +179,7 @@ namespace MDEN.UI.Core
 
             slot.transform.position = local ? LocalPosition : (slot == _rightSlotA ? RightPositionA : RightPositionB);
             slot.transform.localScale = local ? LocalScale : OtherScale;
-            ApplyLabels(slot, player);
+            ApplyLabels(slot, player, local);
 
             var girlIndex = local
                 ? GameAccountManager.GetCurrentSelection().GirlIndex
@@ -385,29 +385,26 @@ namespace MDEN.UI.Core
         private static void CreateLabels()
         {
             var parent = _originalMuseShow.transform.parent;
-            _localLabels = CreateSlotLabels(parent, "MDENRoomLocal", LocalTitlePosition, LocalNamePosition, LocalLabelSize, 24, 32);
-            _rightLabelsA = CreateSlotLabels(parent, "MDENRoomRightA", RightTitlePositionA, RightNamePositionA, OtherLabelSize, 20, 28);
-            _rightLabelsB = CreateSlotLabels(parent, "MDENRoomRightB", RightTitlePositionB, RightNamePositionB, OtherLabelSize, 20, 28);
+            _localLabels = CreateSlotLabels(parent, "MDENRoomLocal", LocalLabelSize, 24, 32);
+            _rightLabelsA = CreateSlotLabels(parent, "MDENRoomRightA", OtherLabelSize, 20, 28);
+            _rightLabelsB = CreateSlotLabels(parent, "MDENRoomRightB", OtherLabelSize, 20, 28);
         }
 
         private static SlotLabels CreateSlotLabels(
             Transform parent,
             string prefix,
-            Vector3 titlePosition,
-            Vector3 namePosition,
             Vector2 size,
             int titleFontSize,
             int nameFontSize)
         {
-            var titleText = CreateLabelText(parent, prefix + "Title", titlePosition, size, titleFontSize, false);
-            var nameText = CreateLabelText(parent, prefix + "Name", namePosition, size, nameFontSize, true);
+            var titleText = CreateLabelText(parent, prefix + "Title", size, titleFontSize, false);
+            var nameText = CreateLabelText(parent, prefix + "Name", size, nameFontSize, true);
             return new SlotLabels(titleText, nameText);
         }
 
         private static Text CreateLabelText(
             Transform parent,
             string name,
-            Vector3 position,
             Vector2 size,
             int fontSize,
             bool clickable)
@@ -415,7 +412,6 @@ namespace MDEN.UI.Core
             var obj = new GameObject(name);
             var rect = obj.AddComponent<RectTransform>();
             rect.SetParent(parent);
-            rect.position = position;
             rect.localScale = Vector3.one;
             rect.sizeDelta = size;
 
@@ -439,12 +435,15 @@ namespace MDEN.UI.Core
             return text;
         }
 
-        private static void ApplyLabels(GameObject slot, RoomCharacterPlayer player)
+        private static void ApplyLabels(GameObject slot, RoomCharacterPlayer player, bool local)
         {
             var labels = GetLabels(slot);
             if (labels == null) return;
 
             labels.SetVisible(true);
+            labels.SetPosition(
+                slot.transform.position + (local ? LocalTitleOffset : OtherTitleOffset),
+                slot.transform.position + (local ? LocalNameOffset : OtherNameOffset));
             labels.Title.text = FormatTitle(player.Title);
             labels.Name.text = FormatName(player.Name);
 
@@ -470,15 +469,15 @@ namespace MDEN.UI.Core
         private static string FormatTitle(string title)
         {
             return string.IsNullOrWhiteSpace(title)
-                ? "<color=#ffffff66>　</color>"
+                ? "<color=#ffffff88>[无头衔]</color>"
                 : $"<color=#{Constants.ColorYellow}>[{EscapeRichText(title)}]</color>";
         }
 
         private static string FormatName(string name)
         {
             return string.IsNullOrWhiteSpace(name)
-                ? "<color=#ffffffff>Unknown</color>"
-                : $"<color=#ffffffff>{EscapeRichText(name)}</color>";
+                ? $"<b><color=#{Constants.ColorPink}>Unknown</color></b>"
+                : $"<b><color=#{Constants.ColorPink}>{EscapeRichText(name)}</color></b>";
         }
 
         private static string EscapeRichText(string value)
@@ -677,6 +676,12 @@ namespace MDEN.UI.Core
             {
                 if (Title != null) Title.gameObject.SetActive(visible);
                 if (Name != null) Name.gameObject.SetActive(visible);
+            }
+
+            public void SetPosition(Vector3 titlePosition, Vector3 namePosition)
+            {
+                if (Title != null) Title.transform.position = titlePosition;
+                if (Name != null) Name.transform.position = namePosition;
             }
 
             public void Destroy()

@@ -53,6 +53,24 @@ namespace MDEN.UI.Core
             Refresh(0);
         }
 
+        public static void RequestRefresh()
+        {
+            var generation = ++_pendingRetryGeneration;
+            MainThreadDispatcher.Enqueue(() =>
+            {
+                if (generation != _pendingRetryGeneration) return;
+                Refresh();
+            });
+        }
+
+        public static void Update()
+        {
+            Chat.Update();
+            ReadyDisplay.Update();
+        }
+
+        public static bool IsChatConsumingInput => Chat.IsConsumingInput;
+
         private static void Refresh(int retryCount)
         {
             if (!LobbyManager.IsInLobby)
@@ -67,7 +85,7 @@ namespace MDEN.UI.Core
             RoomSceneOverlay.Refresh(LobbyManager.CurrentLobby);
             RoomCharacterDisplay.Refresh(LobbyManager.CurrentLobby);
 
-            if (!Chat.IsCreated && retryCount < MaxRefreshRetries)
+            if (NeedsRefreshRetry() && retryCount < MaxRefreshRetries)
             {
                 var generation = ++_pendingRetryGeneration;
                 MainThreadDispatcher.Enqueue(() =>
@@ -76,6 +94,11 @@ namespace MDEN.UI.Core
                     Refresh(retryCount + 1);
                 });
             }
+        }
+
+        private static bool NeedsRefreshRetry()
+        {
+            return !Chat.IsCreated || !RoomSceneOverlay.IsCreated || !RoomCharacterDisplay.IsCreated;
         }
 
         public static void Destroy()

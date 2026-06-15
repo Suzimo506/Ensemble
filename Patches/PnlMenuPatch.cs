@@ -14,6 +14,7 @@ namespace MDEN.Patches
             try
             {
                 NavigationButton.Create();
+                RoomHudController.RequestRefresh();
             }
             catch (Exception ex)
             {

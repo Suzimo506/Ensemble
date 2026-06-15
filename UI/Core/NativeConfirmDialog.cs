@@ -1,7 +1,5 @@
 using System;
-using LocalizeLib;
-using PopupLib.UI.Windows;
-using PopupLib.UI.Windows.Abstract;
+using Il2CppUI.Controls;
 
 namespace MDEN.UI.Core
 {
@@ -9,17 +7,11 @@ namespace MDEN.UI.Core
     {
         public static void Show(string title, string message, Action<bool> onCompleted)
         {
-            var prompt = new PromptWindow(new LocalString(message), new LocalString(title));
-            prompt.AutoReset = true;
-
-            void Completion(BaseWindow _)
-            {
-                prompt.OnCompletion -= Completion;
-                onCompleted?.Invoke(prompt.Result == true);
-            }
-
-            prompt.OnCompletion += Completion;
-            prompt.Show();
+            var body = string.IsNullOrWhiteSpace(title) ? message : $"{title}\n{message}";
+            CommonMessageBox.ShowConfrimAndCancel(
+                body,
+                new Action(() => onCompleted?.Invoke(true)),
+                new Action(() => onCompleted?.Invoke(false)));
         }
     }
 }

@@ -34,12 +34,14 @@ namespace MDEN
                 CloudSyncIndicator.Initialize();
                 NavigationButton.Create();
                 RoomHudController.Refresh();
+                RoomHudController.RequestRefresh();
             }
         }
 
         public override void OnUpdate()
         {
             MainThreadDispatcher.ProcessQueue();
+            RoomHudController.Update();
         }
 
         public override void OnDeinitializeMelon()

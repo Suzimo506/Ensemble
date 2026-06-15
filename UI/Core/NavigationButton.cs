@@ -20,7 +20,11 @@ namespace MDEN.UI.Core
         // 绑定到原生 UI 生命周期中调用
         public static void Create()
         {
-            if (_multiplayerBtn != null) return;
+            if (_multiplayerBtn != null)
+            {
+                RefreshRoomButton();
+                return;
+            }
 
             var btnOptionObj = GameObject.Find("UI/Standerd/PnlNavigation/Top/BtnOption");
             if (btnOptionObj == null)
@@ -89,6 +93,9 @@ namespace MDEN.UI.Core
         {
             if (_multiplayerBtn == null)
             {
+                _myRoomBtn = null;
+                _playlistBtn = null;
+                _startBtn = null;
                 return;
             }
 
@@ -166,8 +173,26 @@ namespace MDEN.UI.Core
                         return;
                     }
 
-                    UIManager.OpenWindow(new RoomReadyWindow());
+                    NativeConfirmDialog.Show("开始游戏", "确认开始多人准备吗？", confirmed =>
+                    {
+                        if (!confirmed) return;
+                        _ = StartPrepareAsync();
+                    });
                 });
+            }
+        }
+
+        private static async System.Threading.Tasks.Task StartPrepareAsync()
+        {
+            using var _ = UIManager.LockUI("Starting lobby...");
+
+            try
+            {
+                await PlaylistManager.StartPrepareAsync();
+            }
+            catch (Exception ex)
+            {
+                MelonLogger.Warning($"Start lobby prepare failed: {ex.Message}");
             }
         }
 

@@ -37,6 +37,8 @@ namespace MDEN.UI.Core
         public static bool ShouldBlockNativeBattleStart()
         {
             if (!LobbyManager.IsInLobby) return false;
+            if (RoomHudController.IsChatConsumingInput) return true;
+
             OnClick();
             return true;
         }
