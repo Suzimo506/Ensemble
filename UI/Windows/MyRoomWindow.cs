@@ -106,8 +106,11 @@ namespace MDEN.UI.Windows
             try
             {
                 await LobbyManager.LeaveLobbyAsync();
+                if (IsDisposed) return;
+
                 MainThreadDispatcher.Enqueue(() =>
                 {
+                    if (IsDisposed) return;
                     Close();
                     NavigationButton.RefreshRoomButton();
                     UIManager.OpenWindow(new RoomListWindow());

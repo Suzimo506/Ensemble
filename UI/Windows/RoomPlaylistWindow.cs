@@ -76,8 +76,11 @@ namespace MDEN.UI.Windows
             try
             {
                 await PlaylistManager.RemoveAsync(_items[objectIndex].Entry);
+                if (IsDisposed) return;
+
                 MainThreadDispatcher.Enqueue(() =>
                 {
+                    if (IsDisposed) return;
                     ShowText.ShowInfo("成功移除歌曲列表");
                     RebuildWindow();
                 });
@@ -85,6 +88,7 @@ namespace MDEN.UI.Windows
             catch (System.Exception ex)
             {
                 MelonLogger.Warning($"Remove playlist entry failed: {ex.Message}");
+                MainThreadDispatcher.Enqueue(() => ShowText.ShowInfo(ex.Message));
             }
         }
 

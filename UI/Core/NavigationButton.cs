@@ -5,6 +5,7 @@ using UnityEngine.UI;
 using UnityEngine.Events;
 using MDEN.Managers;
 using MDEN.UI.Windows;
+using Il2CppAssets.Scripts.UI.Controls;
 
 namespace MDEN.UI.Core
 {
@@ -22,6 +23,14 @@ namespace MDEN.UI.Core
         {
             if (_multiplayerBtn != null)
             {
+                RefreshRoomButton();
+                return;
+            }
+
+            var existing = GameObject.Find("UI/Standerd/PnlNavigation/Top/BtnMDENMultiplayer");
+            if (existing != null)
+            {
+                _multiplayerBtn = existing;
                 RefreshRoomButton();
                 return;
             }
@@ -193,6 +202,7 @@ namespace MDEN.UI.Core
             catch (Exception ex)
             {
                 MelonLogger.Warning($"Start lobby prepare failed: {ex.Message}");
+                MainThreadDispatcher.Enqueue(() => ShowText.ShowInfo(ex.Message));
             }
         }
 
@@ -273,6 +283,14 @@ namespace MDEN.UI.Core
                 GameObject.Destroy(_startBtn);
                 _startBtn = null;
             }
+        }
+
+        public static void ResetSceneObjects()
+        {
+            _multiplayerBtn = null;
+            _myRoomBtn = null;
+            _playlistBtn = null;
+            _startBtn = null;
         }
     }
 }

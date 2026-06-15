@@ -16,6 +16,8 @@ namespace MDEN.Managers
         public static async Task<LoginResponse> ConnectAndLoginAsync(string address)
         {
             var endpoint = ParseAddress(address);
+            var account = GameAccountManager.GetCurrentAccount();
+            var selection = GameAccountManager.GetCurrentSelection();
 
             if (NetworkClient.Instance.IsConnected)
             {
@@ -27,8 +29,6 @@ namespace MDEN.Managers
             {
                 throw new InvalidOperationException("Failed to connect to server.");
             }
-
-            var account = GameAccountManager.GetCurrentAccount();
 
             var response = await NetworkClient.Instance.SendRequestAsync<LoginRequest, LoginResponse>(
                 OpCodes.LoginReq,
@@ -44,7 +44,8 @@ namespace MDEN.Managers
             IsLoggedIn = true;
             CurrentServerAddress = $"{endpoint.Host}:{endpoint.Port}";
             _ = LoadCurrentProfileAsync();
-            _ = PlayerManager.SyncCurrentSelectionAsync();
+            PlayerManager.SyncSelectionFireAndForget(selection);
+            PlayerManager.SyncChartStateFireAndForget();
             return response;
         }
 

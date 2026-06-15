@@ -11,11 +11,13 @@ namespace MDEN.Managers
     {
         private static AssetBundle _uiBundle;
         private static readonly Dictionary<string, Sprite> _spriteCache = new Dictionary<string, Sprite>();
+        private static bool _bundleMissingWarningShown;
 
         // 初始化加载 AssetBundle 或者散装资源目录
         public static void Initialize(string bundlePath)
         {
-            // 如果存在 bundle 则加载 bundle
+            if (_uiBundle != null) return;
+
             if (File.Exists(bundlePath))
             {
                 try
@@ -30,7 +32,11 @@ namespace MDEN.Managers
             }
             else
             {
-                MelonLogger.Warning($"AssetBundle not found at: {bundlePath}, will attempt to load loose Assets.");
+                if (!_bundleMissingWarningShown)
+                {
+                    _bundleMissingWarningShown = true;
+                    MelonLogger.Warning($"AssetBundle not found at: {bundlePath}, will attempt to load loose Assets.");
+                }
             }
         }
 
@@ -39,20 +45,34 @@ namespace MDEN.Managers
         {
             if (_spriteCache.TryGetValue(name, out var cached))
             {
-                return cached;
+                if (TryGetTexture(cached, out _))
+                {
+                    return cached;
+                }
+
+                _spriteCache.Remove(name);
             }
 
-            // 1. 尝试从 Bundle 加载
             if (_uiBundle != null)
             {
-                var obj = _uiBundle.LoadAsset(name);
-                if (obj != null)
+                try
                 {
-                    var tex = obj.Cast<Texture2D>();
-                    var sprite = Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), new Vector2(0.5f, 0.5f));
-                    _spriteCache[name] = sprite;
-                    MelonLogger.Msg($"Successfully loaded texture from bundle: {name}");
-                    return sprite;
+                    var obj = _uiBundle.LoadAsset(name);
+                    if (obj != null)
+                    {
+                        var tex = obj.Cast<Texture2D>();
+                        if (tex != null)
+                        {
+                            var sprite = Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), new Vector2(0.5f, 0.5f));
+                            _spriteCache[name] = sprite;
+                            MelonLogger.Msg($"Successfully loaded texture from bundle: {name}");
+                            return sprite;
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    MelonLogger.Warning($"Failed to load bundle texture {name}: {ex.Message}");
                 }
             }
 
@@ -130,6 +150,12 @@ namespace MDEN.Managers
             return fallback;
         }
 
+        public static Texture2D GetTexture(string name)
+        {
+            var sprite = GetSprite(name);
+            return TryGetTexture(sprite, out var texture) ? texture : null;
+        }
+
         // 生成紫黑色错误提示图
         private static Sprite CreateFallbackSprite()
         {
@@ -172,9 +198,26 @@ namespace MDEN.Managers
             if (_randomBannerResourceNames != null && _randomBannerResourceNames.Count > 0)
             {
                 int index = UnityEngine.Random.Range(0, _randomBannerResourceNames.Count);
-                return GetSprite(_randomBannerResourceNames[index])?.texture;
+                return GetTexture(_randomBannerResourceNames[index]);
             }
             return null;
+        }
+
+        private static bool TryGetTexture(Sprite sprite, out Texture2D texture)
+        {
+            texture = null;
+            if (sprite == null) return false;
+
+            try
+            {
+                texture = sprite.texture;
+                return texture != null;
+            }
+            catch (Exception ex)
+            {
+                MelonLogger.Warning($"Invalid sprite texture skipped: {ex.Message}");
+                return false;
+            }
         }
     }
 }

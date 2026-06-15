@@ -1,5 +1,6 @@
 using System.Linq;
 using System.Threading.Tasks;
+using Il2CppAssets.Scripts.Database;
 using MDEN.Network;
 using MDEN.Protocol;
 using MDEN.Protocol.Enums;
@@ -19,6 +20,8 @@ namespace MDEN.Managers
         private const int AddSuccess = 0;
         private const int AddHidden = 2;
         private const int AddNotSynced = 3;
+        private const int LockSuccess = 0;
+        private const int LockNotSynced = 5;
 
         public static bool CanChangePlaylist
         {
@@ -26,8 +29,7 @@ namespace MDEN.Managers
             {
                 var lobby = LobbyManager.CurrentLobby;
                 if (lobby == null || lobby.Locked || lobby.IsPlaying) return false;
-                if (lobby.HostUid == PlayerManager.CurrentUid) return true;
-                return lobby.ChartSelection == (byte)LobbyChartSelection.Playlist;
+                return true;
             }
         }
 
@@ -57,6 +59,32 @@ namespace MDEN.Managers
                 .Select(ChartManager.ParseEntry)
                 .Where(item => item != null)
                 .ToArray();
+        }
+
+        public static PlaylistEntryViewModel GetCurrentPlaylistEntry()
+        {
+            var lobby = LobbyManager.CurrentLobby;
+            if (!string.IsNullOrWhiteSpace(lobby?.CurrentBattleEntry))
+            {
+                return ChartManager.ParseEntry(lobby.CurrentBattleEntry);
+            }
+
+            var playlist = lobby?.Playlist;
+            if (playlist == null || playlist.Length == 0) return null;
+
+            var index = lobby.CurrentPlaylistEntry < playlist.Length ? lobby.CurrentPlaylistEntry : 0;
+            return ChartManager.ParseEntry(playlist[index]);
+        }
+
+        public static MusicInfo GetCurrentPlaylistMusicInfo()
+        {
+            var entry = GetCurrentPlaylistEntry();
+            return entry == null ? null : ChartManager.GetMusicInfo(entry.ChartKey);
+        }
+
+        public static bool IsPlaylistBattleActive()
+        {
+            return LobbyManager.CurrentLobby?.IsPlaying == true && GetCurrentPlaylistEntry() != null;
         }
 
         public static string GetPreparationButtonText()
@@ -97,7 +125,7 @@ namespace MDEN.Managers
         public static async Task AddAsync(string entry)
         {
             EnsureReady();
-            await PlayerManager.SyncCustomChartsAsync();
+            await PlayerManager.SyncChartStateAsync();
             var response = await NetworkClient.Instance.SendRequestAsync<PlaylistAddRequest, PlaylistAddResponse>(
                 OpCodes.PlaylistAddReq,
                 new PlaylistAddRequest { Entry = entry });
@@ -107,12 +135,12 @@ namespace MDEN.Managers
 
             if (result == AddHidden)
             {
-                throw new System.InvalidOperationException("有人隐藏了此谱面。");
+                throw new System.InvalidOperationException("有人隐藏了该谱面");
             }
 
             if (result == AddNotSynced)
             {
-                throw new System.InvalidOperationException("有人没有此自制谱面。");
+                throw new System.InvalidOperationException("有人未下载该谱面");
             }
 
             throw new System.InvalidOperationException($"添加歌曲失败，错误码 {result}。");
@@ -130,11 +158,23 @@ namespace MDEN.Managers
         public static async Task StartPrepareAsync()
         {
             EnsureReady();
+            await PlayerManager.SyncChartStateAsync();
+
             var response = await NetworkClient.Instance.SendRequestAsync<LobbyLockRequest, LobbyLockResponse>(
                 OpCodes.LobbyLockReq,
                 new LobbyLockRequest { Locked = true });
 
-            if (response != null && response.Result != 0)
+            if (response == null || response.Result == LockSuccess)
+            {
+                return;
+            }
+
+            if (response.Result == LockNotSynced)
+            {
+                throw new System.InvalidOperationException("有人未下载该谱面");
+            }
+
+            if (response.Result != LockSuccess)
             {
                 throw new System.InvalidOperationException($"开始准备失败，错误码 {response.Result}。");
             }
@@ -154,6 +194,14 @@ namespace MDEN.Managers
             await NetworkClient.Instance.SendRequestAsync<PlaylistContinueRequest, PlaylistContinueResponse>(
                 OpCodes.PlaylistContinueReq,
                 new PlaylistContinueRequest());
+        }
+
+        public static async Task StopLobbyAsync()
+        {
+            EnsureReady();
+            await NetworkClient.Instance.SendRequestAsync<LobbyStopRequest, LobbyStopResponse>(
+                OpCodes.LobbyStopReq,
+                new LobbyStopRequest());
         }
 
         public static bool IsLocalPlayerReady()

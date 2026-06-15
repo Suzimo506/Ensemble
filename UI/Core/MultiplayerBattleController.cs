@@ -1,9 +1,11 @@
 using Il2Cpp;
 using Il2CppArcadeController.UI.Panel.PnlHome;
 using Il2CppAssets.Scripts.Database;
+using Il2CppAssets.Scripts.PeroTools.Commons;
 using Il2CppAssets.Scripts.UI.Panels;
-using CustomAlbums.Managers;
 using MelonLoader;
+using System.Linq;
+using System.Reflection;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -12,7 +14,7 @@ namespace MDEN.UI.Core
     public static class MultiplayerBattleController
     {
         private static int _startedLobbyId;
-        private static ushort _startedPlaylistIndex;
+        private static string _startedBattleEntry;
 
         public static void OnLobbyChanged()
         {
@@ -24,24 +26,31 @@ namespace MDEN.UI.Core
                 return;
             }
 
-            if (lobby.Playlist == null || lobby.Playlist.Length == 0) return;
-            if (_startedLobbyId == lobby.Id && _startedPlaylistIndex == lobby.CurrentPlaylistEntry) return;
+            if (lobby.ReadyPlayers == null ||
+                System.Array.IndexOf(lobby.ReadyPlayers, Managers.PlayerManager.CurrentUid) < 0)
+            {
+                return;
+            }
+
+            var battleEntry = !string.IsNullOrWhiteSpace(lobby.CurrentBattleEntry)
+                ? lobby.CurrentBattleEntry
+                : (lobby.Playlist != null && lobby.Playlist.Length > 0 ? lobby.Playlist[0] : null);
+            if (string.IsNullOrWhiteSpace(battleEntry)) return;
+            if (_startedLobbyId == lobby.Id && _startedBattleEntry == battleEntry) return;
 
             _startedLobbyId = lobby.Id;
-            _startedPlaylistIndex = lobby.CurrentPlaylistEntry;
-            StartCurrentPlaylistEntry();
+            _startedBattleEntry = battleEntry;
+            StartCurrentPlaylistEntry(battleEntry);
         }
 
         public static void Reset()
         {
             _startedLobbyId = 0;
-            _startedPlaylistIndex = 0;
+            _startedBattleEntry = null;
         }
 
-        private static void StartCurrentPlaylistEntry()
+        private static void StartCurrentPlaylistEntry(string entryText)
         {
-            var lobby = Managers.LobbyManager.CurrentLobby;
-            var entryText = lobby?.Playlist?[0];
             var entry = Managers.ChartManager.ParseEntry(entryText);
             if (entry == null)
             {
@@ -49,7 +58,7 @@ namespace MDEN.UI.Core
                 return;
             }
 
-            var musicInfo = GetMusicInfo(entry.ChartKey);
+            var musicInfo = Managers.ChartManager.GetMusicInfo(entry.ChartKey);
             if (musicInfo == null)
             {
                 MelonLogger.Warning($"Cannot start multiplayer battle: chart {entry.ChartKey} not found locally.");
@@ -57,39 +66,65 @@ namespace MDEN.UI.Core
             }
 
             JumpToChart(musicInfo.uid);
+            SyncHiddenDifficulty(musicInfo, entry.Difficulty);
             GlobalDataBase.dbMusicTag.selectedDiffTglIndex = entry.Difficulty == 4 ? 3 : entry.Difficulty;
             GlobalDataBase.dbMusicTag.pnlSelectMusicUid = musicInfo.uid;
             GlobalDataBase.dbMusicTag.m_CurSelectedMusicInfo = musicInfo;
             BattleHelper.GameBattleStart(new Il2CppSystem.Object());
         }
 
-        private static MusicInfo GetMusicInfo(string chartKey)
+        private static void SyncHiddenDifficulty(MusicInfo musicInfo, int difficulty)
         {
-            if (string.IsNullOrEmpty(chartKey)) return null;
-            if (chartKey.Length >= 16 && !chartKey.StartsWith($"{AlbumManager.Uid}-"))
+            if (musicInfo == null) return;
+
+            var specialSongManager = Singleton<SpecialSongManager>.instance;
+            if (specialSongManager == null) return;
+
+            var checkUid = Managers.ChartManager.GetHiddenCheckUid(musicInfo);
+            if (string.IsNullOrEmpty(checkUid)) return;
+
+            var hiddenUnlocked = specialSongManager.IsInvokeHideBms(checkUid);
+
+            if (difficulty == 4 && !hiddenUnlocked)
             {
-                foreach (var pair in AlbumManager.LoadedAlbums)
+                specialSongManager.InvokeHideBms(musicInfo, true);
+                ActivateCustomAlbumHiddenIfNeeded(musicInfo, checkUid, specialSongManager);
+            }
+            else if (difficulty == 3 && hiddenUnlocked)
+            {
+                if (specialSongManager.m_IsInvokeHideDic.ContainsKey(checkUid))
                 {
-                    var album = pair.Value;
-                    var sheet = GetPreferredSheet(album);
-                    if (sheet != null && sheet.Md5 == chartKey)
-                    {
-                        return GlobalDataBase.dbMusicTag.GetMusicInfoFromAll(album.Uid);
-                    }
+                    specialSongManager.m_IsInvokeHideDic.Remove(checkUid);
                 }
             }
-
-            return GlobalDataBase.dbMusicTag.GetMusicInfoFromAll(chartKey);
         }
 
-        private static CustomAlbums.Data.Sheet GetPreferredSheet(CustomAlbums.Data.Album album)
+        private static void ActivateCustomAlbumHiddenIfNeeded(
+            MusicInfo musicInfo,
+            string checkUid,
+            SpecialSongManager specialSongManager)
         {
-            if (album == null) return null;
-            if (album.Sheets.TryGetValue(2, out var sheet)) return sheet;
-            if (album.Sheets.TryGetValue(3, out sheet)) return sheet;
-            if (album.Sheets.TryGetValue(1, out sheet)) return sheet;
-            if (album.Sheets.TryGetValue(0, out sheet)) return sheet;
-            return null;
+            if (musicInfo == null || !musicInfo.uid.StartsWith("999-")) return;
+
+            try
+            {
+                var customAlbumsAssembly = System.AppDomain.CurrentDomain
+                    .GetAssemblies()
+                    .FirstOrDefault(assembly => assembly.GetName().Name == "CustomAlbums");
+                var patchType = customAlbumsAssembly?.GetType("CustomAlbums.Patches.HiddenSupportPatch+InvokeHideBmsPatch");
+                var activateHiddenMethod = patchType?.GetMethod(
+                    "ActivateHidden",
+                    BindingFlags.NonPublic | BindingFlags.Static);
+
+                if (activateHiddenMethod == null || !specialSongManager.m_HideBmsInfos.ContainsKey(checkUid)) return;
+
+                var hideBmsInfo = specialSongManager.m_HideBmsInfos[checkUid];
+                activateHiddenMethod.Invoke(null, new object[] { hideBmsInfo });
+                specialSongManager.m_IsInvokeHideDic[checkUid] = true;
+            }
+            catch
+            {
+            }
         }
 
         private static void JumpToChart(string uid)
@@ -125,3 +160,4 @@ namespace MDEN.UI.Core
         }
     }
 }
+

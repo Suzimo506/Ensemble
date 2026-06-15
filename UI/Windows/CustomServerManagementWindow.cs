@@ -143,10 +143,14 @@ namespace MDEN.UI.Windows
 
             try
             {
+                GameAccountManager.RefreshSnapshot();
                 var response = await ConnectionManager.ConnectAndLoginAsync(address);
+                if (IsDisposed) return;
+
                 MelonLogger.Msg($"Connected to {address}, server version: {response.Version}");
                 MainThreadDispatcher.Enqueue(() =>
                 {
+                    if (IsDisposed) return;
                     Close();
                     UIManager.OpenWindow(new RoomListWindow());
                 });

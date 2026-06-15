@@ -134,10 +134,10 @@ namespace MDEN.UI.Windows
 
         private string BuildDetails()
         {
-            return $"<color=#{Constants.ColorYellow}>头衔</color>\n{EscapeRichText(GetDisplayTitle())}\n\n" +
-                $"<color=#{Constants.ColorYellow}>UID</color>\n{EscapeRichText(_player.Uid)}\n\n" +
-                $"<color=#{Constants.ColorYellow}>状态</color>\n{GetStatusText(_player.Status)}\n\n" +
-                $"<color=#{Constants.ColorYellow}>临时资料</color>\n这里先显示占位内容，后续接入详细资料。";
+            return $"头衔\n{EscapeRichText(GetDisplayTitle())}\n\n" +
+                $"UID\n{EscapeRichText(_player.Uid)}\n\n" +
+                $"状态\n{GetStatusText(_player.Status)}\n\n" +
+                $"临时资料\n这里先显示占位内容，后续接入详细资料。";
         }
 
         private string GetDisplayName()

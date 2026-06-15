@@ -5,27 +5,49 @@ namespace MDEN.Managers
 {
     public static class GameAccountManager
     {
-        public static GameAccountInfo GetCurrentAccount()
+        private static GameAccountInfo _cachedAccount;
+        private static GameSelectionInfo _cachedSelection = new GameSelectionInfo(0, -1);
+        private static bool _hasCachedAccount;
+
+        public static void RefreshSnapshot()
         {
             var uid = ReadPeroUid();
-            if (string.IsNullOrWhiteSpace(uid))
+            var nickname = ReadNickname();
+
+            if (!string.IsNullOrWhiteSpace(uid))
+            {
+                if (string.IsNullOrWhiteSpace(nickname))
+                {
+                    ModConfigManager.LoadConfig();
+                    nickname = ModConfigManager.PlayerName;
+                }
+
+                if (string.IsNullOrWhiteSpace(nickname))
+                {
+                    nickname = $"Player{uid.Substring(0, Math.Min(6, uid.Length))}";
+                }
+
+                _cachedAccount = new GameAccountInfo(uid, nickname);
+                _hasCachedAccount = true;
+            }
+
+            _cachedSelection = new GameSelectionInfo(ReadSelectedRoleIndex(), ReadSelectedElfinIndex());
+        }
+
+        public static GameSelectionInfo RefreshSelectionSnapshot()
+        {
+            _cachedSelection = new GameSelectionInfo(ReadSelectedRoleIndex(), ReadSelectedElfinIndex());
+            return _cachedSelection;
+        }
+
+        public static GameAccountInfo GetCurrentAccount()
+        {
+            if (!_hasCachedAccount || string.IsNullOrWhiteSpace(_cachedAccount.Uid))
             {
                 throw new InvalidOperationException("PeroUid is not available. Please log in to the game account first.");
             }
 
-            var nickname = ReadNickname();
-            if (string.IsNullOrWhiteSpace(nickname))
-            {
-                ModConfigManager.LoadConfig();
-                nickname = ModConfigManager.PlayerName;
-            }
-
-            if (string.IsNullOrWhiteSpace(nickname))
-            {
-                nickname = $"Player{uid.Substring(0, Math.Min(6, uid.Length))}";
-            }
-
-            return new GameAccountInfo(uid, nickname);
+            return _cachedAccount;
         }
 
         private static string ReadPeroUid()
@@ -54,7 +76,7 @@ namespace MDEN.Managers
 
         public static GameSelectionInfo GetCurrentSelection()
         {
-            return new GameSelectionInfo(ReadSelectedRoleIndex(), ReadSelectedElfinIndex());
+            return _cachedSelection;
         }
 
         private static int ReadSelectedRoleIndex()
@@ -94,7 +116,7 @@ namespace MDEN.Managers
         public string Nickname { get; }
     }
 
-    public readonly struct GameSelectionInfo
+    public readonly struct GameSelectionInfo : IEquatable<GameSelectionInfo>
     {
         public GameSelectionInfo(int girlIndex, int elfinIndex)
         {
@@ -104,5 +126,23 @@ namespace MDEN.Managers
 
         public int GirlIndex { get; }
         public int ElfinIndex { get; }
+
+        public bool Equals(GameSelectionInfo other)
+        {
+            return GirlIndex == other.GirlIndex && ElfinIndex == other.ElfinIndex;
+        }
+
+        public override bool Equals(object obj)
+        {
+            return obj is GameSelectionInfo other && Equals(other);
+        }
+
+        public override int GetHashCode()
+        {
+            unchecked
+            {
+                return (GirlIndex * 397) ^ ElfinIndex;
+            }
+        }
     }
 }

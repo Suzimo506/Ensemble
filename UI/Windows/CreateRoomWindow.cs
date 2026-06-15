@@ -171,11 +171,14 @@ namespace MDEN.UI.Windows
                 };
 
                 var lobbyId = await LobbyManager.CreateLobbyAsync(request);
+                if (IsDisposed) return;
+
                 LobbyManager.MarkLobbyEntered(lobbyId, request);
 
                 MelonLogger.Msg($"Created lobby: {lobbyId}");
                 MainThreadDispatcher.Enqueue(() =>
                 {
+                    if (IsDisposed) return;
                     Close();
                     NavigationButton.RefreshRoomButton();
                     UIManager.OpenWindow(new MyRoomWindow());

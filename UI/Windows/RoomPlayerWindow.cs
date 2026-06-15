@@ -130,6 +130,8 @@ namespace MDEN.UI.Windows
             try
             {
                 await action.Invoke();
+                if (IsDisposed) return;
+
                 Close();
                 UIManager.OpenWindow(new MyRoomWindow());
             }

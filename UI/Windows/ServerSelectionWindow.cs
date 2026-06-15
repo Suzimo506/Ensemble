@@ -194,11 +194,17 @@ namespace MDEN.UI.Windows
         private Task RebuildWindowOnMainThreadAsync()
         {
             var completion = new TaskCompletionSource<bool>();
+            if (IsDisposed)
+            {
+                completion.SetResult(true);
+                return completion.Task;
+            }
+
             MainThreadDispatcher.Enqueue(() =>
             {
                 try
                 {
-                    if (_window != null)
+                    if (!IsDisposed && _window != null)
                     {
                         RebuildWindow();
                     }
@@ -214,9 +220,10 @@ namespace MDEN.UI.Windows
 
         private void RebuildWindowOnMainThread()
         {
+            if (IsDisposed) return;
             MainThreadDispatcher.Enqueue(() =>
             {
-                if (_window != null)
+                if (!IsDisposed && _window != null)
                 {
                     RebuildWindow();
                 }
@@ -409,10 +416,14 @@ namespace MDEN.UI.Windows
 
             try
             {
+                GameAccountManager.RefreshSnapshot();
                 var response = await ConnectionManager.ConnectAndLoginAsync(address);
+                if (IsDisposed) return;
+
                 MelonLogger.Msg($"Connected to {address}, server version: {response.Version}");
                 MainThreadDispatcher.Enqueue(() =>
                 {
+                    if (IsDisposed) return;
                     Close();
                     UIManager.OpenWindow(new RoomListWindow());
                 });

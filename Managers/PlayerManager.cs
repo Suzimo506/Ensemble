@@ -2,17 +2,24 @@ using System.Threading.Tasks;
 using System.Collections.Generic;
 using System.Linq;
 using CustomAlbums.Managers;
+using Il2CppAssets.Scripts.Database;
 using MDEN.Network;
 using MDEN.Protocol;
 using MDEN.Protocol.Enums;
 using MDEN.Protocol.Messages.Player;
+using MelonLoader;
 
 namespace MDEN.Managers
 {
     public static class PlayerManager
     {
+        private const int SelectionSyncMinFrameInterval = 30;
+
         public static string CurrentUid { get; private set; }
         public static GetPlayerResponse CurrentProfile { get; private set; }
+        private static GameSelectionInfo _lastSyncedSelection = new GameSelectionInfo(int.MinValue, int.MinValue);
+        private static int _lastSelectionSyncFrame;
+        private static bool _selectionSyncInProgress;
 
         public static void SetCurrentUid(string uid)
         {
@@ -34,6 +41,9 @@ namespace MDEN.Managers
         {
             CurrentUid = null;
             CurrentProfile = null;
+            _lastSyncedSelection = new GameSelectionInfo(int.MinValue, int.MinValue);
+            _lastSelectionSyncFrame = 0;
+            _selectionSyncInProgress = false;
         }
 
         public static async Task<GetPlayerResponse> GetMyProfileAsync()
@@ -47,15 +57,76 @@ namespace MDEN.Managers
             return CurrentProfile;
         }
 
+        public static Task<GetPlayerResponse> GetProfileAsync(string targetUid)
+        {
+            EnsureReady();
+
+            return NetworkClient.Instance.SendRequestAsync<GetPlayerRequest, GetPlayerResponse>(
+                OpCodes.GetPlayerReq,
+                new GetPlayerRequest { TargetUid = targetUid });
+        }
+
         public static Task SyncCurrentSelectionAsync()
         {
-            var selection = GameAccountManager.GetCurrentSelection();
-            return UpdateMyProfileAsync(new UpdatePlayerRequest
+            return SyncSelectionAsync(GameAccountManager.GetCurrentSelection());
+        }
+
+        public static async Task SyncSelectionAsync(GameSelectionInfo selection)
+        {
+            await UpdateMyProfileAsync(new UpdatePlayerRequest
             {
                 GirlIndex = selection.GirlIndex,
                 ElfinIndex = selection.ElfinIndex,
                 FavGirlIndex = selection.GirlIndex,
                 FavElfinIndex = selection.ElfinIndex
+            });
+
+            _lastSyncedSelection = selection;
+        }
+
+        public static void SyncCurrentSelectionIfChanged()
+        {
+            if (!NetworkClient.Instance.IsConnected ||
+                !ConnectionManager.IsLoggedIn ||
+                string.IsNullOrEmpty(CurrentUid) ||
+                _selectionSyncInProgress)
+            {
+                return;
+            }
+
+            if (UnityEngine.Time.frameCount - _lastSelectionSyncFrame < SelectionSyncMinFrameInterval)
+            {
+                return;
+            }
+
+            var selection = GameAccountManager.RefreshSelectionSnapshot();
+            if (selection.Equals(_lastSyncedSelection))
+            {
+                return;
+            }
+
+            _lastSelectionSyncFrame = UnityEngine.Time.frameCount;
+            _selectionSyncInProgress = true;
+            _ = SyncSelectionAsync(selection).ContinueWith(task =>
+            {
+                _selectionSyncInProgress = false;
+                if (task.IsFaulted)
+                {
+                    MelonLogger.Warning($"Sync selection failed: {task.Exception?.GetBaseException().Message}");
+                }
+            });
+        }
+
+        public static void SyncSelectionFireAndForget(GameSelectionInfo selection)
+        {
+            if (!NetworkClient.Instance.IsConnected || !ConnectionManager.IsLoggedIn || string.IsNullOrEmpty(CurrentUid)) return;
+
+            _ = SyncSelectionAsync(selection).ContinueWith(task =>
+            {
+                if (task.IsFaulted)
+                {
+                    MelonLogger.Warning($"Sync selection failed: {task.Exception?.GetBaseException().Message}");
+                }
             });
         }
 
@@ -72,6 +143,44 @@ namespace MDEN.Managers
             }
 
             return UpdateMyProfileAsync(new UpdatePlayerRequest { Customs = customs.Distinct().ToArray() });
+        }
+
+        public static Task SyncHiddenChartsAsync()
+        {
+            var hiddens = new List<string>();
+            var hiddenUids = GlobalDataBase.dbMusicTag?.Hide;
+            if (hiddenUids != null)
+            {
+                foreach (string hiddenUid in hiddenUids)
+                {
+                    var key = ChartManager.GetEntryKey(hiddenUid);
+                    if (!string.IsNullOrEmpty(key))
+                    {
+                        hiddens.Add(key);
+                    }
+                }
+            }
+
+            return UpdateMyProfileAsync(new UpdatePlayerRequest { Hiddens = hiddens.Distinct().ToArray() });
+        }
+
+        public static async Task SyncChartStateAsync()
+        {
+            await SyncCustomChartsAsync();
+            await SyncHiddenChartsAsync();
+        }
+
+        public static void SyncChartStateFireAndForget()
+        {
+            if (!NetworkClient.Instance.IsConnected || !ConnectionManager.IsLoggedIn || string.IsNullOrEmpty(CurrentUid)) return;
+
+            _ = SyncChartStateAsync().ContinueWith(task =>
+            {
+                if (task.IsFaulted)
+                {
+                    MelonLogger.Warning($"Sync chart state failed: {task.Exception?.GetBaseException().Message}");
+                }
+            });
         }
 
         public static async Task UpdateMyProfileAsync(UpdatePlayerRequest request)

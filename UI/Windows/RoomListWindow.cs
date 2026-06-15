@@ -197,7 +197,12 @@ namespace MDEN.UI.Windows
             try
             {
                 _lobbies = await LobbyManager.RefreshLobbiesAsync();
-                MainThreadDispatcher.Enqueue(RebuildWindow);
+                if (IsDisposed) return;
+                MainThreadDispatcher.Enqueue(() =>
+                {
+                    if (IsDisposed) return;
+                    RebuildWindow();
+                });
             }
             catch (Exception ex)
             {

@@ -37,37 +37,40 @@ namespace MDEN.UI.Core
         private static int _localGirlIndex = -1;
         private static int _rightGirlIndexA = -1;
         private static int _rightGirlIndexB = -1;
+        private static readonly HashSet<string> _warningKeys = new HashSet<string>();
 
         private static Vector3 _originalPosition;
         private static Vector3 _originalScale;
         private static int _pageIndex;
 
-        private static readonly Vector3 LocalPosition = new Vector3(-3.8f, -0.85f, 100f);
-        private static readonly Vector3 RightPositionA = new Vector3(2.6f, -1.18f, 100f);
-        private static readonly Vector3 RightPositionB = new Vector3(6.9f, -1.18f, 100f);
-        private static readonly Vector3 LocalScale = new Vector3(0.74f, 0.74f, 0.74f);
-        private static readonly Vector3 OtherScale = new Vector3(0.52f, 0.52f, 0.52f);
-        private static readonly Vector3 LocalTitleOffset = new Vector3(0f, 3.42f, 0f);
-        private static readonly Vector3 LocalNameOffset = new Vector3(0f, 3.10f, 0f);
-        private static readonly Vector3 OtherTitleOffset = new Vector3(0f, 3.00f, 0f);
-        private static readonly Vector3 OtherNameOffset = new Vector3(0f, 2.72f, 0f);
+        private static readonly Vector3 LocalPosition = new Vector3(2.3f, -0.9f, 100f);
+        private static readonly Vector3 RightPositionA = new Vector3(-3.7f, -1.65f, 100f);
+        private static readonly Vector3 RightPositionB = new Vector3(8.3f, -1.65f, 100f);
+        private static readonly Vector3 LocalScale = new Vector3(0.68f, 0.68f, 0.68f);
+        private static readonly Vector3 OtherScale = new Vector3(0.54f, 0.54f, 0.54f);
+        private const float LocalLabelXOffset = -2.25f;
+        private const float OtherLabelXOffset = -1.95f;
+        private const float LocalTitleYOffset = 3.45f;
+        private const float LocalNameYOffset = 3.15f;
+        private const float OtherTitleYOffset = 3.10f;
+        private const float OtherNameYOffset = 2.82f;
         private static readonly Vector2 LocalLabelSize = new Vector2(420f, 58f);
         private static readonly Vector2 OtherLabelSize = new Vector2(360f, 52f);
+        private static Text _fontTemplate;
 
         public static bool IsCreated => _localSlot != null;
 
-        public static void Refresh(LobbySyncPush lobby)
+        public static bool Refresh(LobbySyncPush lobby)
         {
             if (lobby == null)
             {
                 Destroy();
-                return;
+                return true;
             }
 
             if (!EnsureCreated())
             {
-                MelonLogger.Warning("Room character display is not ready.");
-                return;
+                return false;
             }
 
             var localPlayer = GetLocalPlayer(lobby);
@@ -80,6 +83,7 @@ namespace MDEN.UI.Core
             ApplySlot(_rightSlotA, others.Skip(_pageIndex * 2).FirstOrDefault(), false);
             ApplySlot(_rightSlotB, others.Skip(_pageIndex * 2 + 1).FirstOrDefault(), false);
             SetPageButtonsVisible(pageCount > 1);
+            return true;
         }
 
         public static void Destroy()
@@ -108,6 +112,7 @@ namespace MDEN.UI.Core
             _localGirlIndex = -1;
             _rightGirlIndexA = -1;
             _rightGirlIndexB = -1;
+            _warningKeys.Clear();
             _pageIndex = 0;
         }
 
@@ -121,7 +126,7 @@ namespace MDEN.UI.Core
             _rolePanel = GameObject.Find("UI/Standerd/PnlMenu/Panels/PnlRole")?.GetComponent<PnlRole>();
             if (_originalMuseShow == null || _sourceButton == null || _rolePanel == null)
             {
-                MelonLogger.Warning("Room character display source objects are missing.");
+                WarnOnce("source-missing", "Room character display source objects are missing.");
                 return false;
             }
 
@@ -132,7 +137,7 @@ namespace MDEN.UI.Core
 
             if (_rolePanel.fancyPanel == null)
             {
-                MelonLogger.Warning("Role fancy panel is missing.");
+                WarnOnce("fancy-panel-missing", "Role fancy panel is missing.");
                 return false;
             }
 
@@ -179,6 +184,7 @@ namespace MDEN.UI.Core
 
             slot.transform.position = local ? LocalPosition : (slot == _rightSlotA ? RightPositionA : RightPositionB);
             slot.transform.localScale = local ? LocalScale : OtherScale;
+            NormalizeSlotVisibility(slot);
             ApplyLabels(slot, player, local);
 
             var girlIndex = local
@@ -187,7 +193,11 @@ namespace MDEN.UI.Core
             if (girlIndex < 0) girlIndex = 0;
 
             if (IsSameGirl(slot, girlIndex)) return;
-            ReplaceGirl(slot, girlIndex);
+            
+            if (!local)
+            {
+                ReplaceGirl(slot, girlIndex);
+            }
             SetCachedGirl(slot, girlIndex);
         }
 
@@ -197,6 +207,43 @@ namespace MDEN.UI.Core
             if (slot == _rightSlotA) return _rightGirlIndexA == girlIndex;
             if (slot == _rightSlotB) return _rightGirlIndexB == girlIndex;
             return false;
+        }
+
+        private static void NormalizeSlotVisibility(GameObject slot)
+        {
+            if (slot == null) return;
+
+            var canvasGroups = slot.GetComponentsInChildren<CanvasGroup>(true);
+            if (canvasGroups != null)
+            {
+                foreach (var canvasGroup in canvasGroups)
+                {
+                    if (canvasGroup == null) continue;
+                    canvasGroup.alpha = 1f;
+                }
+            }
+
+            var graphics = slot.GetComponentsInChildren<Graphic>(true);
+            if (graphics != null)
+            {
+                foreach (var graphic in graphics)
+                {
+                    if (graphic == null) continue;
+                    var color = graphic.color;
+                    color.a = 1f;
+                    graphic.color = color;
+                }
+            }
+
+            var renderers = slot.GetComponentsInChildren<Renderer>(true);
+            if (renderers != null)
+            {
+                foreach (var renderer in renderers)
+                {
+                    if (renderer == null) continue;
+                    renderer.enabled = true;
+                }
+            }
         }
 
         private static void SetCachedGirl(GameObject slot, int girlIndex)
@@ -217,21 +264,21 @@ namespace MDEN.UI.Core
             var prefabTransform = museShow.transform.Find("ShowLocalization/SpinePerfab_other");
             if (prefabTransform == null)
             {
-                MelonLogger.Warning("Character prefab transform is missing.");
+                WarnOnce("prefab-transform-missing", "Character prefab transform is missing.");
                 return;
             }
 
             var charInfo = _rolePanel.m_ConfigCharacter?.GetCharacterInfoByIndex(girlIndex);
             if (charInfo == null)
             {
-                MelonLogger.Warning($"Character info not found. girlIndex={girlIndex}");
+                WarnOnce($"info-missing-{girlIndex}", $"Character info not found. girlIndex={girlIndex}");
                 return;
             }
 
             var subControl = _rolePanel.fancyPanel.GetCellComponent<PnlRoleSubControl>(charInfo.order - 1);
             if (subControl == null)
             {
-                MelonLogger.Warning($"Character cell not ready. order={charInfo.order}");
+                WarnOnce($"cell-not-ready-{charInfo.order}", $"Character cell not ready. order={charInfo.order}");
                 return;
             }
             if (!subControl.m_Init) subControl.Init();
@@ -239,7 +286,7 @@ namespace MDEN.UI.Core
             var charApply = subControl.characterApply;
             if (charApply == null)
             {
-                MelonLogger.Warning($"Character apply is missing. girlIndex={girlIndex}");
+                WarnOnce($"apply-missing-{girlIndex}", $"Character apply is missing. girlIndex={girlIndex}");
                 return;
             }
 
@@ -271,7 +318,7 @@ namespace MDEN.UI.Core
             var renderers = root.GetComponentsInChildren<Renderer>(true);
             if (renderers == null || renderers.Length == 0)
             {
-                MelonLogger.Warning($"Character has no renderer after clone. girlIndex={girlIndex}");
+                WarnOnce($"renderer-missing-{girlIndex}", $"Character has no renderer after clone. girlIndex={girlIndex}");
             }
             else
             {
@@ -416,7 +463,7 @@ namespace MDEN.UI.Core
             rect.sizeDelta = size;
 
             var text = obj.AddComponent<Text>();
-            text.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
+            ApplyGameFont(text);
             text.fontSize = fontSize;
             text.alignment = TextAnchor.MiddleCenter;
             text.horizontalOverflow = HorizontalWrapMode.Overflow;
@@ -441,9 +488,15 @@ namespace MDEN.UI.Core
             if (labels == null) return;
 
             labels.SetVisible(true);
-            labels.SetPosition(
-                slot.transform.position + (local ? LocalTitleOffset : OtherTitleOffset),
-                slot.transform.position + (local ? LocalNameOffset : OtherNameOffset));
+            var titleYOffset = local ? LocalTitleYOffset : OtherTitleYOffset;
+            var nameYOffset = local ? LocalNameYOffset : OtherNameYOffset;
+            var labelXOffset = local ? LocalLabelXOffset : OtherLabelXOffset;
+            var slotPosition = slot.transform.position;
+            var labelX = slotPosition.x + labelXOffset;
+            var titlePosition = new Vector3(labelX, slotPosition.y + titleYOffset, slotPosition.z);
+            var namePosition = new Vector3(labelX, slotPosition.y + nameYOffset, slotPosition.z);
+            labels.SetPosition(titlePosition, namePosition);
+            labels.SetAsLastSibling();
             labels.Title.text = FormatTitle(player.Title);
             labels.Name.text = FormatName(player.Name);
 
@@ -640,6 +693,59 @@ namespace MDEN.UI.Core
             }
         }
 
+        private static void WarnOnce(string key, string message)
+        {
+            if (_warningKeys.Add(key))
+            {
+                MelonLogger.Warning(message);
+            }
+        }
+
+        private static void ApplyGameFont(Text text)
+        {
+            if (text == null) return;
+
+            var template = FindNativeFontTemplate();
+            if (template != null && template.font != null)
+            {
+                text.font = template.font;
+                text.material = template.material;
+                return;
+            }
+
+            text.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
+        }
+
+        private static Text FindNativeFontTemplate()
+        {
+            if (_fontTemplate != null && _fontTemplate.font != null)
+            {
+                return _fontTemplate;
+            }
+
+            Text fallback = null;
+            var texts = UnityEngine.Resources.FindObjectsOfTypeAll<Text>();
+            if (texts != null)
+            {
+                for (var i = 0; i < texts.Length; i++)
+                {
+                    var text = texts[i];
+                    if (text == null || text.font == null) continue;
+                    fallback ??= text;
+
+                    var fontName = text.font.name ?? string.Empty;
+                    if (!fontName.Contains("Arial"))
+                    {
+                        _fontTemplate = text;
+                        return _fontTemplate;
+                    }
+                }
+            }
+
+            _fontTemplate = fallback;
+            return _fontTemplate;
+        }
+
         private static void DestroyObject(GameObject obj)
         {
             if (obj != null)
@@ -682,6 +788,12 @@ namespace MDEN.UI.Core
             {
                 if (Title != null) Title.transform.position = titlePosition;
                 if (Name != null) Name.transform.position = namePosition;
+            }
+
+            public void SetAsLastSibling()
+            {
+                if (Title != null) Title.transform.SetAsLastSibling();
+                if (Name != null) Name.transform.SetAsLastSibling();
             }
 
             public void Destroy()

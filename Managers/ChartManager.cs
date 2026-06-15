@@ -1,6 +1,8 @@
 using CustomAlbums.Data;
 using CustomAlbums.Managers;
 using Il2CppAssets.Scripts.Database;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace MDEN.Managers
 {
@@ -16,6 +18,9 @@ namespace MDEN.Managers
 
     public static class ChartManager
     {
+        private static bool _initialized;
+        private static readonly Dictionary<string, Album> CustomAlbumsByMd5 = new Dictionary<string, Album>();
+
         public static int CurrentDifficulty
         {
             get
@@ -26,15 +31,8 @@ namespace MDEN.Managers
                     var musicInfo = GlobalDataBase.dbMusicTag.m_CurSelectedMusicInfo;
                     if (musicInfo != null)
                     {
-                        var checkUid = musicInfo.uid;
-                        if (checkUid.StartsWith("999-"))
-                        {
-                            var md5 = GetMd5(checkUid);
-                            if (md5 != null)
-                            {
-                                checkUid = $"{AlbumManager.Uid}-{md5}";
-                            }
-                        }
+                        var checkUid = GetHiddenCheckUid(musicInfo);
+                        if (string.IsNullOrEmpty(checkUid)) return diff;
 
                         var specialSongManager = Il2CppAssets.Scripts.PeroTools.Commons.Singleton<Il2Cpp.SpecialSongManager>.instance;
                         if (specialSongManager != null && specialSongManager.IsInvokeHideBms(checkUid))
@@ -50,6 +48,15 @@ namespace MDEN.Managers
 
         public static MusicInfo CurrentMusicInfo => GlobalDataBase.dbMusicTag.CurMusicInfo();
 
+        public static void Initialize()
+        {
+            if (_initialized) return;
+            _initialized = true;
+
+            RebuildCustomAlbumIndex();
+            CustomAlbums.ModExtensions.Events.OnAlbumLoaded += OnAlbumLoaded;
+        }
+
         public static string GetCurrentEntry()
         {
             var musicInfo = CurrentMusicInfo;
@@ -60,6 +67,30 @@ namespace MDEN.Managers
         public static string GetEntry(MusicInfo musicInfo, int difficulty)
         {
             return $"{GetEntryKey(musicInfo)}#{difficulty}#{GetLocalPlayerName()}#{GetNiceChartName(musicInfo, difficulty)}";
+        }
+
+        public static string GetHiddenCheckUid(MusicInfo musicInfo)
+        {
+            if (musicInfo == null || string.IsNullOrWhiteSpace(musicInfo.uid))
+            {
+                return musicInfo?.uid;
+            }
+
+            if (!musicInfo.uid.StartsWith("999-"))
+            {
+                return musicInfo.uid;
+            }
+
+            var md5 = GetMd5(musicInfo.uid);
+            if (!string.IsNullOrEmpty(md5) &&
+                CustomAlbumsByMd5.TryGetValue(md5, out var album) &&
+                album != null)
+            {
+                return album.Uid;
+            }
+
+            var fallbackAlbum = AlbumManager.GetByUid(musicInfo.uid);
+            return fallbackAlbum?.Uid ?? musicInfo.uid;
         }
 
         public static PlaylistEntryViewModel ParseEntry(string entry)
@@ -104,6 +135,45 @@ namespace MDEN.Managers
         public static string GetCustomChartMd5(string uid)
         {
             return GetMd5(uid);
+        }
+
+        public static string GetEntryKey(string uid)
+        {
+            var md5 = GetMd5(uid);
+            return md5 ?? uid;
+        }
+
+        public static MusicInfo GetMusicInfo(string chartKey)
+        {
+            if (string.IsNullOrEmpty(chartKey)) return null;
+
+            if (IsCustomChartKey(chartKey))
+            {
+                if (CustomAlbumsByMd5.TryGetValue(chartKey, out var cachedAlbum))
+                {
+                    if (AlbumManager.GetByUid(cachedAlbum.Uid) != null)
+                    {
+                        return GlobalDataBase.dbMusicTag.GetMusicInfoFromAll(cachedAlbum.Uid);
+                    }
+
+                    CustomAlbumsByMd5.Remove(chartKey);
+                }
+
+                foreach (var pair in AlbumManager.LoadedAlbums)
+                {
+                    var album = pair.Value;
+                    var sheet = GetPreferredSheet(album);
+                    if (sheet != null && sheet.Md5 == chartKey)
+                    {
+                        CustomAlbumsByMd5[chartKey] = album;
+                        return GlobalDataBase.dbMusicTag.GetMusicInfoFromAll(album.Uid);
+                    }
+                }
+
+                return null;
+            }
+
+            return GlobalDataBase.dbMusicTag.GetMusicInfoFromAll(chartKey);
         }
 
         private static string GetNiceChartName(MusicInfo musicInfo, int difficulty)
@@ -158,6 +228,11 @@ namespace MDEN.Managers
 
             Album album = AlbumManager.GetByUid(uid);
             var sheet = GetPreferredSheet(album);
+            if (sheet != null)
+            {
+                CustomAlbumsByMd5[sheet.Md5] = album;
+            }
+
             return sheet?.Md5;
         }
 
@@ -175,5 +250,47 @@ namespace MDEN.Managers
         {
             return PlayerManager.CurrentProfile?.Name ?? PlayerManager.CurrentUid ?? "Unknown";
         }
+
+        private static bool IsCustomChartKey(string chartKey)
+        {
+            return !string.IsNullOrWhiteSpace(chartKey) && chartKey.Length >= 16 && !chartKey.StartsWith($"{AlbumManager.Uid}-");
+        }
+
+        private static void OnAlbumLoaded(object sender, CustomAlbums.ModExtensions.AlbumEventArgs e)
+        {
+            if (e?.Album == null) return;
+
+            var oldKeys = CustomAlbumsByMd5
+                .Where(pair => pair.Value != null && pair.Value.AlbumName == e.Album.AlbumName)
+                .Select(pair => pair.Key)
+                .ToArray();
+            foreach (var key in oldKeys)
+            {
+                CustomAlbumsByMd5.Remove(key);
+            }
+
+            var sheet = GetPreferredSheet(e.Album);
+            if (sheet != null)
+            {
+                CustomAlbumsByMd5[sheet.Md5] = e.Album;
+            }
+
+            PlayerManager.SyncChartStateFireAndForget();
+        }
+
+        private static void RebuildCustomAlbumIndex()
+        {
+            CustomAlbumsByMd5.Clear();
+            foreach (var pair in AlbumManager.LoadedAlbums)
+            {
+                var album = pair.Value;
+                var sheet = GetPreferredSheet(album);
+                if (sheet != null)
+                {
+                    CustomAlbumsByMd5[sheet.Md5] = album;
+                }
+            }
+        }
     }
 }
+

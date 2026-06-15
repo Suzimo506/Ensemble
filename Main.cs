@@ -18,7 +18,9 @@ namespace MDEN
             ReconnectionManager.Instance.Init();
             LobbyManager.Init();
             ChatManager.Init();
+            ChartManager.Initialize();
             BattleManager.Init();
+            BattleHudController.Initialize();
             RoomHudController.Initialize();
             MelonLogger.Msg("Initialization complete.");
         }
@@ -27,6 +29,9 @@ namespace MDEN
         {
             if (sceneName == "UISystem_PC")
             {
+                NavigationButton.ResetSceneObjects();
+                RoomHudController.ResetSceneObjects();
+
                 string bundlePath = System.IO.Path.Combine(MelonLoader.Utils.MelonEnvironment.UserDataDirectory, "MDEN", "ui.bundle");
                 ResourceManager.Initialize(bundlePath);
                 
@@ -36,16 +41,22 @@ namespace MDEN
                 RoomHudController.Refresh();
                 RoomHudController.RequestRefresh();
             }
+            else if (sceneName == "GameMain")
+            {
+                Patches.BattlePatch.SceneLoaded();
+            }
         }
 
         public override void OnUpdate()
         {
             MainThreadDispatcher.ProcessQueue();
+            PlayerManager.SyncCurrentSelectionIfChanged();
             RoomHudController.Update();
         }
 
         public override void OnDeinitializeMelon()
         {
+            BattleHudController.Deinitialize();
             RoomHudController.Deinitialize();
             ConnectionManager.Disconnect();
         }

@@ -9,6 +9,7 @@ namespace MDEN.UI.Core
     {
         private readonly List<Action> _eventUnsubscribers = new List<Action>();
         private bool _isDisposed;
+        protected bool IsDisposed => _isDisposed;
 
         // 登记事件解除操作
         protected void RegisterEventCleanup(Action unsubscribeAction)

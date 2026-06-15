@@ -32,6 +32,7 @@ namespace MDEN.Managers
         {
             EnsureReady();
             await PlayerManager.SyncCurrentSelectionAsync();
+            await PlayerManager.SyncChartStateAsync();
 
             await NetworkClient.Instance.SendRequestAsync<JoinLobbyRequest, JoinLobbyResponse>(
                 OpCodes.JoinLobbyReq,
@@ -42,6 +43,7 @@ namespace MDEN.Managers
         {
             EnsureReady();
             await PlayerManager.SyncCurrentSelectionAsync();
+            await PlayerManager.SyncChartStateAsync();
 
             var response = await NetworkClient.Instance.SendRequestAsync<CreateLobbyRequest, CreateLobbyResponse>(
                 OpCodes.CreateLobbyReq,
