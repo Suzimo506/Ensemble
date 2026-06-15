@@ -14,13 +14,10 @@ namespace MDEN.UI.Windows
     public class RoomPlayerProfileWindow : MDENWindowBase
     {
         private const string InjectedTitleName = "MDENPlayerProfileTitle";
-        private const string InjectedDetailsName = "MDENPlayerProfileDetails";
 
         private readonly PlayerSyncEntry _player;
         private ForumWindow _window;
-        private ForumObject _btnBack;
         private ForumObject _btnAddFriend;
-        private ForumObject _btnProfile;
         private int _lastSelectedIndex = -1;
 
         public RoomPlayerProfileWindow(PlayerSyncEntry player)
@@ -47,9 +44,7 @@ namespace MDEN.UI.Windows
         private void BuildList()
         {
             _window.ForumObjects.Clear();
-            _btnBack = AddButton("返回", "关闭玩家资料");
-            _btnAddFriend = AddButton("添加好友", "好友功能稍后接入");
-            _btnProfile = AddButton("玩家资料", BuildSummary());
+            _btnAddFriend = AddButton("添加好友", BuildDetails());
         }
 
         private ForumObject AddButton(string title, string description)
@@ -71,19 +66,10 @@ namespace MDEN.UI.Windows
             }
 
             var button = _window.ForumObjects[objectIndex];
-            if (button == _btnBack)
-            {
-                UIManager.CloseCurrentWindow();
-                return;
-            }
-
             if (button == _btnAddFriend)
             {
                 MelonLogger.Msg($"Friend action placeholder: {_player.Uid}");
-                return;
             }
-
-            if (button == _btnProfile) return;
         }
 
         private void OnInternalShowInjectTitle(PopupLib.UI.Windows.Abstract.BaseWindow w)
@@ -96,7 +82,6 @@ namespace MDEN.UI.Windows
 
             RemoveInjectedObjects(imgBase);
             InjectTitle(imgBase, txtTitleObj);
-            InjectDetails(imgBase);
         }
 
         private void InjectTitle(Transform imgBase, Transform txtTitleObj)
@@ -125,31 +110,6 @@ namespace MDEN.UI.Windows
             }
         }
 
-        private void InjectDetails(Transform imgBase)
-        {
-            var detailsObj = new GameObject(InjectedDetailsName);
-            detailsObj.transform.SetParent(imgBase, false);
-            detailsObj.transform.localScale = Vector3.one;
-
-            var rect = detailsObj.AddComponent<RectTransform>();
-            rect.anchorMin = new Vector2(0.5f, 0.5f);
-            rect.anchorMax = new Vector2(0.5f, 0.5f);
-            rect.pivot = new Vector2(0f, 1f);
-            rect.anchoredPosition = new Vector2(170f, -70f);
-            rect.sizeDelta = new Vector2(430f, 300f);
-
-            var text = detailsObj.AddComponent<Text>();
-            text.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
-            text.fontSize = 24;
-            text.alignment = TextAnchor.UpperLeft;
-            text.horizontalOverflow = HorizontalWrapMode.Wrap;
-            text.verticalOverflow = VerticalWrapMode.Overflow;
-            text.supportRichText = true;
-            text.raycastTarget = false;
-            text.color = Color.white;
-            text.text = BuildDetails();
-        }
-
         private void RemoveInjectedObjects()
         {
             var imgBase = GameObject.Find("UI/Forward/Tips/PnlBulletinNew/ImgBase")?.transform;
@@ -170,14 +130,6 @@ namespace MDEN.UI.Windows
 
             var oldTitleInScroll = imgBase.Find("ScrollView/" + InjectedTitleName);
             if (oldTitleInScroll != null) UnityEngine.Object.Destroy(oldTitleInScroll.gameObject);
-
-            var oldDetails = imgBase.Find(InjectedDetailsName);
-            if (oldDetails != null) UnityEngine.Object.Destroy(oldDetails.gameObject);
-        }
-
-        private string BuildSummary()
-        {
-            return $"头衔: {GetDisplayTitle()}\nUID: {_player.Uid}\n状态: {GetStatusText(_player.Status)}\nPing: {_player.PingMS}ms";
         }
 
         private string BuildDetails()

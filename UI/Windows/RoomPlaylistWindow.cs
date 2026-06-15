@@ -1,4 +1,5 @@
 using LocalizeLib;
+using Il2CppAssets.Scripts.UI.Controls;
 using MDEN.Managers;
 using MDEN.UI.Core;
 using MelonLoader;
@@ -75,7 +76,11 @@ namespace MDEN.UI.Windows
             try
             {
                 await PlaylistManager.RemoveAsync(_items[objectIndex].Entry);
-                RebuildWindow();
+                MainThreadDispatcher.Enqueue(() =>
+                {
+                    ShowText.ShowInfo("成功移除歌曲列表");
+                    RebuildWindow();
+                });
             }
             catch (System.Exception ex)
             {

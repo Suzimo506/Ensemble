@@ -8,6 +8,12 @@ using MDEN.Protocol.Messages.Playlist;
 
 namespace MDEN.Managers
 {
+    public enum PlaylistToggleResult
+    {
+        Added,
+        Removed
+    }
+
     public static class PlaylistManager
     {
         private const int AddSuccess = 0;
@@ -69,7 +75,7 @@ namespace MDEN.Managers
             return IsCurrentChartInPlaylist() || !IsPlaylistFull();
         }
 
-        public static async Task ToggleCurrentChartAsync()
+        public static async Task<PlaylistToggleResult> ToggleCurrentChartAsync()
         {
             EnsureReady();
             var entry = ChartManager.GetCurrentEntry();
@@ -81,11 +87,11 @@ namespace MDEN.Managers
             if (ContainsEntry(entry))
             {
                 await RemoveAsync(entry);
+                return PlaylistToggleResult.Removed;
             }
-            else
-            {
-                await AddAsync(entry);
-            }
+
+            await AddAsync(entry);
+            return PlaylistToggleResult.Added;
         }
 
         public static async Task AddAsync(string entry)

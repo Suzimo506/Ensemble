@@ -1,5 +1,6 @@
 using System;
 using Il2CppAssets.Scripts.PeroTools.UI;
+using Il2CppAssets.Scripts.UI.Controls;
 using MDEN.Managers;
 using MelonLoader;
 using UnityEngine;
@@ -73,7 +74,9 @@ namespace MDEN.UI.Core
 
             try
             {
-                await PlaylistManager.ToggleCurrentChartAsync();
+                var result = await PlaylistManager.ToggleCurrentChartAsync();
+                MainThreadDispatcher.Enqueue(() => ShowText.ShowInfo(
+                    result == PlaylistToggleResult.Added ? "成功加入歌曲列表" : "成功移除歌曲列表"));
             }
             catch (Exception ex)
             {

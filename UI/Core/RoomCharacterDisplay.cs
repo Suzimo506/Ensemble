@@ -45,12 +45,12 @@ namespace MDEN.UI.Core
         private static readonly Vector3 LocalPosition = new Vector3(-3.8f, -0.85f, 100f);
         private static readonly Vector3 RightPositionA = new Vector3(2.6f, -1.18f, 100f);
         private static readonly Vector3 RightPositionB = new Vector3(6.9f, -1.18f, 100f);
-        private static readonly Vector3 LocalScale = new Vector3(0.82f, 0.82f, 0.82f);
-        private static readonly Vector3 OtherScale = new Vector3(0.58f, 0.58f, 0.58f);
-        private static readonly Vector3 LocalTitleOffset = new Vector3(0f, 4.02f, 0f);
-        private static readonly Vector3 LocalNameOffset = new Vector3(0f, 3.68f, 0f);
-        private static readonly Vector3 OtherTitleOffset = new Vector3(0f, 3.55f, 0f);
-        private static readonly Vector3 OtherNameOffset = new Vector3(0f, 3.24f, 0f);
+        private static readonly Vector3 LocalScale = new Vector3(0.74f, 0.74f, 0.74f);
+        private static readonly Vector3 OtherScale = new Vector3(0.52f, 0.52f, 0.52f);
+        private static readonly Vector3 LocalTitleOffset = new Vector3(0f, 3.42f, 0f);
+        private static readonly Vector3 LocalNameOffset = new Vector3(0f, 3.10f, 0f);
+        private static readonly Vector3 OtherTitleOffset = new Vector3(0f, 3.00f, 0f);
+        private static readonly Vector3 OtherNameOffset = new Vector3(0f, 2.72f, 0f);
         private static readonly Vector2 LocalLabelSize = new Vector2(420f, 58f);
         private static readonly Vector2 OtherLabelSize = new Vector2(360f, 52f);
 

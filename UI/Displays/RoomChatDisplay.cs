@@ -18,6 +18,8 @@ namespace MDEN.UI.Displays
         private const float EntryHeight = 24f;
         private const float InputHeight = 38f;
         private const float Padding = 14f;
+        private const float IdleFadeDelay = 4f;
+        private const float BackgroundFadeSpeed = 3.5f;
         private static readonly Vector2 CollapsedSize = new Vector2(500f, 190f);
         private static readonly Vector2 ExpandedSize = new Vector2(560f, 360f);
 
@@ -31,12 +33,15 @@ namespace MDEN.UI.Displays
         private RectTransform _viewportRect;
         private RectTransform _contentRect;
         private InputField _inputField;
+        private Image _inputBackground;
         private Text _inputText;
         private Text _placeholderText;
+        private float _lastActivityTime;
         private bool _lastFocusState;
         private bool _lastInputBlocked;
         private bool _suppressSubmit;
         private bool _sendInProgress;
+        private int _clearSlashFrame = -1;
         private int _suppressGameInputUntilFrame = -1;
 
         public bool IsCreated => _root != null;
@@ -54,6 +59,7 @@ namespace MDEN.UI.Displays
             if (message == null) return;
 
             EnsureCreated();
+            MarkActive();
             _messages.Add(message);
             while (_messages.Count > ExpandedMessageLimit)
             {
@@ -74,12 +80,15 @@ namespace MDEN.UI.Displays
             _viewportRect = null;
             _contentRect = null;
             _inputField = null;
+            _inputBackground = null;
             _inputText = null;
             _placeholderText = null;
+            _lastActivityTime = 0f;
             _lastFocusState = false;
             _lastInputBlocked = false;
             _suppressSubmit = false;
             _sendInProgress = false;
+            _clearSlashFrame = -1;
             _suppressGameInputUntilFrame = -1;
             SetGameInputBlocked(false);
 
@@ -112,7 +121,8 @@ namespace MDEN.UI.Displays
             _root.transform.SetAsLastSibling();
 
             _background = _root.AddComponent<Image>();
-            _background.color = GetBackgroundColor(false);
+            _lastActivityTime = Time.unscaledTime;
+            _background.color = GetBackgroundColor(false, false, true);
 
             CreateScrollArea();
             CreateInputField();
@@ -153,22 +163,40 @@ namespace MDEN.UI.Displays
 
         private void CreateInputField()
         {
-            _inputText = CreateText("Input", _root.transform, 18, TextAnchor.MiddleLeft);
+            var inputObj = new GameObject("InputField");
+            var inputRootRect = inputObj.AddComponent<RectTransform>();
+            inputRootRect.SetParent(_root.transform, false);
+            inputRootRect.localScale = Vector3.one;
+            inputRootRect.anchorMin = new Vector2(0f, 0f);
+            inputRootRect.anchorMax = new Vector2(1f, 0f);
+            inputRootRect.pivot = new Vector2(0.5f, 0f);
+            inputRootRect.offsetMin = new Vector2(Padding, Padding);
+            inputRootRect.offsetMax = new Vector2(-Padding, Padding + InputHeight);
+
+            _inputBackground = inputObj.AddComponent<Image>();
+            _inputBackground.color = GetInputBackgroundColor(false, true);
+            _inputBackground.raycastTarget = true;
+
+            _inputText = CreateText("InputText", inputObj.transform, 18, TextAnchor.MiddleLeft);
+            _inputText.color = new Color(1f, 1f, 1f, 0.95f);
+            _inputText.raycastTarget = false;
+
             var inputRect = _inputText.GetComponent<RectTransform>();
             inputRect.anchorMin = new Vector2(0f, 0f);
-            inputRect.anchorMax = new Vector2(1f, 0f);
-            inputRect.pivot = new Vector2(0.5f, 0f);
-            inputRect.offsetMin = new Vector2(Padding + 8f, Padding);
-            inputRect.offsetMax = new Vector2(-(Padding + 8f), Padding + InputHeight);
+            inputRect.anchorMax = new Vector2(1f, 1f);
+            inputRect.pivot = new Vector2(0.5f, 0.5f);
+            inputRect.offsetMin = new Vector2(12f, 0f);
+            inputRect.offsetMax = new Vector2(-12f, 0f);
 
-            _inputText.raycastTarget = true;
-            _inputField = _inputText.gameObject.AddComponent<InputField>();
+            _inputField = inputObj.AddComponent<InputField>();
+            _inputField.targetGraphic = _inputBackground;
             _inputField.textComponent = _inputText;
             _inputField.lineType = InputField.LineType.SingleLine;
             _inputField.characterLimit = 120;
             _inputField.onEndEdit.AddListener((UnityAction<string>)OnSubmit);
             _inputField.onValueChanged.AddListener((UnityAction<string>)(_ =>
             {
+                MarkActive();
                 if (RefreshLayout()) RedrawMessages();
             }));
 
@@ -177,10 +205,9 @@ namespace MDEN.UI.Displays
             UnityEngine.Object.Destroy(placeholderObj.GetComponent<InputField>());
 
             _placeholderText = placeholderObj.GetComponent<Text>();
-            _placeholderText.text = "输入聊天消息";
-            _placeholderText.color = new Color(1f, 1f, 1f, 0.48f);
+            _placeholderText.text = "按“/”或点击输入框输入消息";
+            _placeholderText.color = new Color(1f, 1f, 1f, 0.40f);
             _placeholderText.raycastTarget = false;
-            _placeholderText.GetComponent<RectTransform>().anchoredPosition = inputRect.anchoredPosition;
             _inputField.placeholder = _placeholderText;
         }
 
@@ -279,7 +306,20 @@ namespace MDEN.UI.Displays
             }
 
             _rootRect.sizeDelta = focused ? ExpandedSize : CollapsedSize;
-            _background.color = GetBackgroundColor(focused);
+            var active = IsRecentlyActive();
+            _background.color = Color.Lerp(
+                _background.color,
+                GetBackgroundColor(focused, HasMessages(), active),
+                Mathf.Clamp01(Time.unscaledDeltaTime * BackgroundFadeSpeed));
+
+            if (_inputBackground != null)
+            {
+                _inputBackground.color = Color.Lerp(
+                    _inputBackground.color,
+                    GetInputBackgroundColor(focused, active),
+                    Mathf.Clamp01(Time.unscaledDeltaTime * BackgroundFadeSpeed));
+            }
+
             return focusChanged;
         }
 
@@ -302,11 +342,36 @@ namespace MDEN.UI.Displays
             return (GetVisibleLimit() * EntryHeight) + 8f;
         }
 
-        private static Color GetBackgroundColor(bool focused)
+        private bool HasMessages()
         {
-            return focused
-                ? new Color(0.08f, 0.03f, 0.16f, 0.72f)
-                : new Color(0.08f, 0.03f, 0.16f, 0.56f);
+            return _messages.Count > 0;
+        }
+
+        private bool IsRecentlyActive()
+        {
+            return IsConsumingInput || Time.unscaledTime - _lastActivityTime <= IdleFadeDelay;
+        }
+
+        private void MarkActive()
+        {
+            _lastActivityTime = Time.unscaledTime;
+        }
+
+        private static Color GetBackgroundColor(bool focused, bool hasMessages, bool active)
+        {
+            if (focused) return new Color(0.08f, 0.03f, 0.16f, 0.74f);
+            if (active) return new Color(0.08f, 0.03f, 0.16f, 0.52f);
+            return hasMessages
+                ? new Color(0.08f, 0.03f, 0.16f, 0.22f)
+                : new Color(0.08f, 0.03f, 0.16f, 0.14f);
+        }
+
+        private static Color GetInputBackgroundColor(bool focused, bool active)
+        {
+            if (focused) return new Color(0.22f, 0.08f, 0.42f, 0.68f);
+            return active
+                ? new Color(0.18f, 0.06f, 0.34f, 0.42f)
+                : new Color(0.18f, 0.06f, 0.34f, 0.18f);
         }
 
         private static Transform FindChatParent()
@@ -336,11 +401,27 @@ namespace MDEN.UI.Displays
         {
             if (message.IsSystem)
             {
-                return $"<color=#{Constants.ColorYellow}>[系统]</color> {message.Message}";
+                return FormatSystemMessage(message);
             }
 
             var author = string.IsNullOrEmpty(message.AuthorName) ? message.AuthorUid : message.AuthorName;
             return $"<color=#{Constants.ColorCyan}>【{author}】</color>: {message.Message}";
+        }
+
+        private static string FormatSystemMessage(ChatPushMsg message)
+        {
+            if ((message.Message == "PlaylistAdd" || message.Message == "PlaylistRemove") &&
+                !string.IsNullOrEmpty(message.ExtraData))
+            {
+                var parts = message.ExtraData.Split(new[] { '#' }, 2);
+                if (parts.Length == 2)
+                {
+                    var action = message.Message == "PlaylistAdd" ? "加入" : "移除";
+                    return $"<color=#{Constants.ColorPink}>【{EscapeRichText(parts[0])}】</color>将<color=#{Constants.ColorYellow}>【{EscapeRichText(parts[1])}】</color>{action}歌曲列表";
+                }
+            }
+
+            return $"<color=#{Constants.ColorYellow}>[系统]</color> {message.Message}";
         }
 
         private static void SetGameInputBlocked(bool blocked)
@@ -359,7 +440,29 @@ namespace MDEN.UI.Displays
         public void Update()
         {
             if (_root == null) return;
+            HandleFocusShortcut();
             if (RefreshLayout()) RedrawMessages();
+        }
+
+        private void HandleFocusShortcut()
+        {
+            if (_inputField == null || IsInputFocused) return;
+            if (!Input.GetKeyDown(KeyCode.Slash)) return;
+
+            _suppressGameInputUntilFrame = Time.frameCount + 2;
+            _clearSlashFrame = Time.frameCount + 1;
+            MarkActive();
+            _inputField.Select();
+            _inputField.ActivateInputField();
+            _inputField.MoveTextEnd(false);
+            MainThreadDispatcher.Enqueue(ClearSlashShortcutText);
+        }
+
+        private void ClearSlashShortcutText()
+        {
+            if (_inputField == null || Time.frameCount < _clearSlashFrame) return;
+            if (_inputField.text == "/") _inputField.text = string.Empty;
+            _clearSlashFrame = -1;
         }
 
         private async void OnSubmit(string value)
@@ -375,6 +478,7 @@ namespace MDEN.UI.Displays
             }
 
             _sendInProgress = true;
+            MarkActive();
             try
             {
                 await ChatManager.SendAsync(message);
@@ -416,6 +520,11 @@ namespace MDEN.UI.Displays
             return string.IsNullOrWhiteSpace(value)
                 ? string.Empty
                 : value.Trim().Replace("\r", string.Empty).Replace("\n", string.Empty);
+        }
+
+        private static string EscapeRichText(string value)
+        {
+            return value?.Replace("<", "＜").Replace(">", "＞") ?? string.Empty;
         }
     }
 }
