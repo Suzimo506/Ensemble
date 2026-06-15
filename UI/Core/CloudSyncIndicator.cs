@@ -15,6 +15,7 @@ namespace MDEN.UI.Core
         private static GameObject _failed;
         private static Text _pendingText;
         private static CancellationTokenSource _hideCts;
+        private static int _operationId;
 
         public static void Initialize()
         {
@@ -48,6 +49,20 @@ namespace MDEN.UI.Core
 
         public static void Start(string text)
         {
+            var operationId = Interlocked.Increment(ref _operationId);
+            MainThreadDispatcher.Enqueue(() => StartOnMainThread(text, operationId));
+        }
+
+        public static void Finish(bool success)
+        {
+            var operationId = Volatile.Read(ref _operationId);
+            MainThreadDispatcher.Enqueue(() => FinishOnMainThread(success, operationId));
+        }
+
+        private static void StartOnMainThread(string text, int operationId)
+        {
+            if (operationId != _operationId) return;
+
             Initialize();
             if (_message == null) return;
 
@@ -63,16 +78,18 @@ namespace MDEN.UI.Core
             SetActive(_message, true);
         }
 
-        public static void Finish(bool success)
+        private static void FinishOnMainThread(bool success, int operationId)
         {
+            if (operationId != _operationId) return;
             if (_message == null || !_message.activeSelf) return;
 
             SetActive(_pending, false);
-            SetActive(success ? _completed : _failed, true);
-            HideLaterAsync();
+            SetActive(_completed, success);
+            SetActive(_failed, !success);
+            HideLaterAsync(operationId);
         }
 
-        private static async void HideLaterAsync()
+        private static async void HideLaterAsync(int operationId)
         {
             CancelHide();
             _hideCts = new CancellationTokenSource();
@@ -83,6 +100,7 @@ namespace MDEN.UI.Core
                 await Task.Delay(1800, token);
                 MainThreadDispatcher.Enqueue(() =>
                 {
+                    if (operationId != _operationId) return;
                     if (token.IsCancellationRequested || _message == null) return;
                     SetActive(_message, false);
                     SetActive(_pending, false);
