@@ -166,6 +166,7 @@ namespace MDEN.Managers
             {
                 var notify = await CreateCurrentNotifyAsync();
                 if (notify == null) return;
+                ApplyLocalBattleData(notify);
 
                 await NetworkClient.Instance.SendNotifyAsync(
                     OpCodes.BattleDataNotify,
@@ -175,6 +176,32 @@ namespace MDEN.Managers
             {
                 MelonLogger.Warning($"Battle data notify failed: {ex.Message}");
             }
+        }
+
+        private static void ApplyLocalBattleData(BattleDataNotifyMsg notify)
+        {
+            var uid = PlayerManager.CurrentUid;
+            if (string.IsNullOrWhiteSpace(uid)) return;
+
+            lock (BattleDataLock)
+            {
+                PlayerBattleData[uid] = new BattlePlayerEntry
+                {
+                    Uid = uid,
+                    Score = notify.Score,
+                    Accuracy = notify.Accuracy,
+                    Perfects = notify.Perfects,
+                    Greats = notify.Greats,
+                    Earlies = notify.Earlies,
+                    Lates = notify.Lates,
+                    Misses = notify.Misses,
+                    FC = notify.FC,
+                    Alive = notify.Alive,
+                    PingMS = 0
+                };
+            }
+
+            NotifyBattleDataChanged(GetBattleDataSnapshot());
         }
 
         private static Task<BattleDataNotifyMsg> CreateCurrentNotifyAsync()

@@ -61,23 +61,23 @@ namespace MDEN.UI.Windows
             _btnBack.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("OptionsPanel.png")?.texture;
             _window.ForumObjects.Add(_btnBack);
 
-            _btnName = new ForumObject(new LocalString("- 房间名称 -"), new LocalString($"当前: {_roomName}\n点击后输入房间名称，24字上限"));
+            _btnName = new ForumObject(new LocalString("房间名称"), new LocalString($"当前: {_roomName}\n点击后输入房间名称，24字上限"));
             _btnName.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("HomePanel.png")?.texture;
             _window.ForumObjects.Add(_btnName);
 
-            _btnMaxPlayers = new ForumObject(new LocalString("- 人数 -"), new LocalString($"当前: {_maxPlayers}\n点击在 2/4/6/8/10 间切换"));
+            _btnMaxPlayers = new ForumObject(new LocalString("人数"), new LocalString($"当前: {_maxPlayers}\n点击在 2/4/6/8/10 间切换"));
             _btnMaxPlayers.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("PlayerCard.png")?.texture;
             _window.ForumObjects.Add(_btnMaxPlayers);
 
-            _btnPlaylistSize = new ForumObject(new LocalString("- 歌曲列表长度 -"), new LocalString($"当前: {_playlistSize}\n点击在 8/12/16/24/32 间切换"));
+            _btnPlaylistSize = new ForumObject(new LocalString("歌曲列表长度"), new LocalString($"当前: {_playlistSize}\n点击在 8/12/16/24/32 间切换"));
             _btnPlaylistSize.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("RoomList.png")?.texture;
             _window.ForumObjects.Add(_btnPlaylistSize);
 
-            _btnGoal = new ForumObject(new LocalString("- 获胜方式 -"), new LocalString($"当前: {GetGoalName()}\n点击在准确率和分数间切换"));
+            _btnGoal = new ForumObject(new LocalString("获胜方式"), new LocalString($"当前: {GetGoalName()}\n点击在准确率和分数间切换"));
             _btnGoal.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("SocialNetwork.png")?.texture;
             _window.ForumObjects.Add(_btnGoal);
 
-            _btnSettlement = new ForumObject(new LocalString("- 结算功能 -"), new LocalString($"当前: {GetSettlementName()}\n开启后每五首歌弹出一次结算"));
+            _btnSettlement = new ForumObject(new LocalString("结算功能"), new LocalString($"当前: {GetSettlementName()}\n开启后每五首歌弹出一次结算"));
             _btnSettlement.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("OptionsPanel.png")?.texture;
             _window.ForumObjects.Add(_btnSettlement);
 

@@ -30,8 +30,8 @@ namespace MDEN.UI.Core
             target.anchorMin = new Vector2(0f, 0f);
             target.anchorMax = new Vector2(0f, 0f);
             target.pivot = new Vector2(0f, 0f);
-            target.anchoredPosition = new Vector2(36f, 156f);
-            target.sizeDelta = new Vector2(520f, _sizeDelta.y);
+            target.anchoredPosition = new Vector2(36f, 42f);
+            target.sizeDelta = new Vector2(640f, _sizeDelta.y);
             _moved = true;
         }
 

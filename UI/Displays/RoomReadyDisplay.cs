@@ -151,7 +151,7 @@ namespace MDEN.UI.Displays
             _buttonStopText.fontSize = 26;
             _buttonStopText.horizontalOverflow = HorizontalWrapMode.Overflow;
             ApplyGameFont(_buttonStopText);
-            _buttonStopText.text = "- 停止游戏 -";
+            _buttonStopText.text = "停止游戏";
             _buttonStopText.color = Color.white;
 
             _buttonEquip = new GameObject("BtnEquip");
@@ -184,7 +184,7 @@ namespace MDEN.UI.Displays
             _buttonEquipText.fontSize = 23;
             _buttonEquipText.horizontalOverflow = HorizontalWrapMode.Overflow;
             ApplyGameFont(_buttonEquipText);
-            _buttonEquipText.text = "- 使用推荐 -";
+            _buttonEquipText.text = "使用推荐";
             _buttonEquipText.color = Color.white;
 
             UnityEngine.Object.Destroy(_imgBase.transform.Find("Synchronizing/TxtSynchronizing/ImgSynchronizing")?.gameObject);
@@ -220,10 +220,10 @@ namespace MDEN.UI.Displays
 
             var chartTitle = entry == null ? "等待歌曲" : entry.DisplayName;
             var recommended = RecommendedConfigManager.GetDisplayText(entry);
-            _message.text = $"<color=#F8DC51>Next:</color>\n{chartTitle}\n<color=#{Constants.ColorPink}>推荐配置:</color>\n{recommended}";
+            _message.text = $"<color=F8DC51>Next:</color>\n{chartTitle}\n<color={Constants.ColorPink}>推荐配置:</color>\n{recommended}";
 
             bool isReady = PlaylistManager.IsLocalPlayerReady();
-            _buttonMainText.text = lobby.IsPlaying ? "游戏中" : (isReady ? $"{lobby.ReadyPlayers?.Length ?? 0} / {lobby.Players?.Length ?? 0}" : "- 准备 -");
+            _buttonMainText.text = lobby.IsPlaying ? "游戏中" : (isReady ? $"{lobby.ReadyPlayers?.Length ?? 0} / {lobby.Players?.Length ?? 0}" : "准备");
 
             RefreshButtonStates(lobby);
         }
@@ -397,7 +397,7 @@ namespace MDEN.UI.Displays
 
             if (_buttonEquipText != null)
             {
-                _buttonEquipText.text = recommendationEquipped ? "- 已选择 -" : "- 使用推荐 -";
+                _buttonEquipText.text = recommendationEquipped ? "已选择" : "使用推荐";
                 _buttonEquipText.color = canEquip ? Color.white : new Color(0.7f, 0.7f, 0.7f, 1f);
             }
         }

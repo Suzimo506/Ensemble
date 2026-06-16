@@ -28,15 +28,15 @@ namespace MDEN.UI.Displays
             Create();
 
             var activeKeys = new List<string> { "title" };
-            SetEntry("title", $"{lobby.Name} <color=#{Constants.ColorYellow}>({GetPlayerCount(lobby)}/{lobby.MaxPlayers})</color>");
+            SetEntry("title", $"{lobby.Name} <color={Constants.ColorYellow}>({GetPlayerCount(lobby)}/{lobby.MaxPlayers})</color>");
 
             foreach (var player in GetPlayers(lobby))
             {
                 var key = $"player:{player.Uid}";
                 activeKeys.Add(key);
 
-                var hostPrefix = player.Uid == lobby.HostUid ? $"<color=#{Constants.ColorYellow}>[Host]</color> " : string.Empty;
-                var localColorStart = player.Uid == PlayerManager.CurrentUid ? $"<color=#{Constants.ColorCyan}>" : string.Empty;
+                var hostPrefix = player.Uid == lobby.HostUid ? $"<color={Constants.ColorYellow}>[Host]</color> " : string.Empty;
+                var localColorStart = player.Uid == PlayerManager.CurrentUid ? $"<color={Constants.ColorCyan}>" : string.Empty;
                 var localColorEnd = player.Uid == PlayerManager.CurrentUid ? "</color>" : string.Empty;
                 var capturedPlayer = player;
                 SetEntry(

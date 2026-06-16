@@ -231,7 +231,7 @@ namespace MDEN.UI.Core
 
         private static string ColorLabel(string value, string color)
         {
-            return $"<color=#{color}>{value}</color>";
+            return $"<color={color}>{value}</color>";
         }
 
         private static string FormatNames(string[] uids, SettlementResultPush result)
@@ -244,7 +244,7 @@ namespace MDEN.UI.Core
                 var name = EscapeRichText(GetPlayerName(uid, result));
                 if (!string.IsNullOrWhiteSpace(name))
                 {
-                    names.Add($"<color=#ffffffff>{name}</color>");
+                    names.Add($"<color=ffffffff>{name}</color>");
                 }
             }
 

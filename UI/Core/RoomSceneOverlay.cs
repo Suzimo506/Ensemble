@@ -252,8 +252,8 @@ namespace MDEN.UI.Core
             var roomName = EscapeRichText(lobby.Name);
             var hostName = EscapeRichText(GetHostName(lobby));
             var hostColor = GetPlayerColor(lobby.HostUid);
-            return $"<color=#{Constants.ColorYellow}>【{roomName}】</color> {GetPlayerCount(lobby)}/{lobby.MaxPlayers}\n" +
-                   $"房主：<color=#{hostColor}>【{hostName}】</color>";
+            return $"<color={Constants.ColorYellow}>【{roomName}】</color> {GetPlayerCount(lobby)}/{lobby.MaxPlayers}\n" +
+                   $"房主：<color={hostColor}>【{hostName}】</color>";
         }
 
         private static string GetHostName(LobbySyncPush lobby)

@@ -491,6 +491,10 @@ namespace MDEN.UI.Core
             text.raycastTarget = clickable;
             text.supportRichText = true;
 
+            var canvas = obj.AddComponent<Canvas>();
+            canvas.overrideSorting = true;
+            canvas.sortingOrder = 32766;
+
             if (clickable)
             {
                 var button = obj.AddComponent<Button>();
@@ -542,15 +546,15 @@ namespace MDEN.UI.Core
         private static string FormatTitle(string title)
         {
             return string.IsNullOrWhiteSpace(title)
-                ? "<color=#ffffff88>[无头衔]</color>"
-                : $"<color=#{Constants.ColorYellow}>[{EscapeRichText(title)}]</color>";
+                ? "<color=ffffff88>[无头衔]</color>"
+                : $"<color={Constants.ColorYellow}>[{EscapeRichText(title)}]</color>";
         }
 
         private static string FormatName(string name)
         {
             return string.IsNullOrWhiteSpace(name)
-                ? $"<b><color=#{Constants.ColorPink}>Unknown</color></b>"
-                : $"<b><color=#{Constants.ColorPink}>{EscapeRichText(name)}</color></b>";
+                ? $"<b><color={Constants.ColorPink}>Unknown</color></b>"
+                : $"<b><color={Constants.ColorPink}>{EscapeRichText(name)}</color></b>";
         }
 
         private static string EscapeRichText(string value)

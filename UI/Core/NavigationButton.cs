@@ -72,7 +72,7 @@ namespace MDEN.UI.Core
                 var iconRect = iconTrans.GetComponent<RectTransform>();
                 if (iconRect != null)
                 {
-                    iconRect.anchoredPosition = new Vector2(iconRect.anchoredPosition.x - 10f, iconRect.anchoredPosition.y);
+                    CenterIcon(iconRect);
                 }
             }
             // 清理原生绑定的按键事件，防止误触发原生设置
@@ -246,7 +246,12 @@ namespace MDEN.UI.Core
             {
                 icon.sprite = ResourceManager.GetSprite(position == 1 ? "Playlist_Img.png" : "Play_Img.png");
                 icon.preserveAspect = true;
-                icon.transform.localScale = new Vector3(-Mathf.Abs(icon.transform.localScale.x), icon.transform.localScale.y, icon.transform.localScale.z);
+                var iconRect = icon.GetComponent<RectTransform>();
+                if (iconRect != null)
+                {
+                    CenterIcon(iconRect);
+                    iconRect.localScale = new Vector3(-Mathf.Abs(iconRect.localScale.x), iconRect.localScale.y, iconRect.localScale.z);
+                }
             }
 
             RemoveNativeBindings(buttonObj);
@@ -268,6 +273,14 @@ namespace MDEN.UI.Core
 
             var eventTrigger = target.GetComponent<UnityEngine.EventSystems.EventTrigger>();
             if (eventTrigger != null) GameObject.Destroy(eventTrigger);
+        }
+
+        private static void CenterIcon(RectTransform iconRect)
+        {
+            iconRect.anchorMin = new Vector2(0.5f, 0.5f);
+            iconRect.anchorMax = new Vector2(0.5f, 0.5f);
+            iconRect.pivot = new Vector2(0.5f, 0.5f);
+            iconRect.anchoredPosition = Vector2.zero;
         }
 
         private static void DestroyRoomActionButtons()

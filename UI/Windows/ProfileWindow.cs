@@ -114,36 +114,36 @@ namespace MDEN.UI.Windows
             _btnBack.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("OptionsPanel.png")?.texture;
             _window.ForumObjects.Add(_btnBack);
 
-            _btnRefresh = new ForumObject(new LocalString("- 刷新信息 -"), new LocalString(summary));
+            _btnRefresh = new ForumObject(new LocalString("刷新信息"), new LocalString(summary));
             _btnRefresh.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("PlayerCard.png")?.texture;
             _window.ForumObjects.Add(_btnRefresh);
 
             _btnName = new ForumObject(
-                new LocalString("- 修改名字 -"),
+                new LocalString("修改名字"),
                 new LocalString(WithCurrentSetting("修改自己的名字，16字上限", profile?.Name)));
             _btnName.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("PlayerCard.png")?.texture;
             _window.ForumObjects.Add(_btnName);
 
             _btnNameColor = new ForumObject(
-                new LocalString("- 修改名字颜色 -"),
+                new LocalString("修改名字颜色"),
                 new LocalString(WithCurrentSetting("输入十六进制颜色，不要带#，例如 ff00ff", SanitizeColor(profile?.ChatColor))));
             _btnNameColor.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("OptionsPanel.png")?.texture;
             _window.ForumObjects.Add(_btnNameColor);
 
             _btnBio = new ForumObject(
-                new LocalString("- 修改个人介绍 -"),
+                new LocalString("修改个人介绍"),
                 new LocalString(WithCurrentSetting("别人在房间点击你的卡片时显示的介绍，30字上限", profile?.Bio)));
             _btnBio.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("HomePanel.png")?.texture;
             _window.ForumObjects.Add(_btnBio);
 
             _btnEntranceMessage = new ForumObject(
-                new LocalString("- 修改入场提示语 -"),
+                new LocalString("修改入场提示语"),
                 new LocalString(WithCurrentSetting("进入房间时显示的提示语，12字上限", profile?.EntranceMessage)));
             _btnEntranceMessage.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("RoomList.png")?.texture;
             _window.ForumObjects.Add(_btnEntranceMessage);
 
             _btnTitle = new ForumObject(
-                new LocalString("- 修改头衔 -"),
+                new LocalString("修改头衔"),
                 new LocalString(WithCurrentSetting("显示在个人信息中的头衔，12字上限", profile?.Title)));
             _btnTitle.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("SocialNetwork.png")?.texture;
             _window.ForumObjects.Add(_btnTitle);
@@ -151,7 +151,7 @@ namespace MDEN.UI.Windows
 
         private static string WithCurrentSetting(string description, string value)
         {
-            return $"{description}\n当前设置：<color=#{Constants.ColorYellow}>{EscapeRichText(GetDisplayValue(value))}</color>";
+            return $"{description}\n当前设置：<color={Constants.ColorYellow}>{EscapeRichText(GetDisplayValue(value))}</color>";
         }
 
         private static string GetDisplayValue(string value)

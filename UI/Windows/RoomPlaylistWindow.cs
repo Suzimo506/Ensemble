@@ -49,7 +49,9 @@ namespace MDEN.UI.Windows
             for (var i = 0; i < _items.Length; i++)
             {
                 var item = _items[i];
-                AddButton($"#{i + 1}", $"{EscapeRichText(item.DisplayName)}\n难度: {FormatDifficulty(item.Difficulty)}\n添加者: {EscapeRichText(item.OwnerName)}");
+                var title = $"{EscapeRichText(item.DisplayName)} {FormatDifficulty(item.Difficulty)}";
+                var desc = $"谱面: {EscapeRichText(item.DisplayName)}\n难度: {FormatDifficulty(item.Difficulty)}\n添加者: {EscapeRichText(item.OwnerName)}";
+                AddButton(title, desc);
             }
         }
 
@@ -65,10 +67,10 @@ namespace MDEN.UI.Windows
         {
             return difficulty switch
             {
-                1 => $"<color=#00d45aff>萌新</color>",
-                2 => $"<color=#{Constants.ColorBlue}>高手</color>",
-                3 => $"<color=#9b55ffff>大触</color>",
-                4 => $"<color=#ff5555ff>隐藏</color>",
+                1 => "<color=00d45aff>萌新</color>",
+                2 => $"<color={Constants.ColorBlue}>高手</color>",
+                3 => "<color=9b55ffff>大触</color>",
+                4 => "<color=ff5555ff>隐藏</color>",
                 _ => difficulty.ToString()
             };
         }

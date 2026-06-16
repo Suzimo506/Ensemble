@@ -903,7 +903,7 @@ namespace MDEN.UI.Displays
         private static string ColorText(string text, string color)
         {
             var normalized = NormalizeHexColor(color) ?? WhiteTextColor;
-            return $"<color=#{normalized}>{text}</color>";
+            return $"<color={normalized}>{text}</color>";
         }
 
         private static string EscapeRichText(string value)

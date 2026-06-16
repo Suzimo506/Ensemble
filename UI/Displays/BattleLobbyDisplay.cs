@@ -205,14 +205,14 @@ namespace MDEN.UI.Displays
             var nameColor = GetPlayerColor(player.Uid);
             var battleInfo = FormatBattleInfo(player, false);
 
-            return $"{FormatRank(player, rank)} <color=#{nameColor}>{playerName}</color> — {battleInfo}";
+            return $"{FormatRank(player, rank)} <color={nameColor}>{playerName}</color> — {battleInfo}";
         }
 
         internal static string FormatResultEntry(BattlePlayerEntry player, int rank)
         {
             var playerName = EscapeRichText(GetPlayerName(player.Uid));
             var nameColor = GetPlayerColor(player.Uid);
-            return $"{FormatRank(player, rank)} <color=#{nameColor}>{playerName}</color> — {FormatResultAccuracy(player)}";
+            return $"{FormatRank(player, rank)} <color={nameColor}>{playerName}</color> — {FormatResultAccuracy(player)}";
         }
 
         internal static BattlePlayerEntry[] WithLobbyDefaults(BattlePlayerEntry[] players)
@@ -239,29 +239,29 @@ namespace MDEN.UI.Displays
         {
             if (!player.Alive)
             {
-                return $"<color=#{ColorRed}>Down</color>";
+                return $"<color={ColorRed}>Down</color>";
             }
 
             var lobby = LobbyManager.CurrentLobby;
             var goal = (LobbyGoal)(lobby?.Goal ?? (byte)LobbyGoal.Accuracy);
             if (!forceAccuracy && goal == LobbyGoal.Score)
             {
-                return $"<color=#{Constants.ColorYellow}>{player.Score}</color>";
+                return $"<color={Constants.ColorYellow}>{player.Score}</color>";
             }
 
             if (IsTp(player))
             {
-                return $"<color=#{ColorRed}>TP</color>";
+                return $"<color={ColorRed}>TP</color>";
             }
 
             if (IsAp(player))
             {
-                return $"<color=#{ColorGold}>AP</color>{FormatJudgementSuffix(player)}";
+                return $"<color={ColorGold}>AP</color>{FormatJudgementSuffix(player)}";
             }
 
             var accuracy = player.Accuracy.ToString("0.00", CultureInfo.InvariantCulture);
-            var accuracyText = $"<color=#{GetAccuracyColor(player.Accuracy)}>{accuracy}%</color>";
-            var result = player.FC ? $"<color=#{Constants.ColorBlue}>FC</color> {accuracyText}" : accuracyText;
+            var accuracyText = $"<color={GetAccuracyColor(player.Accuracy)}>{accuracy}%</color>";
+            var result = player.FC ? $"<color={Constants.ColorBlue}>FC</color> {accuracyText}" : accuracyText;
             return result + FormatJudgementSuffix(player);
         }
 
@@ -269,22 +269,22 @@ namespace MDEN.UI.Displays
         {
             if (!player.Alive)
             {
-                return $"<color=#{ColorRed}>Down</color>";
+                return $"<color={ColorRed}>Down</color>";
             }
 
             if (IsTp(player))
             {
-                return $"<color=#{ColorRed}>TP</color>";
+                return $"<color={ColorRed}>TP</color>";
             }
 
             if (IsAp(player))
             {
-                return $"<color=#{ColorGold}>AP</color>{FormatJudgementSuffix(player)}";
+                return $"<color={ColorGold}>AP</color>{FormatJudgementSuffix(player)}";
             }
 
             var accuracy = player.Accuracy.ToString("0.00", CultureInfo.InvariantCulture);
-            var accuracyText = $"<color=#{GetAccuracyColor(player.Accuracy)}>{accuracy}%</color>";
-            var result = player.FC ? $"<color=#{Constants.ColorBlue}>FC</color> {accuracyText}" : accuracyText;
+            var accuracyText = $"<color={GetAccuracyColor(player.Accuracy)}>{accuracy}%</color>";
+            var result = player.FC ? $"<color={Constants.ColorBlue}>FC</color> {accuracyText}" : accuracyText;
             return result + FormatJudgementSuffix(player);
         }
 
@@ -317,15 +317,15 @@ namespace MDEN.UI.Displays
 
             if (previous.FC && !player.FC)
             {
-                Popup($"<color=#{Constants.ColorBlue}>失去FC!</color>", player.Uid);
+                Popup($"<color={Constants.ColorBlue}>失去FC!</color>", player.Uid);
             }
             else if (previous.AP && !IsAp(player))
             {
-                Popup($"<color=#{ColorGold}>失去AP!</color>", player.Uid);
+                Popup($"<color={ColorGold}>失去AP!</color>", player.Uid);
             }
             else if (previous.Alive && !player.Alive)
             {
-                Popup($"<color=#{ColorRed}>Down</color>", player.Uid);
+                Popup($"<color={ColorRed}>Down</color>", player.Uid);
             }
             else if (player.Misses > previous.Misses)
             {
@@ -400,7 +400,7 @@ namespace MDEN.UI.Displays
         {
             var text = $"#{rank}";
             return player?.Uid == PlayerManager.CurrentUid
-                ? $"<color=#{Constants.ColorPink}>{text}</color>"
+                ? $"<color={Constants.ColorPink}>{text}</color>"
                 : text;
         }
 
@@ -411,8 +411,8 @@ namespace MDEN.UI.Displays
             if (IsAp(player))
             {
                 var suffix = string.Empty;
-                if (player.Earlies > 0) suffix += $" <color=#{Constants.ColorBlue}>{player.Earlies}E</color>";
-                if (player.Lates > 0) suffix += $" <color=#{Constants.ColorPink}>{player.Lates}L</color>";
+                if (player.Earlies > 0) suffix += $" <color={Constants.ColorBlue}>{player.Earlies}E</color>";
+                if (player.Lates > 0) suffix += $" <color={Constants.ColorPink}>{player.Lates}L</color>";
                 return suffix;
             }
 

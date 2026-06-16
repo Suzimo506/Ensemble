@@ -1,19 +1,25 @@
 using MDEN.Managers;
 using MDEN.Protocol.Messages.Chat;
 using MDEN.UI.Displays;
+using PeroInputManager = Il2CppAssets.Scripts.PeroTools.Managers.InputManager;
 
 namespace MDEN.UI.Core
 {
     public static class RoomHudController
     {
         private const int MaxRefreshRetries = 120;
+        private const int EntranceFallbackDelayFrames = 20;
         private static readonly RoomPlayerListDisplay PlayerList = new RoomPlayerListDisplay();
         private static readonly RoomChatDisplay Chat = new RoomChatDisplay();
         private static readonly RoomReadyDisplay ReadyDisplay = new RoomReadyDisplay();
         private static bool _initialized;
         private static int _pendingRetryGeneration;
         private static int _retryDelayFrames;
+        private static int _entranceFallbackLobbyId = -1;
+        private static int _entranceDisplayedLobbyId = -1;
+        private static bool _entranceFallbackCompleted;
         private static bool _characterNotReadyLogged;
+        private static bool _nativeInputBlockedByChat;
 
         public static void Initialize()
         {
@@ -52,6 +58,7 @@ namespace MDEN.UI.Core
         private static void OnLobbyChanged()
         {
             Refresh();
+            ScheduleEntranceFallback(LobbyManager.CurrentLobby);
             NavigationButton.RefreshRoomButton();
             PreparationStartController.BindOrRefresh();
             ChartPreviewController.OnLobbyChanged(LobbyManager.CurrentLobby);
@@ -84,6 +91,7 @@ namespace MDEN.UI.Core
         public static void Update()
         {
             Chat.Update();
+            UpdateNativeInputBlock();
             ReadyDisplay.Update();
             StageDesignerTextController.Update();
             RoomSceneOverlay.UpdateVisibility();
@@ -176,6 +184,7 @@ namespace MDEN.UI.Core
         {
             _pendingRetryGeneration++;
             _retryDelayFrames = 0;
+            ResetEntranceFallback();
             _characterNotReadyLogged = false;
             PlayerList.Destroy();
             Chat.Destroy();
@@ -185,12 +194,14 @@ namespace MDEN.UI.Core
             RoomCharacterDisplay.Destroy();
             ChartPreviewController.Reset();
             MultiplayerBattleController.Reset();
+            RestoreNativeInput();
         }
 
         public static void ResetSceneObjects()
         {
             _pendingRetryGeneration++;
             _retryDelayFrames = 0;
+            ResetEntranceFallback();
             _characterNotReadyLogged = false;
             PlayerList.Destroy();
             Chat.ResetSceneObjects();
@@ -200,12 +211,114 @@ namespace MDEN.UI.Core
             RoomCharacterDisplay.Destroy();
             ChartPreviewController.Reset();
             MultiplayerBattleController.Reset();
+            RestoreNativeInput();
         }
 
         public static void AddChatMessage(ChatPushMsg message)
         {
             if (!LobbyManager.IsInLobby) return;
+            if (IsOwnEntranceMessage(message))
+            {
+                var lobbyId = LobbyManager.CurrentLobby.Id;
+                if (_entranceDisplayedLobbyId == lobbyId) return;
+
+                _entranceDisplayedLobbyId = lobbyId;
+                _entranceFallbackCompleted = true;
+            }
+
             Chat.AddMessage(message);
+        }
+
+        private static void ScheduleEntranceFallback(MDEN.Protocol.Messages.Lobby.LobbySyncPush lobby)
+        {
+            if (lobby == null)
+            {
+                ResetEntranceFallback();
+                return;
+            }
+
+            if (_entranceFallbackLobbyId == lobby.Id) return;
+
+            _entranceFallbackLobbyId = lobby.Id;
+            _entranceDisplayedLobbyId = -1;
+            _entranceFallbackCompleted = false;
+            MainThreadDispatcher.Enqueue(() => RunEntranceFallback(lobby.Id, EntranceFallbackDelayFrames));
+        }
+
+        private static void RunEntranceFallback(int lobbyId, int framesRemaining)
+        {
+            if (!LobbyManager.IsInLobby || LobbyManager.CurrentLobby?.Id != lobbyId) return;
+            if (_entranceFallbackCompleted || _entranceDisplayedLobbyId == lobbyId) return;
+
+            if (framesRemaining > 0)
+            {
+                MainThreadDispatcher.Enqueue(() => RunEntranceFallback(lobbyId, framesRemaining - 1));
+                return;
+            }
+
+            var entranceMessage = PlayerManager.CurrentProfile?.EntranceMessage?.Trim();
+            if (string.IsNullOrWhiteSpace(entranceMessage))
+            {
+                _entranceFallbackCompleted = true;
+                return;
+            }
+
+            AddChatMessage(new ChatPushMsg
+            {
+                AuthorUid = "system",
+                AuthorName = "System",
+                Message = "PlayerEntranceMessage",
+                ExtraData = $"{PlayerManager.CurrentUid}#{entranceMessage}",
+                IsSystem = true
+            });
+        }
+
+        private static bool IsOwnEntranceMessage(ChatPushMsg message)
+        {
+            if (message == null || message.Message != "PlayerEntranceMessage") return false;
+            if (string.IsNullOrWhiteSpace(message.ExtraData)) return false;
+
+            var parts = message.ExtraData.Split(new[] { '#' }, 2);
+            return parts.Length == 2 && parts[0] == PlayerManager.CurrentUid;
+        }
+
+        private static void ResetEntranceFallback()
+        {
+            _entranceFallbackLobbyId = -1;
+            _entranceDisplayedLobbyId = -1;
+            _entranceFallbackCompleted = false;
+        }
+
+        private static void UpdateNativeInputBlock()
+        {
+            var shouldBlock = LobbyManager.IsInLobby && Chat.IsConsumingInput;
+            if (_nativeInputBlockedByChat == shouldBlock) return;
+
+            _nativeInputBlockedByChat = shouldBlock;
+            SetNativeInputBlocked(shouldBlock);
+        }
+
+        private static void RestoreNativeInput()
+        {
+            if (!_nativeInputBlockedByChat) return;
+
+            _nativeInputBlockedByChat = false;
+            SetNativeInputBlocked(false);
+        }
+
+        private static void SetNativeInputBlocked(bool blocked)
+        {
+            try
+            {
+                if (PeroInputManager.instance != null)
+                {
+                    PeroInputManager.instance.isStopKeyAction = blocked;
+                }
+            }
+            catch
+            {
+                // Native input manager may be unavailable during scene transitions.
+            }
         }
     }
 }
