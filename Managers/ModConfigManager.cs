@@ -17,6 +17,12 @@ namespace MDEN.Managers
         public List<CustomServerInfo> CustomServers { get; set; } = new List<CustomServerInfo>();
         public string ClientUid { get; set; }
         public string PlayerName { get; set; }
+        public string PlayerBio { get; set; }
+        public string PlayerChatColor { get; set; }
+        public string PlayerEntranceMessage { get; set; }
+        public string PlayerTitle { get; set; }
+        public string PlayerAvatarName { get; set; }
+        public bool EnableFavGirlDisplayForOthers { get; set; }
     }
 
     public static class ModConfigManager
@@ -27,6 +33,12 @@ namespace MDEN.Managers
         public static List<CustomServerInfo> CustomServers { get; private set; } = new List<CustomServerInfo>();
         public static string ClientUid { get; private set; }
         public static string PlayerName { get; private set; }
+        public static string PlayerBio { get; private set; }
+        public static string PlayerChatColor { get; private set; }
+        public static string PlayerEntranceMessage { get; private set; }
+        public static string PlayerTitle { get; private set; }
+        public static string PlayerAvatarName { get; private set; }
+        public static bool EnableFavGirlDisplayForOthers { get; private set; }
 
         public static void LoadConfig()
         {
@@ -55,7 +67,13 @@ namespace MDEN.Managers
                 {
                     CustomServers = CustomServers,
                     ClientUid = ClientUid,
-                    PlayerName = PlayerName
+                    PlayerName = PlayerName,
+                    PlayerBio = PlayerBio,
+                    PlayerChatColor = PlayerChatColor,
+                    PlayerEntranceMessage = PlayerEntranceMessage,
+                    PlayerTitle = PlayerTitle,
+                    PlayerAvatarName = PlayerAvatarName,
+                    EnableFavGirlDisplayForOthers = EnableFavGirlDisplayForOthers
                 };
                 var json = JsonSerializer.Serialize(data, new JsonSerializerOptions { WriteIndented = true });
                 File.WriteAllText(ConfigPath, json);
@@ -103,6 +121,36 @@ namespace MDEN.Managers
             }
         }
 
+        public static void SetPlayerBio(string bio)
+        {
+            PlayerBio = bio ?? string.Empty;
+            SaveConfig();
+        }
+
+        public static void SetPlayerChatColor(string chatColor)
+        {
+            PlayerChatColor = string.IsNullOrWhiteSpace(chatColor) ? "ffffff" : chatColor.Trim().TrimStart('#');
+            SaveConfig();
+        }
+
+        public static void SetPlayerEntranceMessage(string entranceMessage)
+        {
+            PlayerEntranceMessage = entranceMessage ?? string.Empty;
+            SaveConfig();
+        }
+
+        public static void SetPlayerTitle(string title)
+        {
+            PlayerTitle = title ?? string.Empty;
+            SaveConfig();
+        }
+
+        public static void SetEnableFavGirlDisplayForOthers(bool enabled)
+        {
+            EnableFavGirlDisplayForOthers = enabled;
+            SaveConfig();
+        }
+
         private static void LoadConfigFromJson(string json)
         {
             if (string.IsNullOrWhiteSpace(json))
@@ -121,6 +169,12 @@ namespace MDEN.Managers
             CustomServers = data?.CustomServers ?? new List<CustomServerInfo>();
             ClientUid = data?.ClientUid;
             PlayerName = data?.PlayerName;
+            PlayerBio = data?.PlayerBio;
+            PlayerChatColor = data?.PlayerChatColor;
+            PlayerEntranceMessage = data?.PlayerEntranceMessage;
+            PlayerTitle = data?.PlayerTitle;
+            PlayerAvatarName = data?.PlayerAvatarName;
+            EnableFavGirlDisplayForOthers = data?.EnableFavGirlDisplayForOthers ?? false;
         }
 
         private static void EnsureIdentity()
@@ -130,6 +184,18 @@ namespace MDEN.Managers
             if (string.IsNullOrWhiteSpace(PlayerName))
             {
                 PlayerName = "Player";
+                changed = true;
+            }
+
+            if (string.IsNullOrWhiteSpace(PlayerChatColor))
+            {
+                PlayerChatColor = "ffffff";
+                changed = true;
+            }
+
+            if (string.IsNullOrWhiteSpace(PlayerAvatarName))
+            {
+                PlayerAvatarName = "head_0";
                 changed = true;
             }
 

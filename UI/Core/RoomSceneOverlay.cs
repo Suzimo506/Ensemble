@@ -252,8 +252,8 @@ namespace MDEN.UI.Core
             var roomName = EscapeRichText(lobby.Name);
             var hostName = EscapeRichText(GetHostName(lobby));
             var hostColor = GetPlayerColor(lobby.HostUid);
-            return $"<color={Constants.ColorYellow}>【{roomName}】</color> {GetPlayerCount(lobby)}/{lobby.MaxPlayers}\n" +
-                   $"房主：<color={hostColor}>【{hostName}】</color>";
+            return $"<color=#{Constants.ColorYellow}>【{roomName}】</color> {GetPlayerCount(lobby)}/{lobby.MaxPlayers}\n" +
+                   $"房主：<color=#{hostColor}>【{hostName}】</color>";
         }
 
         private static string GetHostName(LobbySyncPush lobby)
@@ -275,8 +275,19 @@ namespace MDEN.UI.Core
 
         private static int GetPlayerCount(LobbySyncPush lobby)
         {
-            if (lobby.PlayerDetails != null && lobby.PlayerDetails.Length > 0) return lobby.PlayerDetails.Length;
-            return lobby.Players?.Length ?? 0;
+            if (lobby.PlayerDetails != null && lobby.PlayerDetails.Length > 0)
+            {
+                return lobby.PlayerDetails
+                    .Where(player => !string.IsNullOrEmpty(player?.Uid))
+                    .Select(player => player.Uid)
+                    .Distinct()
+                    .Count();
+            }
+
+            return lobby.Players?
+                .Where(uid => !string.IsNullOrEmpty(uid))
+                .Distinct()
+                .Count() ?? 0;
         }
 
         private static string GetPlayerColor(string uid)

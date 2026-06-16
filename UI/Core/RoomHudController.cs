@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using MDEN.Managers;
 using MDEN.Protocol.Messages.Chat;
 using MDEN.UI.Displays;
@@ -17,7 +18,9 @@ namespace MDEN.UI.Core
         private static int _retryDelayFrames;
         private static int _entranceFallbackLobbyId = -1;
         private static int _entranceDisplayedLobbyId = -1;
+        private static int _entranceTrackedLobbyId = -1;
         private static bool _entranceFallbackCompleted;
+        private static readonly HashSet<int> EntranceAnnouncedLobbyIds = new HashSet<int>();
         private static bool _characterNotReadyLogged;
         private static bool _nativeInputBlockedByChat;
 
@@ -40,9 +43,9 @@ namespace MDEN.UI.Core
             _initialized = false;
         }
 
-        private static void HandleLobbyChanged(MDEN.Protocol.Messages.Lobby.LobbySyncPush _)
+        private static void HandleLobbyChanged(MDEN.Protocol.Messages.Lobby.LobbySyncPush lobby)
         {
-            MainThreadDispatcher.Enqueue(OnLobbyChanged);
+            MainThreadDispatcher.Enqueue(() => OnLobbyChanged(lobby));
         }
 
         private static void HandleChatMessageReceived(ChatPushMsg message)
@@ -55,13 +58,26 @@ namespace MDEN.UI.Core
             MainThreadDispatcher.Enqueue(OnProfileChanged);
         }
 
-        private static void OnLobbyChanged()
+        private static void OnLobbyChanged(MDEN.Protocol.Messages.Lobby.LobbySyncPush lobby)
         {
-            Refresh();
-            ScheduleEntranceFallback(LobbyManager.CurrentLobby);
+            if (lobby == null && LobbyManager.CurrentLobby != null) return;
+            if (lobby != null && LobbyManager.CurrentLobby?.Id != lobby.Id) return;
+
+            var isNewLobbyEntry = lobby != null && _entranceTrackedLobbyId != lobby.Id;
+            if (lobby == null)
+            {
+                _entranceTrackedLobbyId = -1;
+            }
+            else if (isNewLobbyEntry)
+            {
+                _entranceTrackedLobbyId = lobby.Id;
+            }
+
+            Refresh(lobby);
+            ScheduleEntranceFallback(lobby, isNewLobbyEntry);
             NavigationButton.RefreshRoomButton();
             PreparationStartController.BindOrRefresh();
-            ChartPreviewController.OnLobbyChanged(LobbyManager.CurrentLobby);
+            ChartPreviewController.OnLobbyChanged(lobby);
             MultiplayerBattleController.OnLobbyChanged();
         }
 
@@ -75,7 +91,7 @@ namespace MDEN.UI.Core
 
         public static void Refresh()
         {
-            Refresh(0);
+            Refresh(LobbyManager.CurrentLobby, 0);
         }
 
         public static void RequestRefresh()
@@ -84,8 +100,14 @@ namespace MDEN.UI.Core
             MainThreadDispatcher.Enqueue(() =>
             {
                 if (generation != _pendingRetryGeneration) return;
-                Refresh();
+                Refresh(LobbyManager.CurrentLobby);
             });
+        }
+
+        public static void RebuildRoomCharacters()
+        {
+            RoomCharacterDisplay.DestroyGeneratedObjects();
+            RequestRefresh();
         }
 
         public static void Update()
@@ -99,26 +121,28 @@ namespace MDEN.UI.Core
 
         public static bool IsChatConsumingInput => Chat.IsConsumingInput;
 
-        private static void Refresh(int retryCount)
+        private static void Refresh(MDEN.Protocol.Messages.Lobby.LobbySyncPush lobby, int retryCount = 0)
         {
-            if (!LobbyManager.IsInLobby)
+            if (lobby == null || !LobbyManager.IsInLobby)
             {
                 Destroy();
                 return;
             }
 
+            if (LobbyManager.CurrentLobby?.Id != lobby.Id) return;
+
             if (RoomSceneOverlay.IsNavigationReady)
             {
-                PlayerList.Update(LobbyManager.CurrentLobby);
+                PlayerList.Update(lobby);
                 Chat.CreateEmpty();
-                ReadyDisplay.Refresh(LobbyManager.CurrentLobby);
+                ReadyDisplay.Refresh(lobby);
             }
 
             if (!RoomSceneOverlay.IsHomeReady)
             {
                 RoomSceneOverlay.Hide();
                 RoomCharacterDisplay.DestroyGeneratedObjects();
-                ScheduleRefreshRetry(retryCount);
+                ScheduleRefreshRetry(lobby, retryCount);
                 return;
             }
 
@@ -126,11 +150,11 @@ namespace MDEN.UI.Core
             {
                 RoomSceneOverlay.Hide();
                 RoomCharacterDisplay.DestroyGeneratedObjects();
-                ScheduleRefreshRetry(retryCount);
+                ScheduleRefreshRetry(lobby, retryCount);
                 return;
             }
 
-            var characterReady = RoomCharacterDisplay.Refresh(LobbyManager.CurrentLobby);
+            var characterReady = RoomCharacterDisplay.Refresh(lobby);
             if (characterReady)
             {
                 _characterNotReadyLogged = false;
@@ -144,35 +168,36 @@ namespace MDEN.UI.Core
                 }
             }
 
-            RoomSceneOverlay.Refresh(LobbyManager.CurrentLobby);
+            RoomSceneOverlay.Refresh(lobby);
 
             if (NeedsRefreshRetry() && retryCount < MaxRefreshRetries)
             {
-                ScheduleRefreshRetry(retryCount);
+                ScheduleRefreshRetry(lobby, retryCount);
             }
         }
 
-        private static void ScheduleRefreshRetry(int retryCount)
+        private static void ScheduleRefreshRetry(MDEN.Protocol.Messages.Lobby.LobbySyncPush lobby, int retryCount)
         {
             if (retryCount >= MaxRefreshRetries) return;
 
             var generation = ++_pendingRetryGeneration;
             _retryDelayFrames = 3;
-            MainThreadDispatcher.Enqueue(() => RunDelayedRefresh(generation, retryCount));
+            MainThreadDispatcher.Enqueue(() => RunDelayedRefresh(lobby, generation, retryCount));
         }
 
-        private static void RunDelayedRefresh(int generation, int retryCount)
+        private static void RunDelayedRefresh(MDEN.Protocol.Messages.Lobby.LobbySyncPush lobby, int generation, int retryCount)
         {
             if (generation != _pendingRetryGeneration) return;
+            if (lobby == null || !LobbyManager.IsInLobby || LobbyManager.CurrentLobby?.Id != lobby.Id) return;
 
             if (_retryDelayFrames > 0)
             {
                 _retryDelayFrames--;
-                MainThreadDispatcher.Enqueue(() => RunDelayedRefresh(generation, retryCount));
+                MainThreadDispatcher.Enqueue(() => RunDelayedRefresh(lobby, generation, retryCount));
                 return;
             }
 
-            Refresh(retryCount + 1);
+            Refresh(lobby, retryCount + 1);
         }
 
         private static bool NeedsRefreshRetry()
@@ -192,7 +217,7 @@ namespace MDEN.UI.Core
             StageDesignerTextController.Restore();
             RoomSceneOverlay.Destroy();
             RoomCharacterDisplay.Destroy();
-            ChartPreviewController.Reset();
+            ChartPreviewController.ResetAll();
             MultiplayerBattleController.Reset();
             RestoreNativeInput();
         }
@@ -201,7 +226,7 @@ namespace MDEN.UI.Core
         {
             _pendingRetryGeneration++;
             _retryDelayFrames = 0;
-            ResetEntranceFallback();
+            ResetEntranceFallback(false);
             _characterNotReadyLogged = false;
             PlayerList.Destroy();
             Chat.ResetSceneObjects();
@@ -209,7 +234,7 @@ namespace MDEN.UI.Core
             StageDesignerTextController.Restore();
             RoomSceneOverlay.Destroy();
             RoomCharacterDisplay.Destroy();
-            ChartPreviewController.Reset();
+            ChartPreviewController.ResetAll();
             MultiplayerBattleController.Reset();
             RestoreNativeInput();
         }
@@ -220,16 +245,18 @@ namespace MDEN.UI.Core
             if (IsOwnEntranceMessage(message))
             {
                 var lobbyId = LobbyManager.CurrentLobby.Id;
-                if (_entranceDisplayedLobbyId == lobbyId) return;
+                if (EntranceAnnouncedLobbyIds.Contains(lobbyId)) return;
 
                 _entranceDisplayedLobbyId = lobbyId;
                 _entranceFallbackCompleted = true;
+                _entranceTrackedLobbyId = lobbyId;
+                EntranceAnnouncedLobbyIds.Add(lobbyId);
             }
 
             Chat.AddMessage(message);
         }
 
-        private static void ScheduleEntranceFallback(MDEN.Protocol.Messages.Lobby.LobbySyncPush lobby)
+        private static void ScheduleEntranceFallback(MDEN.Protocol.Messages.Lobby.LobbySyncPush lobby, bool isNewLobbyEntry)
         {
             if (lobby == null)
             {
@@ -237,7 +264,15 @@ namespace MDEN.UI.Core
                 return;
             }
 
+            if (!isNewLobbyEntry) return;
             if (_entranceFallbackLobbyId == lobby.Id) return;
+            if (EntranceAnnouncedLobbyIds.Contains(lobby.Id))
+            {
+                _entranceFallbackLobbyId = lobby.Id;
+                _entranceDisplayedLobbyId = lobby.Id;
+                _entranceFallbackCompleted = true;
+                return;
+            }
 
             _entranceFallbackLobbyId = lobby.Id;
             _entranceDisplayedLobbyId = -1;
@@ -282,11 +317,16 @@ namespace MDEN.UI.Core
             return parts.Length == 2 && parts[0] == PlayerManager.CurrentUid;
         }
 
-        private static void ResetEntranceFallback()
+        private static void ResetEntranceFallback(bool clearAnnounced = true)
         {
             _entranceFallbackLobbyId = -1;
             _entranceDisplayedLobbyId = -1;
             _entranceFallbackCompleted = false;
+            if (clearAnnounced)
+            {
+                _entranceTrackedLobbyId = -1;
+                EntranceAnnouncedLobbyIds.Clear();
+            }
         }
 
         private static void UpdateNativeInputBlock()

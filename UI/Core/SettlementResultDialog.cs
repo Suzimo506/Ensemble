@@ -179,14 +179,15 @@ namespace MDEN.UI.Core
             rect.anchoredPosition = new Vector2(0f, 30f);
 
             var image = buttonObj.AddComponent<Image>();
-            image.color = new Color(0.58f, 0.17f, 0.95f, 0.95f);
+            image.color = new Color(1f, 0.73f, 0.16f, 0.96f);
 
             var button = buttonObj.AddComponent<Button>();
             button.targetGraphic = image;
             button.onClick.AddListener((UnityAction)new Action(Destroy));
 
-            var label = CreateText(template, rect, "Label", "- 确认 -", 28, TextAnchor.MiddleCenter);
-            label.color = Color.white;
+            var label = CreateText(template, rect, "Label", "确认", 30, TextAnchor.MiddleCenter);
+            label.color = new Color(0.25f, 0.05f, 0.36f, 1f);
+            label.fontStyle = FontStyle.Bold;
             var labelRect = label.rectTransform;
             labelRect.anchorMin = Vector2.zero;
             labelRect.anchorMax = Vector2.one;

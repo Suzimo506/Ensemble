@@ -20,6 +20,7 @@ namespace MDEN.Managers
         public static GetPlayerResponse CurrentProfile { get; private set; }
         public static event Action ProfileChanged;
         private static GameSelectionInfo _lastSyncedSelection = new GameSelectionInfo(int.MinValue, int.MinValue);
+        private static GameSelectionInfo _lastSyncedFavSelection = new GameSelectionInfo(int.MinValue, int.MinValue);
         private static int _lastSelectionSyncFrame;
         private static bool _selectionSyncInProgress;
 
@@ -31,12 +32,7 @@ namespace MDEN.Managers
         public static void SetCurrentIdentity(string uid, string name)
         {
             CurrentUid = uid;
-            CurrentProfile = new GetPlayerResponse
-            {
-                Uid = uid,
-                Name = name,
-                Status = (byte)PlayerStatus.Online
-            };
+            CurrentProfile = CreateLocalProfile(uid, name, PlayerStatus.Online);
         }
 
         public static void ClearSession()
@@ -44,20 +40,18 @@ namespace MDEN.Managers
             CurrentUid = null;
             CurrentProfile = null;
             _lastSyncedSelection = new GameSelectionInfo(int.MinValue, int.MinValue);
+            _lastSyncedFavSelection = new GameSelectionInfo(int.MinValue, int.MinValue);
             _lastSelectionSyncFrame = 0;
             _selectionSyncInProgress = false;
         }
 
         public static async Task<GetPlayerResponse> GetMyProfileAsync()
         {
-            EnsureReady();
-
-            CurrentProfile = await NetworkClient.Instance.SendRequestAsync<GetPlayerRequest, GetPlayerResponse>(
-                OpCodes.GetPlayerReq,
-                new GetPlayerRequest { TargetUid = CurrentUid });
-
+            var uid = ResolveLocalUid();
+            CurrentUid ??= uid;
+            CurrentProfile = CreateLocalProfile(uid, GetLocalPlayerName(), PlayerStatus.Online);
             ProfileChanged?.Invoke();
-            return CurrentProfile;
+            return await Task.FromResult(CurrentProfile);
         }
 
         public static Task<GetPlayerResponse> GetProfileAsync(string targetUid)
@@ -76,15 +70,20 @@ namespace MDEN.Managers
 
         public static async Task SyncSelectionAsync(GameSelectionInfo selection)
         {
+            var favSelection = ModConfigManager.EnableFavGirlDisplayForOthers
+                ? GameAccountManager.GetCurrentFavGirlSelection()
+                : selection;
+
             await UpdateMyProfileAsync(new UpdatePlayerRequest
             {
                 GirlIndex = selection.GirlIndex,
                 ElfinIndex = selection.ElfinIndex,
-                FavGirlIndex = selection.GirlIndex,
-                FavElfinIndex = selection.ElfinIndex
+                FavGirlIndex = favSelection.GirlIndex,
+                FavElfinIndex = favSelection.ElfinIndex
             });
 
             _lastSyncedSelection = selection;
+            _lastSyncedFavSelection = favSelection;
         }
 
         public static void SyncCurrentSelectionIfChanged()
@@ -103,7 +102,10 @@ namespace MDEN.Managers
             }
 
             var selection = GameAccountManager.RefreshSelectionSnapshot();
-            if (selection.Equals(_lastSyncedSelection))
+            var favSelection = ModConfigManager.EnableFavGirlDisplayForOthers
+                ? GameAccountManager.GetCurrentFavGirlSelection()
+                : selection;
+            if (selection.Equals(_lastSyncedSelection) && favSelection.Equals(_lastSyncedFavSelection))
             {
                 return;
             }
@@ -207,29 +209,112 @@ namespace MDEN.Managers
             ProfileChanged?.Invoke();
         }
 
+        public static async Task SyncLocalProfileToServerAsync()
+        {
+            EnsureReady();
+
+            await NetworkClient.Instance.SendRequestAsync<UpdatePlayerRequest, UpdatePlayerResponse>(
+                OpCodes.UpdatePlayerReq,
+                CreateLocalProfileUpdateRequest());
+        }
+
         public static Task UpdateNameAsync(string name)
         {
-            return UpdateMyProfileAsync(new UpdatePlayerRequest { Name = name });
+            ModConfigManager.SetPlayerName(name);
+            ApplyLocalProfileConfig();
+            return Task.CompletedTask;
         }
 
         public static Task UpdateChatColorAsync(string chatColor)
         {
-            return UpdateMyProfileAsync(new UpdatePlayerRequest { ChatColor = chatColor });
+            ModConfigManager.SetPlayerChatColor(chatColor);
+            ApplyLocalProfileConfig();
+            return Task.CompletedTask;
         }
 
         public static Task UpdateBioAsync(string bio)
         {
-            return UpdateMyProfileAsync(new UpdatePlayerRequest { Bio = bio });
+            ModConfigManager.SetPlayerBio(bio);
+            ApplyLocalProfileConfig();
+            return Task.CompletedTask;
         }
 
         public static Task UpdateEntranceMessageAsync(string entranceMessage)
         {
-            return UpdateMyProfileAsync(new UpdatePlayerRequest { EntranceMessage = entranceMessage });
+            ModConfigManager.SetPlayerEntranceMessage(entranceMessage);
+            ApplyLocalProfileConfig();
+            return Task.CompletedTask;
         }
 
         public static Task UpdateTitleAsync(string title)
         {
-            return UpdateMyProfileAsync(new UpdatePlayerRequest { Title = title });
+            ModConfigManager.SetPlayerTitle(title);
+            ApplyLocalProfileConfig();
+            return Task.CompletedTask;
+        }
+
+        private static void ApplyLocalProfileConfig()
+        {
+            CurrentUid ??= ResolveLocalUid();
+
+            if (!string.IsNullOrEmpty(CurrentUid))
+            {
+                CurrentProfile ??= CreateLocalProfile(CurrentUid, GetLocalPlayerName(), PlayerStatus.Online);
+                ApplyLocalUpdate(CurrentProfile, CreateLocalProfileUpdateRequest());
+            }
+
+            ProfileChanged?.Invoke();
+        }
+
+        private static GetPlayerResponse CreateLocalProfile(string uid, string fallbackName, PlayerStatus status)
+        {
+            return new GetPlayerResponse
+            {
+                Uid = uid,
+                Name = GetLocalPlayerName(fallbackName),
+                Status = (byte)status,
+                Bio = ModConfigManager.PlayerBio,
+                ChatColor = ModConfigManager.PlayerChatColor,
+                EntranceMessage = ModConfigManager.PlayerEntranceMessage,
+                Title = ModConfigManager.PlayerTitle,
+                AvatarName = ModConfigManager.PlayerAvatarName
+            };
+        }
+
+        private static UpdatePlayerRequest CreateLocalProfileUpdateRequest()
+        {
+            return new UpdatePlayerRequest
+            {
+                Name = GetLocalPlayerName(),
+                Bio = ModConfigManager.PlayerBio ?? string.Empty,
+                ChatColor = ModConfigManager.PlayerChatColor ?? "ffffff",
+                EntranceMessage = ModConfigManager.PlayerEntranceMessage ?? string.Empty,
+                Title = ModConfigManager.PlayerTitle ?? string.Empty,
+                AvatarName = ModConfigManager.PlayerAvatarName ?? "head_0"
+            };
+        }
+
+        private static string GetLocalPlayerName(string fallbackName = null)
+        {
+            return string.IsNullOrWhiteSpace(ModConfigManager.PlayerName) || ModConfigManager.PlayerName == "Player"
+                ? fallbackName ?? CurrentProfile?.Name ?? CurrentUid ?? "Player"
+                : ModConfigManager.PlayerName;
+        }
+
+        private static string ResolveLocalUid()
+        {
+            if (!string.IsNullOrEmpty(CurrentUid)) return CurrentUid;
+
+            try
+            {
+                var account = GameAccountManager.GetCurrentAccount();
+                if (!string.IsNullOrWhiteSpace(account.Uid)) return account.Uid;
+            }
+            catch
+            {
+            }
+
+            return "Local";
         }
 
         private static void EnsureReady()

@@ -10,18 +10,56 @@ namespace MDEN.UI.Core
     {
         private const int PreviewRetryCount = 8;
         private const int PreviewRetryDelayFrames = 6;
+        private const int ResultPanelWaitFrames = 300;
         private static int _previewLobbyId;
         private static string _previewEntry;
         private static int _previewGeneration;
+        private static int _resultHoldGeneration;
+        private static bool _resultPreviewHeld;
+        private static bool _resultPanelSeen;
 
         public static void OnLobbyChanged(LobbySyncPush lobby)
         {
-            if (lobby == null || !lobby.Locked || lobby.IsPlaying)
+            if (lobby == null || !lobby.Locked)
+            {
+                ResetAll();
+                return;
+            }
+
+            if (lobby.IsPlaying)
             {
                 Reset();
                 return;
             }
 
+            if (_resultPreviewHeld) return;
+
+            PreviewCurrentLockedLobby(lobby);
+        }
+
+        public static void HoldPreviewUntilResultPanelCloses()
+        {
+            _resultPreviewHeld = true;
+            _resultPanelSeen = false;
+            var generation = ++_resultHoldGeneration;
+            MainThreadDispatcher.Enqueue(() => RunResultPanelHold(generation, ResultPanelWaitFrames));
+        }
+
+        public static void Reset()
+        {
+            _previewGeneration++;
+            _previewLobbyId = 0;
+            _previewEntry = null;
+        }
+
+        public static void ResetAll()
+        {
+            Reset();
+            ClearResultHold();
+        }
+
+        private static void PreviewCurrentLockedLobby(LobbySyncPush lobby)
+        {
             var entry = PlaylistManager.GetCurrentPlaylistEntry();
             if (entry == null || string.IsNullOrWhiteSpace(entry.Entry))
             {
@@ -41,11 +79,51 @@ namespace MDEN.UI.Core
             SchedulePreviewRetry(lobby.Id, entry.Entry, PreviewRetryCount);
         }
 
-        public static void Reset()
+        private static void RunResultPanelHold(int generation, int framesUntilFallbackRelease)
         {
-            _previewGeneration++;
-            _previewLobbyId = 0;
-            _previewEntry = null;
+            if (generation != _resultHoldGeneration || !_resultPreviewHeld) return;
+
+            var resultPanelVisible = IsNativeResultPanelVisible();
+            if (resultPanelVisible)
+            {
+                _resultPanelSeen = true;
+            }
+
+            if (_resultPanelSeen)
+            {
+                if (!resultPanelVisible)
+                {
+                    ReleaseResultHold(generation);
+                    return;
+                }
+
+                MainThreadDispatcher.Enqueue(() => RunResultPanelHold(generation, framesUntilFallbackRelease));
+                return;
+            }
+
+            if (framesUntilFallbackRelease <= 0)
+            {
+                ReleaseResultHold(generation);
+                return;
+            }
+
+            MainThreadDispatcher.Enqueue(() => RunResultPanelHold(generation, framesUntilFallbackRelease - 1));
+        }
+
+        private static void ReleaseResultHold(int generation)
+        {
+            if (generation != _resultHoldGeneration) return;
+
+            _resultPreviewHeld = false;
+            _resultPanelSeen = false;
+            PreviewCurrentLockedLobby(LobbyManager.CurrentLobby);
+        }
+
+        private static void ClearResultHold()
+        {
+            _resultHoldGeneration++;
+            _resultPreviewHeld = false;
+            _resultPanelSeen = false;
         }
 
         private static void SchedulePreviewRetry(int lobbyId, string entryText, int retriesRemaining)

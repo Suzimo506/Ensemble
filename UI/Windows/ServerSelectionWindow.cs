@@ -6,6 +6,7 @@ using PopupLib.UI.Windows;
 using PopupLib.UI.Components;
 using MDEN.Managers;
 using MDEN.Network; // 仅引用 DTO
+using MDEN.Protocol.Messages.System;
 using LocalizeLib;
 using MDEN.UI.Core;
 using MelonLoader;
@@ -23,6 +24,7 @@ namespace MDEN.UI.Windows
         private ForumObject _btnJoinServer;
         private static List<ApiServerEntry> _officialServerData = new List<ApiServerEntry>();
         private static List<Tuple<string, string>> _officialNodeDisplayData = new List<Tuple<string, string>>();
+        private static Dictionary<string, string> _customServerStatusDescriptions = new Dictionary<string, string>();
         private static bool _hasFetchedNodes = false;
 
         private int _lastSelectedIndex = -1;
@@ -155,7 +157,7 @@ namespace MDEN.UI.Windows
                 {
                     var info = await ServerManager.PingServerAsync(server.Address);
                     string displayName = server.Name;
-                    string desc = "获取信息失败或服务器离线";
+                    string desc = BuildServerStatsDescription(info);
 
                     if (info != null)
                     {
@@ -165,16 +167,25 @@ namespace MDEN.UI.Windows
                         else if (info.NodeId == "us") displayName = "美国";
                         else if (info.NodeId == "test") displayName = "内测节点";
                         else displayName = info.NodeId;
-
-                        desc = $"当前在线: <color={Constants.ColorYellow}>{info.PlayerCount}</color> 人\n房间数量: <color={Constants.ColorCyan}>{info.RoomCount}</color> 个";
                     }
 
                     displayName = $"<color={Constants.ColorYellow}>{displayName}</color>";
                     displayData.Add(new Tuple<string, string>(displayName, desc));
                 }
 
+                var customStatusDescriptions = new Dictionary<string, string>();
+                ModConfigManager.LoadConfig();
+                foreach (var customServer in ModConfigManager.CustomServers)
+                {
+                    if (customServer == null || string.IsNullOrWhiteSpace(customServer.Address)) continue;
+
+                    var info = await ServerManager.PingServerAsync(customServer.Address);
+                    customStatusDescriptions[customServer.Address] = BuildServerStatsDescription(info);
+                }
+
                 _officialServerData = servers;
                 _officialNodeDisplayData = displayData;
+                _customServerStatusDescriptions = customStatusDescriptions;
                 CloudSyncIndicator.Finish(true);
 
             }
@@ -183,6 +194,7 @@ namespace MDEN.UI.Windows
                 MelonLogger.Warning($"Fetch official nodes failed: {e.Message}");
                 _officialServerData = new List<ApiServerEntry>();
                 _officialNodeDisplayData = new List<Tuple<string, string>>();
+                _customServerStatusDescriptions = new Dictionary<string, string>();
                 CloudSyncIndicator.Finish(false);
             }
             finally
@@ -237,10 +249,31 @@ namespace MDEN.UI.Windows
             for (int i = 0; i < ModConfigManager.CustomServers.Count; i++)
             {
                 var cs = ModConfigManager.CustomServers[i];
-                var fo = new ForumObject(new LocalString($"<color={Constants.ColorBlue}>{cs.Name}</color>"), new LocalString($"IP地址: {cs.Address}\n点击后管理该服务器"));
+                var fo = new ForumObject(new LocalString($"<color={Constants.ColorBlue}>{cs.Name}</color>"), new LocalString(BuildCustomServerDescription(cs)));
                 fo.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("HomePanel.png")?.texture;
                 _customNodes.Add(fo);
             }
+        }
+
+        private static string BuildServerStatsDescription(ServerInfoResponse info)
+        {
+            if (info == null) return "获取信息失败或服务器离线";
+
+            return $"当前在线: <color={Constants.ColorYellow}>{info.PlayerCount}</color> 人\n房间数量: <color={Constants.ColorCyan}>{info.RoomCount}</color> 个";
+        }
+
+        private static string BuildCustomServerDescription(CustomServerInfo server)
+        {
+            if (server == null) return "节点不存在";
+
+            var status = "当前在线: 未刷新\n房间数量: 未刷新";
+            if (!string.IsNullOrWhiteSpace(server.Address) &&
+                _customServerStatusDescriptions.TryGetValue(server.Address, out var cachedStatus))
+            {
+                status = cachedStatus;
+            }
+
+            return $"IP地址: {server.Address}\n{status}\n点击后管理该服务器";
         }
 
         private void RebuildWindow()
@@ -341,6 +374,7 @@ namespace MDEN.UI.Windows
                     {
                         ModConfigManager.AddCustomServer(res);
                         MelonLogger.Msg($"Added custom server: {res}");
+                        await RefreshNodesAsync(true);
                     }
                     
                     // 刷新会重建 ForumWindow

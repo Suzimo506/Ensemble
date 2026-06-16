@@ -23,7 +23,7 @@ namespace MDEN.UI.Core
             if (!LobbyManager.IsInLobby) return;
 
             var orderedPlayers = BattleLobbyDisplay
-                .OrderPlayers(BattleLobbyDisplay.WithLobbyDefaults(players ?? Array.Empty<BattlePlayerEntry>()))
+                .OrderPlayers(players ?? Array.Empty<BattlePlayerEntry>())
                 .ToArray();
             if (orderedPlayers.Length == 0) return;
 

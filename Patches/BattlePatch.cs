@@ -56,6 +56,7 @@ namespace MDEN.Patches
                     return;
                 }
 
+                ChartPreviewController.HoldPreviewUntilResultPanelCloses();
                 _ = FinishBattleAndShowResultsAsync(true);
                 BattleHudController.Destroy();
             }
@@ -68,6 +69,7 @@ namespace MDEN.Patches
             {
                 if (!LobbyManager.IsInLobby) return;
 
+                ChartPreviewController.HoldPreviewUntilResultPanelCloses();
                 _ = FinishBattleAndShowResultsAsync(false);
                 BattleHudController.Destroy();
             }
@@ -152,6 +154,7 @@ namespace MDEN.Patches
 
             if (!LobbyManager.IsInLobby) return;
 
+            MainThreadDispatcher.Enqueue(RoomHudController.RebuildRoomCharacters);
             BattleResultBannerDisplay.ClearAll();
             await BattleResultBannerDisplay.ShowAsync(BattleManager.GetBattleDataSnapshot());
         }

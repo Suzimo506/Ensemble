@@ -48,14 +48,13 @@ namespace MDEN.UI.Core
         private static readonly Vector3 RightPositionB = new Vector3(8.3f, -1.65f, 100f);
         private static readonly Vector3 LocalScale = new Vector3(0.68f, 0.68f, 0.68f);
         private static readonly Vector3 OtherScale = new Vector3(0.54f, 0.54f, 0.54f);
-        private const float LocalLabelXOffset = -2.25f;
-        private const float OtherLabelXOffset = -1.95f;
-        private const float LocalTitleYOffset = 3.45f;
-        private const float LocalNameYOffset = 3.15f;
-        private const float OtherTitleYOffset = 3.10f;
-        private const float OtherNameYOffset = 2.82f;
-        private static readonly Vector2 LocalLabelSize = new Vector2(420f, 58f);
-        private static readonly Vector2 OtherLabelSize = new Vector2(360f, 52f);
+        private const float LabelXOffset = -2.15f;
+        private const float LocalTitleYOffset = 3.95f;
+        private const float LocalNameYOffset = 3.55f;
+        private const float OtherTitleYOffset = 3.70f;
+        private const float OtherNameYOffset = 3.34f;
+        private static readonly Vector2 LocalLabelSize = new Vector2(250f, 125f);
+        private static readonly Vector2 OtherLabelSize = new Vector2(250f, 125f);
         private static readonly string[] OwnedObjectNames =
         {
             "MDENRoomCharacterRightA",
@@ -137,7 +136,19 @@ namespace MDEN.UI.Core
 
         private static bool EnsureCreated()
         {
-            if (_localSlot != null) return true;
+            if (_localSlot != null)
+            {
+                if (_localLabels == null || _localLabels.IsDestroyed ||
+                    _rightLabelsA == null || _rightLabelsA.IsDestroyed ||
+                    _rightLabelsB == null || _rightLabelsB.IsDestroyed)
+                {
+                    DestroyGeneratedObjects();
+                }
+                else
+                {
+                    return true;
+                }
+            }
 
             DestroyOwnedObjectsByName();
             _originalMuseShow = GameObject.Find("UI/Standerd/PnlHome/MuseShow");
@@ -208,7 +219,7 @@ namespace MDEN.UI.Core
             ApplyLabels(slot, player, local);
 
             var girlIndex = local
-                ? GameAccountManager.GetCurrentSelection().GirlIndex
+                ? GetLocalDisplaySelection().GirlIndex
                 : player.GirlIndex;
             if (girlIndex < 0) girlIndex = 0;
 
@@ -452,9 +463,9 @@ namespace MDEN.UI.Core
         private static void CreateLabels()
         {
             var parent = _originalMuseShow.transform.parent;
-            _localLabels = CreateSlotLabels(parent, "MDENRoomLocal", LocalLabelSize, 24, 32);
-            _rightLabelsA = CreateSlotLabels(parent, "MDENRoomRightA", OtherLabelSize, 20, 28);
-            _rightLabelsB = CreateSlotLabels(parent, "MDENRoomRightB", OtherLabelSize, 20, 28);
+            _localLabels = CreateSlotLabels(parent, "MDENRoomLocal", LocalLabelSize, 24, 36);
+            _rightLabelsA = CreateSlotLabels(parent, "MDENRoomRightA", OtherLabelSize, 22, 32);
+            _rightLabelsB = CreateSlotLabels(parent, "MDENRoomRightB", OtherLabelSize, 22, 32);
         }
 
         private static SlotLabels CreateSlotLabels(
@@ -481,6 +492,7 @@ namespace MDEN.UI.Core
             rect.SetParent(parent);
             rect.localScale = Vector3.one;
             rect.sizeDelta = size;
+            rect.anchoredPosition3D = Vector3.zero;
 
             var text = obj.AddComponent<Text>();
             ApplyGameFont(text);
@@ -490,10 +502,11 @@ namespace MDEN.UI.Core
             text.verticalOverflow = VerticalWrapMode.Overflow;
             text.raycastTarget = clickable;
             text.supportRichText = true;
+            text.color = Color.white;
 
-            var canvas = obj.AddComponent<Canvas>();
-            canvas.overrideSorting = true;
-            canvas.sortingOrder = 32766;
+            var shadow = obj.AddComponent<Shadow>();
+            shadow.effectDistance = new Vector2(2f, -2f);
+            shadow.effectColor = new Color(0f, 0f, 0f, 0.45f);
 
             if (clickable)
             {
@@ -514,9 +527,8 @@ namespace MDEN.UI.Core
             labels.SetVisible(true);
             var titleYOffset = local ? LocalTitleYOffset : OtherTitleYOffset;
             var nameYOffset = local ? LocalNameYOffset : OtherNameYOffset;
-            var labelXOffset = local ? LocalLabelXOffset : OtherLabelXOffset;
             var slotPosition = slot.transform.position;
-            var labelX = slotPosition.x + labelXOffset;
+            var labelX = slotPosition.x + LabelXOffset;
             var titlePosition = new Vector3(labelX, slotPosition.y + titleYOffset, slotPosition.z);
             var namePosition = new Vector3(labelX, slotPosition.y + nameYOffset, slotPosition.z);
             labels.SetPosition(titlePosition, namePosition);
@@ -546,15 +558,15 @@ namespace MDEN.UI.Core
         private static string FormatTitle(string title)
         {
             return string.IsNullOrWhiteSpace(title)
-                ? "<color=ffffff88>[无头衔]</color>"
-                : $"<color={Constants.ColorYellow}>[{EscapeRichText(title)}]</color>";
+                ? "<color=#ffffff88>[无头衔]</color>"
+                : $"<color=#{Constants.ColorYellow}>[{EscapeRichText(title)}]</color>";
         }
 
         private static string FormatName(string name)
         {
             return string.IsNullOrWhiteSpace(name)
-                ? $"<b><color={Constants.ColorPink}>Unknown</color></b>"
-                : $"<b><color={Constants.ColorPink}>{EscapeRichText(name)}</color></b>";
+                ? $"<b><color=#{Constants.ColorPink}>Unknown</color></b>"
+                : $"<b><color=#{Constants.ColorPink}>{EscapeRichText(name)}</color></b>";
         }
 
         private static string EscapeRichText(string value)
@@ -577,14 +589,14 @@ namespace MDEN.UI.Core
         private static RoomCharacterPlayer GetLocalPlayer(LobbySyncPush lobby)
         {
             var uid = PlayerManager.CurrentUid;
-            return GetPlayers(lobby).FirstOrDefault(p => p.Uid == uid)
+            return GetPlayers(lobby).FirstOrDefault(p => IsSameUid(p.Uid, uid))
                 ?? new RoomCharacterPlayer
                 {
                     Uid = uid,
                     Name = PlayerManager.CurrentProfile?.Name ?? uid,
                     Title = PlayerManager.CurrentProfile?.Title,
-                    GirlIndex = GameAccountManager.GetCurrentSelection().GirlIndex,
-                    ElfinIndex = GameAccountManager.GetCurrentSelection().ElfinIndex,
+                    GirlIndex = GetLocalDisplaySelection().GirlIndex,
+                    ElfinIndex = GetLocalDisplaySelection().ElfinIndex,
                     Status = (byte)PlayerStatus.InLobby
                 };
         }
@@ -594,7 +606,7 @@ namespace MDEN.UI.Core
             var currentUid = PlayerManager.CurrentUid;
             foreach (var player in GetPlayers(lobby))
             {
-                if (player.Uid == currentUid) continue;
+                if (IsSameUid(player.Uid, currentUid)) continue;
                 yield return player;
             }
         }
@@ -602,24 +614,28 @@ namespace MDEN.UI.Core
         private static IEnumerable<RoomCharacterPlayer> GetPlayers(LobbySyncPush lobby)
         {
             var characterMap = lobby.PlayerCharacters?
-                .Where(p => !string.IsNullOrEmpty(p?.Uid))
-                .ToDictionary(p => p.Uid, p => p);
+                .Where(p => !string.IsNullOrEmpty(NormalizeUid(p?.Uid)))
+                .GroupBy(p => NormalizeUid(p.Uid))
+                .ToDictionary(group => group.Key, group => group.First());
+            var seenUids = new HashSet<string>();
 
             if (lobby.PlayerDetails != null && lobby.PlayerDetails.Length > 0)
             {
                 foreach (var player in lobby.PlayerDetails)
                 {
-                    if (string.IsNullOrEmpty(player?.Uid)) continue;
-                    var character = GetCharacter(characterMap, player.Uid);
+                    var uid = NormalizeUid(player?.Uid);
+                    if (string.IsNullOrEmpty(uid)) continue;
+                    if (!seenUids.Add(uid)) continue;
+                    var character = GetCharacter(characterMap, uid);
                     yield return new RoomCharacterPlayer
                     {
-                        Uid = player.Uid,
-                        Name = string.IsNullOrEmpty(player.Name) ? player.Uid : player.Name,
+                        Uid = uid,
+                        Name = string.IsNullOrEmpty(player.Name) ? uid : player.Name,
                         Title = GetDisplayTitle(player),
                         PingMS = player.PingMS,
                         Status = player.Status,
-                        GirlIndex = GetGirlIndex(player.Uid, character),
-                        ElfinIndex = GetElfinIndex(player.Uid, character)
+                        GirlIndex = GetGirlIndex(uid, character),
+                        ElfinIndex = GetElfinIndex(uid, character)
                     };
                 }
 
@@ -627,18 +643,20 @@ namespace MDEN.UI.Core
             }
 
             if (lobby.Players == null) yield break;
-            foreach (var uid in lobby.Players)
+            foreach (var rawUid in lobby.Players)
             {
+                var uid = NormalizeUid(rawUid);
                 if (string.IsNullOrEmpty(uid)) continue;
+                if (!seenUids.Add(uid)) continue;
                 var character = GetCharacter(characterMap, uid);
                 yield return new RoomCharacterPlayer
                 {
                     Uid = uid,
                     Name = uid,
-                    Title = uid == PlayerManager.CurrentUid ? PlayerManager.CurrentProfile?.Title : null,
+                    Title = IsSameUid(uid, PlayerManager.CurrentUid) ? PlayerManager.CurrentProfile?.Title : null,
                     GirlIndex = GetGirlIndex(uid, character),
                     ElfinIndex = GetElfinIndex(uid, character),
-                    Status = (byte)(uid == PlayerManager.CurrentUid ? PlayerStatus.InLobby : PlayerStatus.Offline)
+                    Status = (byte)(IsSameUid(uid, PlayerManager.CurrentUid) ? PlayerStatus.InLobby : PlayerStatus.Offline)
                 };
             }
         }
@@ -664,22 +682,31 @@ namespace MDEN.UI.Core
 
         private static int GetGirlIndex(string uid, LobbyPlayerCharacterEntry character)
         {
-            if (uid == PlayerManager.CurrentUid)
+            if (IsSameUid(uid, PlayerManager.CurrentUid))
             {
-                return GameAccountManager.GetCurrentSelection().GirlIndex;
+                return GetLocalDisplaySelection().GirlIndex;
             }
 
-            return character?.GirlIndex ?? 0;
+            var favGirlIndex = character?.FavGirlIndex ?? -1;
+            return favGirlIndex >= 0 ? favGirlIndex : character?.GirlIndex ?? 0;
         }
 
         private static int GetElfinIndex(string uid, LobbyPlayerCharacterEntry character)
         {
-            if (uid == PlayerManager.CurrentUid)
+            if (IsSameUid(uid, PlayerManager.CurrentUid))
             {
-                return GameAccountManager.GetCurrentSelection().ElfinIndex;
+                return GetLocalDisplaySelection().ElfinIndex;
             }
 
-            return character?.ElfinIndex ?? -1;
+            var favElfinIndex = character?.FavElfinIndex ?? -2;
+            return favElfinIndex >= -1 ? favElfinIndex : character?.ElfinIndex ?? -1;
+        }
+
+        private static GameSelectionInfo GetLocalDisplaySelection()
+        {
+            return ModConfigManager.EnableFavGirlDisplayForOthers
+                ? GameAccountManager.GetCurrentFavGirlSelection()
+                : GameAccountManager.GetCurrentSelection();
         }
 
         private static LobbyPlayerCharacterEntry GetCharacter(
@@ -693,12 +720,22 @@ namespace MDEN.UI.Core
 
         private static string GetDisplayTitle(PlayerSyncEntry player)
         {
-            if (player?.Uid == PlayerManager.CurrentUid && !string.IsNullOrEmpty(PlayerManager.CurrentProfile?.Title))
+            if (IsSameUid(player?.Uid, PlayerManager.CurrentUid) && !string.IsNullOrEmpty(PlayerManager.CurrentProfile?.Title))
             {
                 return PlayerManager.CurrentProfile.Title;
             }
 
             return player?.Title;
+        }
+
+        private static string NormalizeUid(string uid)
+        {
+            return uid?.Trim();
+        }
+
+        private static bool IsSameUid(string left, string right)
+        {
+            return string.Equals(NormalizeUid(left), NormalizeUid(right), StringComparison.OrdinalIgnoreCase);
         }
 
         private static void RestoreOriginal()
@@ -813,6 +850,7 @@ namespace MDEN.UI.Core
             public Text Title { get; }
             public Text Name { get; }
             public Button Button { get; }
+            public bool IsDestroyed => Title == null || Name == null || Button == null;
 
             public void SetVisible(bool visible)
             {

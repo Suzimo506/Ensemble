@@ -67,7 +67,7 @@ namespace MDEN.UI.Core
         {
             var entry = PlaylistManager.GetCurrentPlaylistEntry();
             var owner = string.IsNullOrWhiteSpace(entry?.OwnerName) ? "Unknown" : entry.OwnerName;
-            return $"<size=22>选谱人: <color={Constants.ColorCyan}>{EscapeRichText(owner)}</color></size>";
+            return $"<size=22>选谱人: <color=#{Constants.ColorCyan}>{EscapeRichText(owner)}</color></size>";
         }
 
         private static void ApplyGameFont(Text text)

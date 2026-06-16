@@ -153,6 +153,11 @@ namespace MDEN.UI.Windows
                     ? new RoomListWindow()
                     : new ServerSelectionWindow());
             }
+            else if (button == _btnSettings)
+            {
+                Close();
+                UIManager.OpenWindow(new SettingsWindow());
+            }
             else if (button == _btnSupportUs)
             {
                 MelonLoader.MelonLogger.Msg("Support us button selected.");

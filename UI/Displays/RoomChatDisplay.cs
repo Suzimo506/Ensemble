@@ -630,7 +630,7 @@ namespace MDEN.UI.Displays
                 var missing = ParsePlayerMissingChart(msg);
                 if (missing.HasValue)
                 {
-                    return $"{SystemPrefix()} {ColorText(EscapeRichText(missing.Value.PlayerName), RedTextColor)} 未下载该谱面: {ColorText(EscapeRichText(CleanChartNameForDisplay(missing.Value.ChartName)), Constants.ColorYellow)}";
+                    return $"{SystemPrefix()} {ColorText(EscapeRichText(missing.Value.PlayerName), RedTextColor)} 未下载该谱面: {FormatMissingChartNameForDisplay(missing.Value.ChartName)}";
                 }
             }
 
@@ -638,7 +638,7 @@ namespace MDEN.UI.Displays
             if (textMissing.HasValue)
             {
                 var playerName = string.IsNullOrWhiteSpace(textMissing.Value.Players) ? "Unknown" : textMissing.Value.Players;
-                return $"{SystemPrefix()} {ColorText(EscapeRichText(playerName), RedTextColor)} 未下载该谱面: {ColorText(EscapeRichText(CleanChartNameForDisplay(textMissing.Value.ChartName)), Constants.ColorYellow)}";
+                return $"{SystemPrefix()} {ColorText(EscapeRichText(playerName), RedTextColor)} 未下载该谱面: {FormatMissingChartNameForDisplay(textMissing.Value.ChartName)}";
             }
 
             if ((msg.Message == "PlaylistAdd" || msg.Message == "PlaylistRemove") &&
@@ -790,6 +790,47 @@ namespace MDEN.UI.Displays
             return value.Trim();
         }
 
+        private static string FormatMissingChartNameForDisplay(string chartName)
+        {
+            if (string.IsNullOrWhiteSpace(chartName)) return ColorText(string.Empty, Constants.ColorYellow);
+
+            var raw = chartName.Trim();
+            var visible = StripRichTextForDisplay(raw);
+            var match = Regex.Match(visible, @"^\s*(?<category>[【\[].*?[\]】])\s*(?<rest>.*)$");
+            if (!match.Success)
+            {
+                return ColorText(EscapeRichText(CleanChartNameForDisplay(raw)), Constants.ColorYellow);
+            }
+
+            var category = EscapeRichText(match.Groups["category"].Value.Trim());
+            var rest = EscapeRichText(match.Groups["rest"].Value.Trim());
+            var categoryColor = ExtractFirstColor(raw);
+            var categoryText = string.IsNullOrEmpty(categoryColor)
+                ? category
+                : ColorText(category, categoryColor);
+
+            return string.IsNullOrWhiteSpace(rest)
+                ? categoryText
+                : $"{categoryText}{ColorText(rest, Constants.ColorYellow)}";
+        }
+
+        private static string StripRichTextForDisplay(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value)) return string.Empty;
+
+            value = Regex.Replace(value, @"<\s*/?\s*color\b[^>]*>", string.Empty, RegexOptions.IgnoreCase);
+            value = Regex.Replace(value, @"^\s*color\s*=\s*#?[0-9a-fA-F]{3,8}\s*", string.Empty, RegexOptions.IgnoreCase);
+            return value.Trim();
+        }
+
+        private static string ExtractFirstColor(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value)) return null;
+
+            var match = Regex.Match(value, @"color\s*=\s*#?(?<color>[0-9a-fA-F]{3,8})", RegexOptions.IgnoreCase);
+            return match.Success ? match.Groups["color"].Value : null;
+        }
+
         private static string SystemPrefix()
         {
             return ColorText("[系统]", Constants.ColorYellow);
@@ -903,7 +944,7 @@ namespace MDEN.UI.Displays
         private static string ColorText(string text, string color)
         {
             var normalized = NormalizeHexColor(color) ?? WhiteTextColor;
-            return $"<color={normalized}>{text}</color>";
+            return $"<color=#{normalized}>{text}</color>";
         }
 
         private static string EscapeRichText(string value)

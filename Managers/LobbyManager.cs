@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using MDEN.Network;
 using MDEN.Protocol;
@@ -15,6 +16,8 @@ namespace MDEN.Managers
         public static LobbySyncPush CurrentLobby { get; private set; }
         public static bool IsInLobby => CurrentLobby != null;
         public static event Action<LobbySyncPush> CurrentLobbyChanged;
+        private static readonly HashSet<int> IgnoredLobbySyncIds = new HashSet<int>();
+        private static int? _pendingJoinLobbyId;
 
         public static async Task<LobbyListEntry[]> RefreshLobbiesAsync()
         {
@@ -31,17 +34,28 @@ namespace MDEN.Managers
         public static async Task JoinLobbyAsync(int lobbyId)
         {
             EnsureReady();
+            _pendingJoinLobbyId = lobbyId;
+            await PlayerManager.SyncLocalProfileToServerAsync();
             await PlayerManager.SyncCurrentSelectionAsync();
             await PlayerManager.SyncChartStateAsync();
 
-            await NetworkClient.Instance.SendRequestAsync<JoinLobbyRequest, JoinLobbyResponse>(
-                OpCodes.JoinLobbyReq,
-                new JoinLobbyRequest { LobbyId = lobbyId });
+            try
+            {
+                await NetworkClient.Instance.SendRequestAsync<JoinLobbyRequest, JoinLobbyResponse>(
+                    OpCodes.JoinLobbyReq,
+                    new JoinLobbyRequest { LobbyId = lobbyId });
+            }
+            catch
+            {
+                _pendingJoinLobbyId = null;
+                throw;
+            }
         }
 
         public static async Task<int> CreateLobbyAsync(CreateLobbyRequest request)
         {
             EnsureReady();
+            await PlayerManager.SyncLocalProfileToServerAsync();
             await PlayerManager.SyncCurrentSelectionAsync();
             await PlayerManager.SyncChartStateAsync();
 
@@ -55,11 +69,18 @@ namespace MDEN.Managers
         public static async Task LeaveLobbyAsync()
         {
             EnsureReady();
+            var leavingLobbyId = CurrentLobby?.Id;
 
             await NetworkClient.Instance.SendRequestAsync<LeaveLobbyRequest, LeaveLobbyResponse>(
                 OpCodes.LeaveLobbyReq,
                 new LeaveLobbyRequest());
 
+            if (leavingLobbyId.HasValue)
+            {
+                IgnoredLobbySyncIds.Add(leavingLobbyId.Value);
+            }
+
+            _pendingJoinLobbyId = null;
             CurrentLobby = null;
             NotifyCurrentLobbyChanged();
         }
@@ -118,11 +139,15 @@ namespace MDEN.Managers
         {
             CurrentLobbies = new LobbyListEntry[0];
             CurrentLobby = null;
+            _pendingJoinLobbyId = null;
+            IgnoredLobbySyncIds.Clear();
             NotifyCurrentLobbyChanged();
         }
 
         public static void MarkLobbyEntered(int lobbyId, CreateLobbyRequest request)
         {
+            _pendingJoinLobbyId = null;
+            IgnoredLobbySyncIds.Remove(lobbyId);
             var currentUid = PlayerManager.CurrentUid;
             var currentName = PlayerManager.CurrentProfile?.Name;
 
@@ -162,6 +187,24 @@ namespace MDEN.Managers
 
         private static void OnLobbySync(LobbySyncPush push)
         {
+            if (push == null) return;
+
+            if (IgnoredLobbySyncIds.Contains(push.Id) &&
+                CurrentLobby?.Id != push.Id &&
+                _pendingJoinLobbyId != push.Id)
+            {
+                MelonLogger.Msg($"Ignored stale lobby sync: {push.Id}");
+                return;
+            }
+
+            if (_pendingJoinLobbyId.HasValue && _pendingJoinLobbyId.Value != push.Id)
+            {
+                MelonLogger.Msg($"Ignored lobby sync while joining {_pendingJoinLobbyId.Value}: {push.Id}");
+                return;
+            }
+
+            _pendingJoinLobbyId = null;
+            IgnoredLobbySyncIds.Remove(push.Id);
             CurrentLobby = push;
             MelonLogger.Msg($"Lobby sync received: {push.Id}, players: {push.Players?.Length ?? 0}/{push.MaxPlayers}");
             NotifyCurrentLobbyChanged();

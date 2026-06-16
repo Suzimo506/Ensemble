@@ -1,5 +1,8 @@
 using System;
+using System.Linq;
+using System.Reflection;
 using Il2CppAssets.Scripts.Database;
+using MelonLoader;
 
 namespace MDEN.Managers
 {
@@ -38,6 +41,14 @@ namespace MDEN.Managers
         {
             _cachedSelection = new GameSelectionInfo(ReadSelectedRoleIndex(), ReadSelectedElfinIndex());
             return _cachedSelection;
+        }
+
+        public static GameSelectionInfo GetCurrentFavGirlSelection()
+        {
+            var current = GetCurrentSelection();
+            return new GameSelectionInfo(
+                ReadFavGirlIndex(current.GirlIndex),
+                ReadFavElfinIndex(current.ElfinIndex));
         }
 
         public static GameAccountInfo GetCurrentAccount()
@@ -100,6 +111,35 @@ namespace MDEN.Managers
             catch
             {
                 return -1;
+            }
+        }
+
+        private static int ReadFavGirlIndex(int fallback)
+        {
+            return ReadFavGirlValue("FavGirl", fallback);
+        }
+
+        private static int ReadFavElfinIndex(int fallback)
+        {
+            return ReadFavGirlValue("FavElfin", fallback);
+        }
+
+        private static int ReadFavGirlValue(string propertyName, int fallback)
+        {
+            try
+            {
+                var assembly = AppDomain.CurrentDomain
+                    .GetAssemblies()
+                    .FirstOrDefault(a => string.Equals(a.GetName().Name, "FavGirl", StringComparison.OrdinalIgnoreCase));
+                var saveType = assembly?.GetType("FavGirl.FavSave");
+                var property = saveType?.GetProperty(propertyName, BindingFlags.Public | BindingFlags.Static);
+                var value = property?.GetValue(null);
+                return value is int intValue ? intValue : fallback;
+            }
+            catch (Exception ex)
+            {
+                MelonLogger.Warning($"Read FavGirl {propertyName} failed: {ex.Message}");
+                return fallback;
             }
         }
     }

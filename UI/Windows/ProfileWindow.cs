@@ -26,6 +26,7 @@ namespace MDEN.UI.Windows
 
         public override async void Show()
         {
+            ModConfigManager.LoadConfig();
             _window = new ForumWindow();
             _window.AutoReset = true;
             BuildList();
@@ -107,14 +108,14 @@ namespace MDEN.UI.Windows
 
             var profile = PlayerManager.CurrentProfile;
             var summary = profile == null
-                ? "连接服务器后可查看和修改个人信息"
+                ? "个人信息会保存到本地 Ensemble.json"
                 : $"名字: {profile.Name}\n颜色: {SanitizeColor(profile.ChatColor)}\n介绍: {profile.Bio ?? ""}\n入场提示: {profile.EntranceMessage ?? ""}\n头衔: {profile.Title ?? ""}";
 
             _btnBack = new ForumObject(new LocalString("- 返回 -"), new LocalString("回到主菜单"));
             _btnBack.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("OptionsPanel.png")?.texture;
             _window.ForumObjects.Add(_btnBack);
 
-            _btnRefresh = new ForumObject(new LocalString("刷新信息"), new LocalString(summary));
+            _btnRefresh = new ForumObject(new LocalString("本地资料"), new LocalString(summary));
             _btnRefresh.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("PlayerCard.png")?.texture;
             _window.ForumObjects.Add(_btnRefresh);
 
@@ -240,11 +241,11 @@ namespace MDEN.UI.Windows
             try
             {
                 await saveAction.Invoke(value);
-                MelonLogger.Msg($"Profile field saved: {fieldName}");
+                MelonLogger.Msg($"Local profile field saved: {fieldName}");
             }
             catch (Exception ex)
             {
-                MelonLogger.Warning($"Save profile field failed: {fieldName}, {ex.Message}");
+                MelonLogger.Warning($"Save local profile field failed: {fieldName}, {ex.Message}");
             }
         }
 
@@ -252,6 +253,7 @@ namespace MDEN.UI.Windows
         {
             try
             {
+                ModConfigManager.LoadConfig();
                 await PlayerManager.GetMyProfileAsync();
                 if (IsDisposed) return;
                 MainThreadDispatcher.Enqueue(() =>

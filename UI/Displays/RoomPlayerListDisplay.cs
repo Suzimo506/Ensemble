@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using MDEN.Managers;
 using MDEN.Protocol.Messages.Lobby;
 using MDEN.Protocol.Models;
@@ -28,15 +29,15 @@ namespace MDEN.UI.Displays
             Create();
 
             var activeKeys = new List<string> { "title" };
-            SetEntry("title", $"{lobby.Name} <color={Constants.ColorYellow}>({GetPlayerCount(lobby)}/{lobby.MaxPlayers})</color>");
+            SetEntry("title", $"{lobby.Name} <color=#{Constants.ColorYellow}>({GetPlayerCount(lobby)}/{lobby.MaxPlayers})</color>");
 
             foreach (var player in GetPlayers(lobby))
             {
                 var key = $"player:{player.Uid}";
                 activeKeys.Add(key);
 
-                var hostPrefix = player.Uid == lobby.HostUid ? $"<color={Constants.ColorYellow}>[Host]</color> " : string.Empty;
-                var localColorStart = player.Uid == PlayerManager.CurrentUid ? $"<color={Constants.ColorCyan}>" : string.Empty;
+                var hostPrefix = player.Uid == lobby.HostUid ? $"<color=#{Constants.ColorYellow}>[Host]</color> " : string.Empty;
+                var localColorStart = player.Uid == PlayerManager.CurrentUid ? $"<color=#{Constants.ColorCyan}>" : string.Empty;
                 var localColorEnd = player.Uid == PlayerManager.CurrentUid ? "</color>" : string.Empty;
                 var capturedPlayer = player;
                 SetEntry(
@@ -50,17 +51,28 @@ namespace MDEN.UI.Displays
 
         private static int GetPlayerCount(LobbySyncPush lobby)
         {
-            if (lobby.PlayerDetails != null && lobby.PlayerDetails.Length > 0) return lobby.PlayerDetails.Length;
-            return lobby.Players?.Length ?? 0;
+            if (lobby.PlayerDetails != null && lobby.PlayerDetails.Length > 0)
+            {
+                return lobby.PlayerDetails
+                    .Where(player => !string.IsNullOrEmpty(player?.Uid))
+                    .Select(player => player.Uid)
+                    .Distinct()
+                    .Count();
+            }
+
+            if (lobby.Players == null) return 0;
+            return lobby.Players.Where(uid => !string.IsNullOrEmpty(uid)).Distinct().Count();
         }
 
         private static IEnumerable<PlayerSyncEntry> GetPlayers(LobbySyncPush lobby)
         {
+            var seenUids = new HashSet<string>();
             if (lobby.PlayerDetails != null && lobby.PlayerDetails.Length > 0)
             {
                 foreach (var player in lobby.PlayerDetails)
                 {
                     if (string.IsNullOrEmpty(player?.Uid)) continue;
+                    if (!seenUids.Add(player.Uid)) continue;
                     yield return new PlayerSyncEntry
                     {
                         Uid = player.Uid,
@@ -78,6 +90,7 @@ namespace MDEN.UI.Displays
             foreach (var uid in lobby.Players)
             {
                 if (string.IsNullOrEmpty(uid)) continue;
+                if (!seenUids.Add(uid)) continue;
                 yield return new PlayerSyncEntry
                 {
                     Uid = uid,

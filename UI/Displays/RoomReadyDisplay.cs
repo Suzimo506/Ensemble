@@ -220,7 +220,7 @@ namespace MDEN.UI.Displays
 
             var chartTitle = entry == null ? "等待歌曲" : entry.DisplayName;
             var recommended = RecommendedConfigManager.GetDisplayText(entry);
-            _message.text = $"<color=F8DC51>Next:</color>\n{chartTitle}\n<color={Constants.ColorPink}>推荐配置:</color>\n{recommended}";
+            _message.text = $"<color=#F8DC51>Next:</color>\n{chartTitle}\n<color=#{Constants.ColorPink}>推荐配置:</color>\n{recommended}";
 
             bool isReady = PlaylistManager.IsLocalPlayerReady();
             _buttonMainText.text = lobby.IsPlaying ? "游戏中" : (isReady ? $"{lobby.ReadyPlayers?.Length ?? 0} / {lobby.Players?.Length ?? 0}" : "准备");

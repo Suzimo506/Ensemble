@@ -47,7 +47,7 @@ namespace MDEN.Managers
             SessionToken = response.Token;
             IsLoggedIn = true;
             CurrentServerAddress = $"{endpoint.Host}:{endpoint.Port}";
-            _ = LoadCurrentProfileAsync();
+            _ = SyncLocalProfileAsync();
             PlayerManager.SyncSelectionFireAndForget(selection);
             PlayerManager.SyncChartStateFireAndForget();
             return response;
@@ -96,15 +96,15 @@ namespace MDEN.Managers
             return new ServerEndpoint(host, port);
         }
 
-        private static async Task LoadCurrentProfileAsync()
+        private static async Task SyncLocalProfileAsync()
         {
             try
             {
-                await PlayerManager.GetMyProfileAsync();
+                await PlayerManager.SyncLocalProfileToServerAsync();
             }
             catch (Exception ex)
             {
-                MelonLogger.Warning($"Failed to load player profile: {ex.Message}");
+                MelonLogger.Warning($"Failed to sync local player profile: {ex.Message}");
             }
         }
 

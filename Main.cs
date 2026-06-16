@@ -14,6 +14,7 @@ namespace MDEN
         public override void OnInitializeMelon()
         {
             MelonLogger.Msg("Mod is initializing...");
+            ModConfigManager.LoadConfig();
             PushDispatcher.Instance.Init();
             ReconnectionManager.Instance.Init();
             LobbyManager.Init();
