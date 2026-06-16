@@ -33,6 +33,13 @@ namespace MDEN.UI.Displays
         public bool IsCreated => _frame != null;
         public void CreateEmpty() => Initialize();
 
+        public void InvalidatePlayerColors()
+        {
+            _playerColorCache.Clear();
+            _pendingColorRequests.Clear();
+            RefreshMessageTexts();
+        }
+
         private readonly Dictionary<ChatPushMsg, Text> _textList = new Dictionary<ChatPushMsg, Text>();
         private readonly List<ChatPushMsg> _messages = new List<ChatPushMsg>();
         private readonly Dictionary<string, string> _playerColorCache = new Dictionary<string, string>();

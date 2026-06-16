@@ -271,11 +271,11 @@ namespace MDEN.UI.Windows
             _window.ForumObjects.Clear();
             _lastSelectedIndex = -1; // 重建时清除选中状态
 
-            _btnBack = new ForumObject(new LocalString("返回"), new LocalString("回到上一个窗口"));
+            _btnBack = new ForumObject(new LocalString("- 返回 -"), new LocalString("回到上一个窗口"));
             _btnBack.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("OptionsPanel.png")?.texture;
             _window.ForumObjects.Add(_btnBack);
 
-            _btnRefresh = new ForumObject(new LocalString("刷新"), new LocalString("重新获取最新的服务器节点"));
+            _btnRefresh = new ForumObject(new LocalString("- 刷新 -"), new LocalString("重新获取最新的服务器节点"));
             _btnRefresh.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("RoomList.png")?.texture;
             _window.ForumObjects.Add(_btnRefresh);
 
@@ -297,11 +297,11 @@ namespace MDEN.UI.Windows
                 _window.ForumObjects.Add(node);
             }
 
-            _btnAddServer = new ForumObject(new LocalString("添加服务器"), new LocalString("添加私人服务器长期到列表"));
+            _btnAddServer = new ForumObject(new LocalString("- 添加服务器 -"), new LocalString("添加私人服务器长期到列表"));
             _btnAddServer.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("OptionsPanel.png")?.texture;
             _window.ForumObjects.Add(_btnAddServer);
 
-            _btnJoinServer = new ForumObject(new LocalString("加入服务器"), new LocalString("临时加入私人服务器"));
+            _btnJoinServer = new ForumObject(new LocalString("- 加入服务器 -"), new LocalString("临时加入私人服务器"));
             _btnJoinServer.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("SocialNetwork.png")?.texture;
             _window.ForumObjects.Add(_btnJoinServer);
         }

@@ -1,4 +1,5 @@
 using System.Threading.Tasks;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using CustomAlbums.Managers;
@@ -17,6 +18,7 @@ namespace MDEN.Managers
 
         public static string CurrentUid { get; private set; }
         public static GetPlayerResponse CurrentProfile { get; private set; }
+        public static event Action ProfileChanged;
         private static GameSelectionInfo _lastSyncedSelection = new GameSelectionInfo(int.MinValue, int.MinValue);
         private static int _lastSelectionSyncFrame;
         private static bool _selectionSyncInProgress;
@@ -54,6 +56,7 @@ namespace MDEN.Managers
                 OpCodes.GetPlayerReq,
                 new GetPlayerRequest { TargetUid = CurrentUid });
 
+            ProfileChanged?.Invoke();
             return CurrentProfile;
         }
 
@@ -200,6 +203,8 @@ namespace MDEN.Managers
             {
                 ModConfigManager.SetPlayerName(request.Name);
             }
+
+            ProfileChanged?.Invoke();
         }
 
         public static Task UpdateNameAsync(string name)

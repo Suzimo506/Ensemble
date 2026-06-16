@@ -20,7 +20,9 @@ namespace MDEN
             ChatManager.Init();
             ChartManager.Initialize();
             BattleManager.Init();
+            SettlementManager.Init();
             BattleHudController.Initialize();
+            SettlementHudController.Initialize();
             RoomHudController.Initialize();
             MelonLogger.Msg("Initialization complete.");
         }
@@ -57,6 +59,7 @@ namespace MDEN
         public override void OnDeinitializeMelon()
         {
             BattleHudController.Deinitialize();
+            SettlementHudController.Deinitialize();
             RoomHudController.Deinitialize();
             ConnectionManager.Disconnect();
         }

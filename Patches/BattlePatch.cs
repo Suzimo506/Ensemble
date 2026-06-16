@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using System.Threading.Tasks;
 using HarmonyLib;
 using Il2Cpp;
 using Il2CppArcadeController.UI.Panel.PnlHome;
@@ -33,6 +34,7 @@ namespace MDEN.Patches
 
                 HidePauseButton();
                 HideFailRestartButton();
+                BattleManager.PrepareForNewBattle();
                 BattleHudController.OnBattleStarted();
                 _ = BattleManager.SyncStartAsync();
             }
@@ -54,7 +56,7 @@ namespace MDEN.Patches
                     return;
                 }
 
-                _ = BattleManager.ReportBattleFinishedAsync(true);
+                _ = FinishBattleAndShowResultsAsync(true);
                 BattleHudController.Destroy();
             }
         }
@@ -66,7 +68,7 @@ namespace MDEN.Patches
             {
                 if (!LobbyManager.IsInLobby) return;
 
-                _ = BattleManager.ReportBattleFinishedAsync(false);
+                _ = FinishBattleAndShowResultsAsync(false);
                 BattleHudController.Destroy();
             }
         }
@@ -139,6 +141,26 @@ namespace MDEN.Patches
             if (returnButton != null && failRestartButton != null)
             {
                 returnButton.transform.localPosition = failRestartButton.transform.localPosition;
+            }
+        }
+
+        private static async Task FinishBattleAndShowResultsAsync(bool alive)
+        {
+            BattleResultBannerDisplay.ClearAll();
+            await BattleManager.ReportBattleFinishedAsync(alive);
+            await WaitForLobbyBattleEndAsync();
+
+            if (!LobbyManager.IsInLobby) return;
+
+            BattleResultBannerDisplay.ClearAll();
+            await BattleResultBannerDisplay.ShowAsync(BattleManager.GetBattleDataSnapshot());
+        }
+
+        private static async Task WaitForLobbyBattleEndAsync()
+        {
+            while (LobbyManager.IsInLobby && LobbyManager.CurrentLobby?.IsPlaying == true)
+            {
+                await Task.Delay(500);
             }
         }
     }

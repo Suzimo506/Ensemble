@@ -54,19 +54,19 @@ namespace MDEN.UI.Windows
             var serverName = selectedServer?.Name ?? "自定义节点";
             var serverAddress = selectedServer?.Address ?? "节点不存在";
 
-            _btnBack = new ForumObject(new LocalString("返回"), new LocalString("回到节点列表"));
+            _btnBack = new ForumObject(new LocalString("- 返回 -"), new LocalString("回到节点列表"));
             _btnBack.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("OptionsPanel.png")?.texture;
             _window.ForumObjects.Add(_btnBack);
 
-            _btnJoin = new ForumObject(new LocalString("加入"), new LocalString($"加入节点: {serverAddress}"));
+            _btnJoin = new ForumObject(new LocalString("- 加入 -"), new LocalString($"加入节点: {serverAddress}"));
             _btnJoin.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("RoomList.png")?.texture;
             _window.ForumObjects.Add(_btnJoin);
 
-            _btnRename = new ForumObject(new LocalString("重命名"), new LocalString($"重命名节点: {serverName}"));
+            _btnRename = new ForumObject(new LocalString("- 重命名 -"), new LocalString($"重命名节点: {serverName}"));
             _btnRename.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("OptionsPanel.png")?.texture;
             _window.ForumObjects.Add(_btnRename);
 
-            _btnDelete = new ForumObject(new LocalString("删除"), new LocalString($"从列表中删除节点: {serverName}"));
+            _btnDelete = new ForumObject(new LocalString("- 删除 -"), new LocalString($"从列表中删除节点: {serverName}"));
             _btnDelete.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("HomePanel.png")?.texture;
             _window.ForumObjects.Add(_btnDelete);
         }

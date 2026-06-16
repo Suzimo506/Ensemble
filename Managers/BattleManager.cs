@@ -43,6 +43,16 @@ namespace MDEN.Managers
             }
         }
 
+        public static void PrepareForNewBattle()
+        {
+            lock (BattleDataLock)
+            {
+                PlayerBattleData.Clear();
+            }
+
+            NotifyBattleDataChanged(Array.Empty<BattlePlayerEntry>());
+        }
+
         public static async Task SyncStartAsync()
         {
             if (_synchronizing || !LobbyManager.IsInLobby) return;

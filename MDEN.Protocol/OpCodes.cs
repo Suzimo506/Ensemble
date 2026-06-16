@@ -61,6 +61,7 @@ namespace MDEN.Protocol
         public const ushort BattleDataPush = 0x0501;
         public const ushort BattleReturnedReq = 0x0502;
         public const ushort BattleReturnedResp = 0x0503;
+        public const ushort SettlementResultPush = 0x0504;
 
         // === 聊天 (0x0600 ~ 0x06FF) ===
         public const ushort ChatNotify = 0x0600;

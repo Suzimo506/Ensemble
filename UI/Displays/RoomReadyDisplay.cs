@@ -17,11 +17,14 @@ namespace MDEN.UI.Displays
         private GameObject _imgBase;
         private GameObject _buttonMain;
         private GameObject _buttonStop;
+        private GameObject _buttonEquip;
         private Text _buttonMainText;
         private Text _buttonStopText;
+        private Text _buttonEquipText;
         private Text _message;
         private bool _busy;
         private bool _stopBusy;
+        private bool _equipBusy;
 
         private void EnsureCreated()
         {
@@ -74,6 +77,7 @@ namespace MDEN.UI.Displays
             messageBase.gameObject.SetActive(true);
 
             _message = messageBase.Find("TxtSynchronizing").GetComponent<Text>();
+            ApplyGameFont(_message);
             _message.alignment = TextAnchor.UpperRight;
             _message.verticalOverflow = VerticalWrapMode.Overflow;
 
@@ -95,7 +99,7 @@ namespace MDEN.UI.Displays
             buttonMainRect.anchorMin = buttonMainRect.pivot;
             buttonMainRect.anchorMax = buttonMainRect.pivot;
             buttonMainRect.localScale = Vector3.one;
-            buttonMainRect.sizeDelta = new Vector2(300f, 60f);
+            buttonMainRect.sizeDelta = new Vector2(105f, 58f);
 
             var buttonMainImg = _buttonMain.AddComponent<Image>();
             buttonMainImg.sprite = sprRoundedSquare;
@@ -113,19 +117,19 @@ namespace MDEN.UI.Displays
 
             _buttonMainText = buttonMainTextGo.AddComponent<Text>();
             _buttonMainText.alignment = TextAnchor.MiddleCenter;
-            _buttonMainText.fontSize = 28;
+            _buttonMainText.fontSize = 26;
             _buttonMainText.horizontalOverflow = HorizontalWrapMode.Overflow;
-            _buttonMainText.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
+            ApplyGameFont(_buttonMainText);
 
             _buttonStop = new GameObject("BtnStop");
             var buttonStopRect = _buttonStop.AddComponent<RectTransform>();
             buttonStopRect.SetParent(_imgBase.transform, false);
-            buttonStopRect.anchoredPosition3D = new Vector3(-10f, 80f, 0f);
+            buttonStopRect.anchoredPosition3D = new Vector3(-230f, 10f, 0f);
             buttonStopRect.pivot = new Vector2(1f, 0f);
             buttonStopRect.anchorMin = buttonStopRect.pivot;
             buttonStopRect.anchorMax = buttonStopRect.pivot;
             buttonStopRect.localScale = Vector3.one;
-            buttonStopRect.sizeDelta = new Vector2(300f, 54f);
+            buttonStopRect.sizeDelta = new Vector2(105f, 58f);
 
             var buttonStopImg = _buttonStop.AddComponent<Image>();
             buttonStopImg.sprite = sprRoundedSquare;
@@ -146,9 +150,42 @@ namespace MDEN.UI.Displays
             _buttonStopText.alignment = TextAnchor.MiddleCenter;
             _buttonStopText.fontSize = 26;
             _buttonStopText.horizontalOverflow = HorizontalWrapMode.Overflow;
-            _buttonStopText.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
-            _buttonStopText.text = "停止游戏";
+            ApplyGameFont(_buttonStopText);
+            _buttonStopText.text = "- 停止游戏 -";
             _buttonStopText.color = Color.white;
+
+            _buttonEquip = new GameObject("BtnEquip");
+            var buttonEquipRect = _buttonEquip.AddComponent<RectTransform>();
+            buttonEquipRect.SetParent(_imgBase.transform, false);
+            buttonEquipRect.anchoredPosition3D = new Vector3(-120f, 10f, 0f);
+            buttonEquipRect.pivot = new Vector2(1f, 0f);
+            buttonEquipRect.anchorMin = buttonEquipRect.pivot;
+            buttonEquipRect.anchorMax = buttonEquipRect.pivot;
+            buttonEquipRect.localScale = Vector3.one;
+            buttonEquipRect.sizeDelta = new Vector2(105f, 58f);
+
+            var buttonEquipImg = _buttonEquip.AddComponent<Image>();
+            buttonEquipImg.sprite = sprRoundedSquare;
+            buttonEquipImg.type = Image.Type.Tiled;
+            buttonEquipImg.color = new Color(0.98f, 0.62f, 0.1f, 1f);
+
+            var equipButton = _buttonEquip.AddComponent<Button>();
+            equipButton.onClick.AddListener((UnityAction)OnEquipClicked);
+
+            var buttonEquipTextGo = new GameObject("BtnTxt");
+            var buttonEquipTextRect = buttonEquipTextGo.AddComponent<RectTransform>();
+            buttonEquipTextRect.SetParent(buttonEquipRect.transform, false);
+            buttonEquipTextRect.anchoredPosition3D = Vector3.zero;
+            buttonEquipTextRect.localScale = Vector3.one;
+            buttonEquipTextRect.sizeDelta = buttonEquipRect.sizeDelta;
+
+            _buttonEquipText = buttonEquipTextGo.AddComponent<Text>();
+            _buttonEquipText.alignment = TextAnchor.MiddleCenter;
+            _buttonEquipText.fontSize = 23;
+            _buttonEquipText.horizontalOverflow = HorizontalWrapMode.Overflow;
+            ApplyGameFont(_buttonEquipText);
+            _buttonEquipText.text = "- 使用推荐 -";
+            _buttonEquipText.color = Color.white;
 
             UnityEngine.Object.Destroy(_imgBase.transform.Find("Synchronizing/TxtSynchronizing/ImgSynchronizing")?.gameObject);
             UnityEngine.Object.Destroy(_imgBase.transform.Find("SynchronizingFail")?.gameObject);
@@ -175,26 +212,20 @@ namespace MDEN.UI.Displays
 
             _notification.SetActive(true);
 
-            var entry = ChartManager.ParseEntry(lobby.Playlist != null && lobby.Playlist.Length > 0 ? lobby.Playlist[0] : null);
+            var entry = PlaylistManager.GetCurrentPlaylistEntry();
+            if (entry != null)
+            {
+                RecommendedConfigManager.Request(entry);
+            }
+
             var chartTitle = entry == null ? "等待歌曲" : entry.DisplayName;
-            _message.text = $"<color=#F8DC51>Next:</color>\n{chartTitle}";
+            var recommended = RecommendedConfigManager.GetDisplayText(entry);
+            _message.text = $"<color=#F8DC51>Next:</color>\n{chartTitle}\n<color=#{Constants.ColorPink}>推荐配置:</color>\n{recommended}";
 
             bool isReady = PlaylistManager.IsLocalPlayerReady();
-            _buttonMainText.text = lobby.IsPlaying ? "游戏中" : (isReady ? $"{lobby.ReadyPlayers?.Length ?? 0} / {lobby.Players?.Length ?? 0}" : "准备");
-            
-            Color bgColor = (isReady || lobby.IsPlaying) ? new Color(0.5f, 0.5f, 0.5f, 1f) : new Color(0f, 0.82f, 0.28f, 1f);
-            Color fgColor = (isReady || lobby.IsPlaying) ? new Color(0.6f, 0.6f, 0.6f, 1f) : new Color(0.536f, 1f, 0.05f, 1f);
+            _buttonMainText.text = lobby.IsPlaying ? "游戏中" : (isReady ? $"{lobby.ReadyPlayers?.Length ?? 0} / {lobby.Players?.Length ?? 0}" : "- 准备 -");
 
-            _buttonMainText.color = fgColor;
-            _buttonMain.GetComponent<Image>().color = bgColor;
-            _buttonMain.GetComponent<Button>().interactable = !_busy && !lobby.IsPlaying;
-
-            bool canStop = lobby.HostUid == PlayerManager.CurrentUid;
-            _buttonStop.GetComponent<Button>().interactable = canStop && !_stopBusy;
-            _buttonStop.GetComponent<Image>().color = canStop
-                ? new Color(0.85f, 0.08f, 0.08f, 1f)
-                : new Color(0.42f, 0.24f, 0.24f, 1f);
-            _buttonStopText.color = canStop ? Color.white : new Color(0.68f, 0.68f, 0.68f, 1f);
+            RefreshButtonStates(lobby);
         }
 
         public void Update()
@@ -206,6 +237,7 @@ namespace MDEN.UI.Displays
         {
             _busy = false;
             _stopBusy = false;
+            _equipBusy = false;
             
             if (_buttonMain != null)
             {
@@ -219,6 +251,12 @@ namespace MDEN.UI.Displays
                 if (btn != null) btn.onClick.RemoveAllListeners();
             }
 
+            if (_buttonEquip != null)
+            {
+                var btn = _buttonEquip.GetComponent<Button>();
+                if (btn != null) btn.onClick.RemoveAllListeners();
+            }
+
             if (_notification != null)
             {
                 UnityEngine.Object.Destroy(_notification);
@@ -228,8 +266,10 @@ namespace MDEN.UI.Displays
             _imgBase = null;
             _buttonMain = null;
             _buttonStop = null;
+            _buttonEquip = null;
             _buttonMainText = null;
             _buttonStopText = null;
+            _buttonEquipText = null;
             _message = null;
         }
 
@@ -238,7 +278,7 @@ namespace MDEN.UI.Displays
             if (_busy || LobbyManager.CurrentLobby?.IsPlaying == true) return;
 
             _busy = true;
-            Refresh(LobbyManager.CurrentLobby);
+            RefreshButtonStates(LobbyManager.CurrentLobby);
 
             try
             {
@@ -252,8 +292,31 @@ namespace MDEN.UI.Displays
             finally
             {
                 _busy = false;
-                // Dispatch back to main thread to update UI
-                MainThreadDispatcher.Enqueue(() => Refresh(LobbyManager.CurrentLobby));
+                MainThreadDispatcher.Enqueue(() => RefreshButtonStates(LobbyManager.CurrentLobby));
+            }
+        }
+
+        private async void OnEquipClicked()
+        {
+            if (_equipBusy || RecommendedConfigManager.Current == null) return;
+            if (LobbyManager.CurrentLobby?.IsPlaying == true) return;
+
+            _equipBusy = true;
+            RefreshButtonStates(LobbyManager.CurrentLobby);
+
+            try
+            {
+                using var _ = UIManager.LockUI("Applying recommended config...");
+                await RecommendedConfigManager.ApplyCurrentAsync();
+            }
+            catch (Exception ex)
+            {
+                MelonLogger.Warning($"Apply recommended config failed: {ex.Message}");
+            }
+            finally
+            {
+                _equipBusy = false;
+                MainThreadDispatcher.Enqueue(() => RefreshButtonStates(LobbyManager.CurrentLobby));
             }
         }
 
@@ -262,7 +325,7 @@ namespace MDEN.UI.Displays
             if (_stopBusy || LobbyManager.CurrentLobby?.HostUid != PlayerManager.CurrentUid) return;
 
             _stopBusy = true;
-            Refresh(LobbyManager.CurrentLobby);
+            RefreshButtonStates(LobbyManager.CurrentLobby);
 
             try
             {
@@ -276,8 +339,95 @@ namespace MDEN.UI.Displays
             finally
             {
                 _stopBusy = false;
-                MainThreadDispatcher.Enqueue(() => Refresh(LobbyManager.CurrentLobby));
+                MainThreadDispatcher.Enqueue(() => RefreshButtonStates(LobbyManager.CurrentLobby));
             }
+        }
+
+        private void RefreshButtonStates(LobbySyncPush lobby)
+        {
+            if (_buttonMain == null || _buttonStop == null || _buttonEquip == null || lobby == null) return;
+
+            var isReady = PlaylistManager.IsLocalPlayerReady();
+            var mainDisabled = isReady || lobby.IsPlaying || _busy;
+            var mainImage = _buttonMain.GetComponent<Image>();
+            var mainButton = _buttonMain.GetComponent<Button>();
+            if (mainImage != null)
+            {
+                mainImage.color = mainDisabled ? new Color(0.5f, 0.5f, 0.5f, 1f) : new Color(0f, 0.82f, 0.28f, 1f);
+            }
+
+            if (mainButton != null)
+            {
+                mainButton.interactable = !_busy && !lobby.IsPlaying;
+            }
+
+            if (_buttonMainText != null)
+            {
+                _buttonMainText.color = mainDisabled ? new Color(0.6f, 0.6f, 0.6f, 1f) : new Color(0.536f, 1f, 0.05f, 1f);
+            }
+
+            var canStop = lobby.HostUid == PlayerManager.CurrentUid && !_stopBusy;
+            var stopButton = _buttonStop.GetComponent<Button>();
+            var stopImage = _buttonStop.GetComponent<Image>();
+            if (stopButton != null) stopButton.interactable = canStop;
+            if (stopImage != null)
+            {
+                stopImage.color = canStop
+                    ? new Color(0.85f, 0.08f, 0.08f, 1f)
+                    : new Color(0.42f, 0.24f, 0.24f, 1f);
+            }
+
+            if (_buttonStopText != null)
+            {
+                _buttonStopText.color = canStop ? Color.white : new Color(0.68f, 0.68f, 0.68f, 1f);
+            }
+
+            var hasRecommendation = RecommendedConfigManager.Current != null;
+            var recommendationEquipped = RecommendedConfigManager.IsCurrentEquipped();
+            var canEquip = hasRecommendation && !recommendationEquipped && !lobby.IsPlaying && !_equipBusy;
+            var equipButton = _buttonEquip.GetComponent<Button>();
+            var equipImage = _buttonEquip.GetComponent<Image>();
+            if (equipButton != null) equipButton.interactable = canEquip;
+            if (equipImage != null)
+            {
+                equipImage.color = canEquip
+                    ? new Color(0.98f, 0.62f, 0.1f, 1f)
+                    : new Color(0.42f, 0.36f, 0.28f, 1f);
+            }
+
+            if (_buttonEquipText != null)
+            {
+                _buttonEquipText.text = recommendationEquipped ? "- 已选择 -" : "- 使用推荐 -";
+                _buttonEquipText.color = canEquip ? Color.white : new Color(0.7f, 0.7f, 0.7f, 1f);
+            }
+        }
+
+        private static void ApplyGameFont(Text text)
+        {
+            if (text == null) return;
+
+            var template = FindNativeFontTemplate();
+            if (template != null && template.font != null)
+            {
+                text.font = template.font;
+                text.material = template.material;
+                return;
+            }
+
+            text.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
+        }
+
+        private static Text FindNativeFontTemplate()
+        {
+            var texts = Resources.FindObjectsOfTypeAll<Text>();
+            foreach (var text in texts)
+            {
+                if (text == null || text.font == null) continue;
+                var fontName = text.font.name ?? string.Empty;
+                if (!fontName.Contains("Arial")) return text;
+            }
+
+            return null;
         }
     }
 }

@@ -54,11 +54,11 @@ namespace MDEN.UI.Windows
         {
             _window.ForumObjects.Clear();
 
-            _btnBack = CreateButton("返回", "回到我的房间");
-            _btnKick = CreateButton("踢出", "将该玩家踢出房间");
-            _btnTransferHost = CreateButton("移交房主", "将房主权限移交给该玩家");
-            _btnBanChartSelect = CreateButton("禁止选谱", "禁止该玩家选择谱面");
-            _btnMute = CreateButton("禁言", "禁止该玩家发送聊天消息");
+            _btnBack = CreateButton("- 返回 -", "回到我的房间");
+            _btnKick = CreateButton("- 踢出 -", "将该玩家踢出房间");
+            _btnTransferHost = CreateButton("- 移交房主 -", "将房主权限移交给该玩家");
+            _btnBanChartSelect = CreateButton("- 禁止选谱 -", "禁止该玩家选择谱面");
+            _btnMute = CreateButton("- 禁言 -", "禁止该玩家发送聊天消息");
 
             _btnInfo = CreateButton(
                 string.IsNullOrEmpty(_player?.Name) ? "玩家信息" : _player.Name,

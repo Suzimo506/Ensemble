@@ -108,35 +108,66 @@ namespace MDEN.UI.Windows
             var profile = PlayerManager.CurrentProfile;
             var summary = profile == null
                 ? "连接服务器后可查看和修改个人信息"
-                : $"名字: {profile.Name}\n颜色: {profile.ChatColor ?? "ffffff"}\n介绍: {profile.Bio ?? ""}\n入场提示: {profile.EntranceMessage ?? ""}\n头衔: {profile.Title ?? ""}";
+                : $"名字: {profile.Name}\n颜色: {SanitizeColor(profile.ChatColor)}\n介绍: {profile.Bio ?? ""}\n入场提示: {profile.EntranceMessage ?? ""}\n头衔: {profile.Title ?? ""}";
 
-            _btnBack = new ForumObject(new LocalString("返回"), new LocalString("回到主菜单"));
+            _btnBack = new ForumObject(new LocalString("- 返回 -"), new LocalString("回到主菜单"));
             _btnBack.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("OptionsPanel.png")?.texture;
             _window.ForumObjects.Add(_btnBack);
 
-            _btnRefresh = new ForumObject(new LocalString("刷新信息"), new LocalString(summary));
+            _btnRefresh = new ForumObject(new LocalString("- 刷新信息 -"), new LocalString(summary));
             _btnRefresh.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("PlayerCard.png")?.texture;
             _window.ForumObjects.Add(_btnRefresh);
 
-            _btnName = new ForumObject(new LocalString("修改名字"), new LocalString("修改自己的名字，16字上限"));
+            _btnName = new ForumObject(
+                new LocalString("- 修改名字 -"),
+                new LocalString(WithCurrentSetting("修改自己的名字，16字上限", profile?.Name)));
             _btnName.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("PlayerCard.png")?.texture;
             _window.ForumObjects.Add(_btnName);
 
-            _btnNameColor = new ForumObject(new LocalString("修改名字颜色"), new LocalString("输入十六进制颜色，不要带#，例如 ff00ff"));
+            _btnNameColor = new ForumObject(
+                new LocalString("- 修改名字颜色 -"),
+                new LocalString(WithCurrentSetting("输入十六进制颜色，不要带#，例如 ff00ff", SanitizeColor(profile?.ChatColor))));
             _btnNameColor.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("OptionsPanel.png")?.texture;
             _window.ForumObjects.Add(_btnNameColor);
 
-            _btnBio = new ForumObject(new LocalString("修改个人介绍"), new LocalString("别人在房间点击你的卡片时显示的介绍，30字上限"));
+            _btnBio = new ForumObject(
+                new LocalString("- 修改个人介绍 -"),
+                new LocalString(WithCurrentSetting("别人在房间点击你的卡片时显示的介绍，30字上限", profile?.Bio)));
             _btnBio.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("HomePanel.png")?.texture;
             _window.ForumObjects.Add(_btnBio);
 
-            _btnEntranceMessage = new ForumObject(new LocalString("修改入场提示语"), new LocalString("进入房间时显示的提示语，12字上限"));
+            _btnEntranceMessage = new ForumObject(
+                new LocalString("- 修改入场提示语 -"),
+                new LocalString(WithCurrentSetting("进入房间时显示的提示语，12字上限", profile?.EntranceMessage)));
             _btnEntranceMessage.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("RoomList.png")?.texture;
             _window.ForumObjects.Add(_btnEntranceMessage);
 
-            _btnTitle = new ForumObject(new LocalString("修改头衔"), new LocalString("显示在个人信息中的头衔，12字上限"));
+            _btnTitle = new ForumObject(
+                new LocalString("- 修改头衔 -"),
+                new LocalString(WithCurrentSetting("显示在个人信息中的头衔，12字上限", profile?.Title)));
             _btnTitle.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("SocialNetwork.png")?.texture;
             _window.ForumObjects.Add(_btnTitle);
+        }
+
+        private static string WithCurrentSetting(string description, string value)
+        {
+            return $"{description}\n当前设置：<color=#{Constants.ColorYellow}>{EscapeRichText(GetDisplayValue(value))}</color>";
+        }
+
+        private static string GetDisplayValue(string value)
+        {
+            return string.IsNullOrWhiteSpace(value) ? "未设置" : value.Trim();
+        }
+
+        private static string SanitizeColor(string color)
+        {
+            if (string.IsNullOrWhiteSpace(color)) return "ffffff";
+            return color.Trim().TrimStart('#');
+        }
+
+        private static string EscapeRichText(string value)
+        {
+            return value?.Replace("<", "＜").Replace(">", "＞") ?? string.Empty;
         }
 
         private async void OnSelectionChanged(PopupLib.UI.Windows.Interfaces.IListWindow window, int objectIndex)
@@ -192,12 +223,12 @@ namespace MDEN.UI.Windows
                 if (value.Length > maxLength || !validator(value))
                 {
                     MelonLogger.Warning(validationError);
-                    RebuildWindow();
+                    MainThreadDispatcher.Enqueue(RebuildWindow);
                     return;
                 }
 
                 await SaveProfileFieldAsync(fieldName, value, saveAction);
-                RebuildWindow();
+                MainThreadDispatcher.Enqueue(RebuildWindow);
             };
             input.Show();
         }

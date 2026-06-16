@@ -20,6 +20,7 @@ namespace MDEN.UI.Core
             if (_initialized) return;
             LobbyManager.CurrentLobbyChanged += HandleLobbyChanged;
             ChatManager.MessageReceived += HandleChatMessageReceived;
+            PlayerManager.ProfileChanged += HandleProfileChanged;
             _initialized = true;
         }
 
@@ -28,6 +29,7 @@ namespace MDEN.UI.Core
             if (!_initialized) return;
             LobbyManager.CurrentLobbyChanged -= HandleLobbyChanged;
             ChatManager.MessageReceived -= HandleChatMessageReceived;
+            PlayerManager.ProfileChanged -= HandleProfileChanged;
             Destroy();
             _initialized = false;
         }
@@ -42,12 +44,26 @@ namespace MDEN.UI.Core
             MainThreadDispatcher.Enqueue(() => AddChatMessage(message));
         }
 
+        private static void HandleProfileChanged()
+        {
+            MainThreadDispatcher.Enqueue(OnProfileChanged);
+        }
+
         private static void OnLobbyChanged()
         {
             Refresh();
             NavigationButton.RefreshRoomButton();
             PreparationStartController.BindOrRefresh();
+            ChartPreviewController.OnLobbyChanged(LobbyManager.CurrentLobby);
             MultiplayerBattleController.OnLobbyChanged();
+        }
+
+        private static void OnProfileChanged()
+        {
+            Chat.InvalidatePlayerColors();
+            RoomSceneOverlay.InvalidatePlayerColors();
+            BattleLobbyDisplay.InvalidatePlayerColors();
+            RequestRefresh();
         }
 
         public static void Refresh()
@@ -69,6 +85,7 @@ namespace MDEN.UI.Core
         {
             Chat.Update();
             ReadyDisplay.Update();
+            StageDesignerTextController.Update();
             RoomSceneOverlay.UpdateVisibility();
         }
 
@@ -92,6 +109,15 @@ namespace MDEN.UI.Core
             if (!RoomSceneOverlay.IsHomeReady)
             {
                 RoomSceneOverlay.Hide();
+                RoomCharacterDisplay.DestroyGeneratedObjects();
+                ScheduleRefreshRetry(retryCount);
+                return;
+            }
+
+            if (!RoomSceneOverlay.IsHomeVisible)
+            {
+                RoomSceneOverlay.Hide();
+                RoomCharacterDisplay.DestroyGeneratedObjects();
                 ScheduleRefreshRetry(retryCount);
                 return;
             }
@@ -154,8 +180,10 @@ namespace MDEN.UI.Core
             PlayerList.Destroy();
             Chat.Destroy();
             ReadyDisplay.Destroy();
+            StageDesignerTextController.Restore();
             RoomSceneOverlay.Destroy();
             RoomCharacterDisplay.Destroy();
+            ChartPreviewController.Reset();
             MultiplayerBattleController.Reset();
         }
 
@@ -167,8 +195,10 @@ namespace MDEN.UI.Core
             PlayerList.Destroy();
             Chat.ResetSceneObjects();
             ReadyDisplay.Destroy();
+            StageDesignerTextController.Restore();
             RoomSceneOverlay.Destroy();
             RoomCharacterDisplay.Destroy();
+            ChartPreviewController.Reset();
             MultiplayerBattleController.Reset();
         }
 

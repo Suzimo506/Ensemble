@@ -20,6 +20,7 @@ namespace MDEN.UI.Windows
         private ForumObject _btnMaxPlayers;
         private ForumObject _btnPlaylistSize;
         private ForumObject _btnGoal;
+        private ForumObject _btnSettlement;
         private ForumObject _btnCreate;
         private int _lastSelectedIndex = -1;
 
@@ -27,6 +28,7 @@ namespace MDEN.UI.Windows
         private ushort _maxPlayers = 4;
         private ushort _playlistSize = 12;
         private LobbyGoal _goal = LobbyGoal.Accuracy;
+        private bool _settlementEnabled;
 
         public override void Show()
         {
@@ -55,27 +57,31 @@ namespace MDEN.UI.Windows
             _window.ForumObjects.Clear();
             _lastSelectedIndex = -1;
 
-            _btnBack = new ForumObject(new LocalString("返回"), new LocalString("回到房间列表"));
+            _btnBack = new ForumObject(new LocalString("- 返回 -"), new LocalString("回到房间列表"));
             _btnBack.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("OptionsPanel.png")?.texture;
             _window.ForumObjects.Add(_btnBack);
 
-            _btnName = new ForumObject(new LocalString("房间名称"), new LocalString($"当前: {_roomName}\n点击后输入房间名称，24字上限"));
+            _btnName = new ForumObject(new LocalString("- 房间名称 -"), new LocalString($"当前: {_roomName}\n点击后输入房间名称，24字上限"));
             _btnName.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("HomePanel.png")?.texture;
             _window.ForumObjects.Add(_btnName);
 
-            _btnMaxPlayers = new ForumObject(new LocalString("人数"), new LocalString($"当前: {_maxPlayers}\n点击在 2/4/6/8/10 间切换"));
+            _btnMaxPlayers = new ForumObject(new LocalString("- 人数 -"), new LocalString($"当前: {_maxPlayers}\n点击在 2/4/6/8/10 间切换"));
             _btnMaxPlayers.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("PlayerCard.png")?.texture;
             _window.ForumObjects.Add(_btnMaxPlayers);
 
-            _btnPlaylistSize = new ForumObject(new LocalString("歌曲列表长度"), new LocalString($"当前: {_playlistSize}\n点击在 8/12/16/24/32 间切换"));
+            _btnPlaylistSize = new ForumObject(new LocalString("- 歌曲列表长度 -"), new LocalString($"当前: {_playlistSize}\n点击在 8/12/16/24/32 间切换"));
             _btnPlaylistSize.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("RoomList.png")?.texture;
             _window.ForumObjects.Add(_btnPlaylistSize);
 
-            _btnGoal = new ForumObject(new LocalString("获胜方式"), new LocalString($"当前: {GetGoalName()}\n点击在准确率和分数间切换"));
+            _btnGoal = new ForumObject(new LocalString("- 获胜方式 -"), new LocalString($"当前: {GetGoalName()}\n点击在准确率和分数间切换"));
             _btnGoal.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("SocialNetwork.png")?.texture;
             _window.ForumObjects.Add(_btnGoal);
 
-            _btnCreate = new ForumObject(new LocalString($"<color={Constants.ColorYellow}>确认创建</color>"), new LocalString(BuildSummary()));
+            _btnSettlement = new ForumObject(new LocalString("- 结算功能 -"), new LocalString($"当前: {GetSettlementName()}\n开启后每五首歌弹出一次结算"));
+            _btnSettlement.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("OptionsPanel.png")?.texture;
+            _window.ForumObjects.Add(_btnSettlement);
+
+            _btnCreate = new ForumObject(new LocalString($"<color={Constants.ColorYellow}>- 确认创建 -</color>"), new LocalString(BuildSummary()));
             _btnCreate.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("RoomList.png")?.texture;
             _window.ForumObjects.Add(_btnCreate);
         }
@@ -113,6 +119,11 @@ namespace MDEN.UI.Windows
             else if (button == _btnGoal)
             {
                 _goal = _goal == LobbyGoal.Accuracy ? LobbyGoal.Score : LobbyGoal.Accuracy;
+                RebuildWindow();
+            }
+            else if (button == _btnSettlement)
+            {
+                _settlementEnabled = !_settlementEnabled;
                 RebuildWindow();
             }
             else if (button == _btnCreate)
@@ -167,7 +178,8 @@ namespace MDEN.UI.Windows
                     PlayType = (byte)LobbyPlayType.All,
                     ChartSelection = (byte)LobbyChartSelection.HostPlaylist,
                     Goal = (byte)_goal,
-                    PlaylistSize = _playlistSize
+                    PlaylistSize = _playlistSize,
+                    SettlementEnabled = _settlementEnabled
                 };
 
                 var lobbyId = await LobbyManager.CreateLobbyAsync(request);
@@ -216,12 +228,19 @@ namespace MDEN.UI.Windows
 
         private string BuildSummary()
         {
-            return $"名称: {_roomName}\n人数: <color={Constants.ColorYellow}>{_maxPlayers}</color>\n歌曲列表长度: {_playlistSize}\n获胜方式: {GetGoalName()}";
+            return $"名称: {_roomName}\n人数: <color={Constants.ColorYellow}>{_maxPlayers}</color>\n歌曲列表长度: {_playlistSize}\n获胜方式: {GetGoalName()}\n结算功能: {GetSettlementName()}";
         }
 
         private string GetGoalName()
         {
             return _goal == LobbyGoal.Score ? "分数" : "准确率";
+        }
+
+        private string GetSettlementName()
+        {
+            return _settlementEnabled
+                ? $"<color={Constants.ColorYellow}>开启</color>"
+                : "关闭";
         }
 
         private void RebuildWindow()

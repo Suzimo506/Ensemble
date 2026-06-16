@@ -17,6 +17,10 @@ namespace MDEN.Managers
         {
             var endpoint = ParseAddress(address);
             var account = GameAccountManager.GetCurrentAccount();
+            var configuredName = ModConfigManager.PlayerName;
+            var displayName = string.IsNullOrWhiteSpace(configuredName) || configuredName == "Player"
+                ? account.Nickname
+                : configuredName;
             var selection = GameAccountManager.GetCurrentSelection();
 
             if (NetworkClient.Instance.IsConnected)
@@ -35,11 +39,11 @@ namespace MDEN.Managers
                 new LoginRequest
                 {
                     Uid = account.Uid,
-                    Name = account.Nickname,
+                    Name = displayName,
                     IsReconnect = false
                 });
 
-            PlayerManager.SetCurrentIdentity(account.Uid, account.Nickname);
+            PlayerManager.SetCurrentIdentity(account.Uid, displayName);
             SessionToken = response.Token;
             IsLoggedIn = true;
             CurrentServerAddress = $"{endpoint.Host}:{endpoint.Port}";

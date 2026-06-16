@@ -102,15 +102,15 @@ namespace MDEN.UI.Windows
             _window.ForumObjects.Clear();
             _lastSelectedIndex = -1;
 
-            _btnBack = new ForumObject(new LocalString("返回"), new LocalString("回到节点列表"));
+            _btnBack = new ForumObject(new LocalString("- 返回 -"), new LocalString("回到节点列表"));
             _btnBack.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("OptionsPanel.png")?.texture;
             _window.ForumObjects.Add(_btnBack);
 
-            _btnRefresh = new ForumObject(new LocalString("刷新"), new LocalString("重新获取当前服务器的房间列表"));
+            _btnRefresh = new ForumObject(new LocalString("- 刷新 -"), new LocalString("重新获取当前服务器的房间列表"));
             _btnRefresh.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("RoomList.png")?.texture;
             _window.ForumObjects.Add(_btnRefresh);
 
-            _btnCreateRoom = new ForumObject(new LocalString("创建房间"), new LocalString("创建新的联机房间"));
+            _btnCreateRoom = new ForumObject(new LocalString("- 创建房间 -"), new LocalString("创建新的联机房间"));
             _btnCreateRoom.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("HomePanel.png")?.texture;
             _window.ForumObjects.Add(_btnCreateRoom);
 

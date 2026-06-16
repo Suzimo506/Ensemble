@@ -11,6 +11,7 @@ namespace MDEN.Protocol.Messages.Lobby
         public byte ChartSelection { get; set; }
         public byte Goal { get; set; }
         public ushort PlaylistSize { get; set; }
+        public bool SettlementEnabled { get; set; }
 
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public string Password { get; set; }
@@ -108,6 +109,7 @@ namespace MDEN.Protocol.Messages.Lobby
         public byte Goal { get; set; }
         public ushort MaxPlayers { get; set; }
         public ushort PlaylistSize { get; set; }
+        public bool SettlementEnabled { get; set; }
         public bool IsPrivate { get; set; }
         public bool Locked { get; set; }
         public bool IsPlaying { get; set; }

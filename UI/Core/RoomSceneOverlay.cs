@@ -23,6 +23,14 @@ namespace MDEN.UI.Core
         public static bool IsHomeReady => GameObject.Find("UI/Standerd/PnlHome") != null;
         public static bool IsNavigationReady => GameObject.Find("UI/Standerd/PnlNavigation") != null;
         public static bool IsReady => IsHomeReady && IsNavigationReady;
+        public static bool IsHomeVisible => GetHomeVisible();
+
+        public static void InvalidatePlayerColors()
+        {
+            PlayerColorCache.Clear();
+            PendingColorRequests.Clear();
+            Refresh(LobbyManager.CurrentLobby);
+        }
 
         private static readonly string[] HiddenObjectPaths =
         {
@@ -41,7 +49,7 @@ namespace MDEN.UI.Core
             EnsureFrame();
             if (_frame == null) return;
 
-            if (!IsHomeVisible())
+            if (!IsHomeVisible)
             {
                 _frame.SetActive(false);
                 return;
@@ -63,9 +71,17 @@ namespace MDEN.UI.Core
         public static void UpdateVisibility()
         {
             if (_frame == null) return;
-            var visible = LobbyManager.IsInLobby && IsHomeVisible();
+            var visible = LobbyManager.IsInLobby && IsHomeVisible;
             _frame.SetActive(visible);
-            if (visible) EnsureOverlayOrder();
+            if (visible)
+            {
+                EnsureNativeBackgroundVisible();
+                EnsureOverlayOrder();
+                if (_roomInfo != null)
+                {
+                    _roomInfo.text = FormatRoomInfo(LobbyManager.CurrentLobby);
+                }
+            }
         }
 
         public static void Destroy()
@@ -114,7 +130,7 @@ namespace MDEN.UI.Core
             if (canvas != null) canvas.sortingOrder = OverlaySortingOrder;
         }
 
-        private static bool IsHomeVisible()
+        private static bool GetHomeVisible()
         {
             var home = GameObject.Find("UI/Standerd/PnlHome");
             return home != null &&

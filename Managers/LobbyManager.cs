@@ -134,6 +134,7 @@ namespace MDEN.Managers
                 HostName = currentName,
                 MaxPlayers = request.MaxPlayers,
                 PlaylistSize = request.PlaylistSize,
+                SettlementEnabled = request.SettlementEnabled,
                 PlayType = request.PlayType,
                 ChartSelection = request.ChartSelection,
                 Goal = request.Goal,

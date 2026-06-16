@@ -46,7 +46,7 @@ namespace MDEN.UI.Windows
                 ? "Not in lobby."
                 : $"房主: {lobby.HostName ?? lobby.HostUid}\n人数: {lobby.Players?.Length ?? 0}/{lobby.MaxPlayers}\n状态: {(lobby.IsPlaying ? "游戏中" : "等待中")}";
 
-            _btnLeave = new ForumObject(new LocalString("退出房间"), new LocalString("离开当前联机房间"));
+            _btnLeave = new ForumObject(new LocalString("- 退出房间 -"), new LocalString("离开当前联机房间"));
             _btnLeave.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("HomePanel.png")?.texture;
             _window.ForumObjects.Add(_btnLeave);
 

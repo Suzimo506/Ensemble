@@ -1,6 +1,9 @@
+using System;
+using System.Threading.Tasks;
 using LocalizeLib;
 using MDEN.Managers;
 using MDEN.Protocol.Enums;
+using MDEN.Protocol.Messages.Player;
 using MDEN.Protocol.Models;
 using MDEN.UI.Core;
 using MelonLoader;
@@ -18,6 +21,7 @@ namespace MDEN.UI.Windows
         private readonly PlayerSyncEntry _player;
         private ForumWindow _window;
         private ForumObject _btnAddFriend;
+        private GetPlayerResponse _profile;
         private int _lastSelectedIndex = -1;
 
         public RoomPlayerProfileWindow(PlayerSyncEntry player)
@@ -39,12 +43,37 @@ namespace MDEN.UI.Windows
                 UnbindWindowEvents();
                 RemoveInjectedObjects();
             });
+
+            _ = LoadProfileAsync();
+        }
+
+        private async Task LoadProfileAsync()
+        {
+            if (string.IsNullOrWhiteSpace(_player.Uid)) return;
+
+            try
+            {
+                _profile = _player.Uid == PlayerManager.CurrentUid
+                    ? await PlayerManager.GetMyProfileAsync()
+                    : await PlayerManager.GetProfileAsync(_player.Uid);
+
+                if (IsDisposed) return;
+                MainThreadDispatcher.Enqueue(() =>
+                {
+                    if (IsDisposed || _window == null) return;
+                    RebuildWindow();
+                });
+            }
+            catch (Exception ex)
+            {
+                MelonLogger.Warning($"Load player profile failed: {_player.Uid}, {ex.Message}");
+            }
         }
 
         private void BuildList()
         {
             _window.ForumObjects.Clear();
-            _btnAddFriend = AddButton("添加好友", BuildDetails());
+            _btnAddFriend = AddButton("- 添加好友 -", BuildDetails());
         }
 
         private ForumObject AddButton(string title, string description)
@@ -137,17 +166,37 @@ namespace MDEN.UI.Windows
             return $"头衔\n{EscapeRichText(GetDisplayTitle())}\n\n" +
                 $"UID\n{EscapeRichText(_player.Uid)}\n\n" +
                 $"状态\n{GetStatusText(_player.Status)}\n\n" +
-                $"临时资料\n这里先显示占位内容，后续接入详细资料。";
+                $"名字颜色\n{EscapeRichText(GetDisplayColor())}\n\n" +
+                $"入场提示\n{EscapeRichText(GetDisplayEntranceMessage())}\n\n" +
+                $"个人介绍\n{EscapeRichText(GetDisplayBio())}";
         }
 
         private string GetDisplayName()
         {
+            if (!string.IsNullOrWhiteSpace(_profile?.Name)) return _profile.Name;
             return string.IsNullOrWhiteSpace(_player.Name) ? _player.Uid ?? "玩家资料" : _player.Name;
         }
 
         private string GetDisplayTitle()
         {
+            if (!string.IsNullOrWhiteSpace(_profile?.Title)) return _profile.Title;
             return string.IsNullOrWhiteSpace(_player.Title) ? "暂无头衔" : _player.Title;
+        }
+
+        private string GetDisplayBio()
+        {
+            return string.IsNullOrWhiteSpace(_profile?.Bio) ? "暂无介绍" : _profile.Bio;
+        }
+
+        private string GetDisplayEntranceMessage()
+        {
+            return string.IsNullOrWhiteSpace(_profile?.EntranceMessage) ? "暂无入场提示" : _profile.EntranceMessage;
+        }
+
+        private string GetDisplayColor()
+        {
+            var color = _profile?.ChatColor?.Trim().TrimStart('#');
+            return string.IsNullOrWhiteSpace(color) ? "ffffff" : color;
         }
 
         private static string GetStatusText(byte status)
@@ -168,6 +217,22 @@ namespace MDEN.UI.Windows
         private static string EscapeRichText(string value)
         {
             return value?.Replace("<", "＜").Replace(">", "＞") ?? string.Empty;
+        }
+
+        private void RebuildWindow()
+        {
+            if (_window == null) return;
+
+            _window.OnSelectionChanged -= OnSelectionChanged;
+            _window.OnInternalShow -= OnInternalShowInjectTitle;
+            _window.ForceClose();
+            _window = new ForumWindow();
+            _window.AutoReset = true;
+            BuildList();
+            _window.OnSelectionChanged += OnSelectionChanged;
+            _window.OnInternalShow += OnInternalShowInjectTitle;
+            _window.Show();
+            _lastSelectedIndex = -1;
         }
 
         public override void Close()

@@ -29,6 +29,7 @@ namespace MDEN.UI.Core
         {
             if (!LobbyManager.IsInLobby) return;
             _battleActive = true;
+            BattleChartOwnerDisplay.Show();
             Display.Create();
             Display.Refresh(BattleManager.GetBattleDataSnapshot());
         }
@@ -36,6 +37,7 @@ namespace MDEN.UI.Core
         public static void Destroy()
         {
             _battleActive = false;
+            BattleChartOwnerDisplay.Destroy();
             Display.Destroy();
         }
 

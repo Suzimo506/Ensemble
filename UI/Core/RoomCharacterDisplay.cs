@@ -56,6 +56,19 @@ namespace MDEN.UI.Core
         private const float OtherNameYOffset = 2.82f;
         private static readonly Vector2 LocalLabelSize = new Vector2(420f, 58f);
         private static readonly Vector2 OtherLabelSize = new Vector2(360f, 52f);
+        private static readonly string[] OwnedObjectNames =
+        {
+            "MDENRoomCharacterRightA",
+            "MDENRoomCharacterRightB",
+            "MDENRoomCharacterPrev",
+            "MDENRoomCharacterNext",
+            "MDENRoomLocalTitle",
+            "MDENRoomLocalName",
+            "MDENRoomRightATitle",
+            "MDENRoomRightAName",
+            "MDENRoomRightBTitle",
+            "MDENRoomRightBName"
+        };
         private static Text _fontTemplate;
 
         public static bool IsCreated => _localSlot != null;
@@ -89,6 +102,17 @@ namespace MDEN.UI.Core
         public static void Destroy()
         {
             RestoreOriginal();
+            DestroyGeneratedObjects();
+            _originalMuseShow = null;
+            _originalElfinShow = null;
+            _sourceButton = null;
+            _rolePanel = null;
+            _warningKeys.Clear();
+            _pageIndex = 0;
+        }
+
+        public static void DestroyGeneratedObjects()
+        {
             DestroyObject(_rightSlotA);
             DestroyObject(_rightSlotB);
             DestroyObject(_leftButton);
@@ -97,10 +121,6 @@ namespace MDEN.UI.Core
             _rightLabelsA?.Destroy();
             _rightLabelsB?.Destroy();
 
-            _originalMuseShow = null;
-            _originalElfinShow = null;
-            _sourceButton = null;
-            _rolePanel = null;
             _localSlot = null;
             _rightSlotA = null;
             _rightSlotB = null;
@@ -112,14 +132,14 @@ namespace MDEN.UI.Core
             _localGirlIndex = -1;
             _rightGirlIndexA = -1;
             _rightGirlIndexB = -1;
-            _warningKeys.Clear();
-            _pageIndex = 0;
+            DestroyOwnedObjectsByName();
         }
 
         private static bool EnsureCreated()
         {
             if (_localSlot != null) return true;
 
+            DestroyOwnedObjectsByName();
             _originalMuseShow = GameObject.Find("UI/Standerd/PnlHome/MuseShow");
             _originalElfinShow = GameObject.Find("UI/Standerd/PnlHome/ElfinShow");
             _sourceButton = GameObject.Find("UI/Standerd/PnlMenu/Panels/PnlRole/MainShow/FancyScrollView/BtnPrevious");
@@ -750,6 +770,18 @@ namespace MDEN.UI.Core
         {
             if (obj != null)
             {
+                obj.SetActive(false);
+                UnityEngine.Object.Destroy(obj);
+            }
+        }
+
+        private static void DestroyOwnedObjectsByName()
+        {
+            foreach (var objectName in OwnedObjectNames)
+            {
+                var obj = GameObject.Find(objectName);
+                if (obj == null) continue;
+                obj.SetActive(false);
                 UnityEngine.Object.Destroy(obj);
             }
         }

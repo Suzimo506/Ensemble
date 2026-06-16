@@ -49,7 +49,7 @@ namespace MDEN.UI.Windows
             for (var i = 0; i < _items.Length; i++)
             {
                 var item = _items[i];
-                AddButton($"#{i + 1} {item.DisplayName}", $"难度: {item.Difficulty}\n添加者: {item.OwnerName}");
+                AddButton($"#{i + 1}", $"{EscapeRichText(item.DisplayName)}\n难度: {FormatDifficulty(item.Difficulty)}\n添加者: {EscapeRichText(item.OwnerName)}");
             }
         }
 
@@ -61,7 +61,24 @@ namespace MDEN.UI.Windows
             return obj;
         }
 
-        private async void OnSelectionChanged(PopupLib.UI.Windows.Interfaces.IListWindow window, int objectIndex)
+        private static string FormatDifficulty(int difficulty)
+        {
+            return difficulty switch
+            {
+                1 => $"<color=#00d45aff>萌新</color>",
+                2 => $"<color=#{Constants.ColorBlue}>高手</color>",
+                3 => $"<color=#9b55ffff>大触</color>",
+                4 => $"<color=#ff5555ff>隐藏</color>",
+                _ => difficulty.ToString()
+            };
+        }
+
+        private static string EscapeRichText(string value)
+        {
+            return value?.Replace("<", "＜").Replace(">", "＞") ?? string.Empty;
+        }
+
+        private void OnSelectionChanged(PopupLib.UI.Windows.Interfaces.IListWindow window, int objectIndex)
         {
             if (_window == null || objectIndex < 0 || objectIndex >= _window.ForumObjects.Count) return;
             if (_lastSelectedIndex != objectIndex)
@@ -72,10 +89,22 @@ namespace MDEN.UI.Windows
 
             if (!PlaylistManager.CanChangePlaylist || objectIndex >= _items.Length) return;
 
+            var item = _items[objectIndex];
+            NativeConfirmDialog.Show("删除歌曲", $"确认从歌曲列表移除「{item.DisplayName}」吗？", confirmed =>
+            {
+                if (!confirmed) return;
+                _ = RemoveItemAsync(item);
+            });
+        }
+
+        private async System.Threading.Tasks.Task RemoveItemAsync(PlaylistEntryViewModel item)
+        {
+            if (item == null || IsDisposed) return;
+
             using var _ = UIManager.LockUI("Removing playlist entry...");
             try
             {
-                await PlaylistManager.RemoveAsync(_items[objectIndex].Entry);
+                await PlaylistManager.RemoveAsync(item.Entry);
                 if (IsDisposed) return;
 
                 MainThreadDispatcher.Enqueue(() =>
