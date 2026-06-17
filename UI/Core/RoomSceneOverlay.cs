@@ -57,7 +57,6 @@ namespace MDEN.UI.Core
 
             EnsureNativeBackgroundVisible();
             HideSinglePlayerControls();
-            EnsureHomeStartButtonVisible();
             _frame.SetActive(true);
             EnsureOverlayOrder();
             _roomInfo.text = FormatRoomInfo(lobby);
@@ -76,6 +75,7 @@ namespace MDEN.UI.Core
             if (visible)
             {
                 EnsureNativeBackgroundVisible();
+                HideSinglePlayerControls();
                 EnsureOverlayOrder();
                 if (_roomInfo != null)
                 {
@@ -187,15 +187,6 @@ namespace MDEN.UI.Core
                 }
 
                 obj.SetActive(false);
-            }
-        }
-
-        private static void EnsureHomeStartButtonVisible()
-        {
-            var startButton = GameObject.Find("UI/Standerd/PnlHome/Bottom/Btn");
-            if (startButton != null && !startButton.activeSelf)
-            {
-                startButton.SetActive(true);
             }
         }
 

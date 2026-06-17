@@ -32,6 +32,7 @@ namespace MDEN
         {
             if (sceneName == "UISystem_PC")
             {
+                UIManager.ForceUnlock();
                 NavigationButton.ResetSceneObjects();
                 RoomHudController.ResetSceneObjects();
 
@@ -46,6 +47,7 @@ namespace MDEN
             }
             else if (sceneName == "GameMain")
             {
+                UIManager.ForceUnlock();
                 Patches.BattlePatch.SceneLoaded();
             }
         }

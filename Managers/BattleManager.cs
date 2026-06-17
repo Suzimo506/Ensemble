@@ -24,6 +24,7 @@ namespace MDEN.Managers
         private static bool _synchronizing;
         private static bool _finishReported;
         private static bool _forcedDead;
+        private static bool _accuracyInitialized;
 
         public static bool Synchronizing => _synchronizing;
         public static event Action<BattlePlayerEntry[]> BattleDataChanged;
@@ -57,12 +58,10 @@ namespace MDEN.Managers
         {
             if (_synchronizing || !LobbyManager.IsInLobby) return;
 
-            _taskStageTarget = TaskStageTarget.instance;
-            _battleRoleAttributeComponent = BattleRoleAttributeComponent.instance;
-            AccuracyManager.Init();
-
             _finishReported = false;
             _forcedDead = false;
+            _accuracyInitialized = false;
+            EnsureBattleComponents();
             _syncCts?.Cancel();
             _syncCts?.Dispose();
             _syncCts = new CancellationTokenSource();
@@ -131,6 +130,7 @@ namespace MDEN.Managers
             _forcedDead = false;
             _taskStageTarget = null;
             _battleRoleAttributeComponent = null;
+            _accuracyInitialized = false;
 
             lock (BattleDataLock)
             {
@@ -160,7 +160,7 @@ namespace MDEN.Managers
 
         private static async Task SendCurrentAsync()
         {
-            if (!IsNetworkReady() || _taskStageTarget == null) return;
+            if (!IsNetworkReady() || !EnsureBattleComponents()) return;
 
             try
             {
@@ -223,6 +223,9 @@ namespace MDEN.Managers
 
         private static BattleDataNotifyMsg CreateCurrentNotify()
         {
+            EnsureBattleComponents();
+            if (_taskStageTarget == null) return null;
+
             var alive = !_forcedDead && (_battleRoleAttributeComponent == null || !_battleRoleAttributeComponent.IsDead());
 
             return new BattleDataNotifyMsg
@@ -257,6 +260,22 @@ namespace MDEN.Managers
         private static void NotifyBattleDataChanged(BattlePlayerEntry[] players)
         {
             MainThreadDispatcher.Enqueue(() => BattleDataChanged?.Invoke(players));
+        }
+
+        private static bool EnsureBattleComponents()
+        {
+            _taskStageTarget ??= TaskStageTarget.instance;
+            _battleRoleAttributeComponent ??= BattleRoleAttributeComponent.instance;
+
+            if (!_accuracyInitialized && _taskStageTarget != null && StageBattleComponent.instance != null)
+            {
+                AccuracyManager.Init();
+                _accuracyInitialized = true;
+                _taskStageTarget ??= TaskStageTarget.instance;
+                _battleRoleAttributeComponent ??= BattleRoleAttributeComponent.instance;
+            }
+
+            return _taskStageTarget != null;
         }
 
         private static bool IsNetworkReady()

@@ -30,6 +30,14 @@ namespace MDEN.UI.Core
             });
         }
 
+        public static void ForceUnlock()
+        {
+            if (_lockCount <= 0) return;
+
+            _lockCount = 0;
+            MelonLogger.Warning("Global UI lock force released.");
+        }
+
         // 关闭顶部窗口并开新窗，确保栈中只有一个活跃业务窗口
         public static void OpenWindow(MDENWindowBase newWindow)
         {
@@ -48,5 +56,6 @@ namespace MDEN.UI.Core
                 top.Dispose();
             }
         }
+
     }
 }

@@ -2,8 +2,10 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Il2CppAssets.Scripts.Database;
+using Il2CppAssets.Scripts.PeroTools.Commons;
+using Il2CppAssets.Scripts.PeroTools.Managers;
 using Il2CppAssets.Scripts.UI;
-using Il2CppAssets.Scripts.UI.Panels.PnlRole;
+using Il2CppPeroTools2.Resources;
 using MDEN.Managers;
 using MDEN.Protocol.Enums;
 using MDEN.Protocol.Messages.Lobby;
@@ -18,59 +20,57 @@ namespace MDEN.UI.Core
 {
     public static class RoomCharacterDisplay
     {
+        private const int MaxOtherSlots = 4;
         private const int PirateRinGirlIndex = 32;
-        private const float PageButtonGap = 8.7f;
-
-        private static GameObject _originalMuseShow;
-        private static GameObject _originalElfinShow;
-        private static GameObject _sourceButton;
-        private static PnlRole _rolePanel;
-
-        private static GameObject _localSlot;
-        private static GameObject _rightSlotA;
-        private static GameObject _rightSlotB;
-        private static GameObject _leftButton;
-        private static GameObject _rightButton;
-        private static SlotLabels _localLabels;
-        private static SlotLabels _rightLabelsA;
-        private static SlotLabels _rightLabelsB;
-        private static int _localGirlIndex = -1;
-        private static int _rightGirlIndexA = -1;
-        private static int _rightGirlIndexB = -1;
-        private static readonly HashSet<string> _warningKeys = new HashSet<string>();
-
-        private static Vector3 _originalPosition;
-        private static Vector3 _originalScale;
-        private static int _pageIndex;
-
-        private static readonly Vector3 LocalPosition = new Vector3(2.3f, -0.9f, 100f);
-        private static readonly Vector3 RightPositionA = new Vector3(-3.7f, -1.65f, 100f);
-        private static readonly Vector3 RightPositionB = new Vector3(8.3f, -1.65f, 100f);
-        private static readonly Vector3 LocalScale = new Vector3(0.68f, 0.68f, 0.68f);
-        private static readonly Vector3 OtherScale = new Vector3(0.54f, 0.54f, 0.54f);
-        private const float LabelXOffset = -2.15f;
-        private const float LocalTitleYOffset = 3.95f;
-        private const float LocalNameYOffset = 3.55f;
-        private const float OtherTitleYOffset = 3.70f;
-        private const float OtherNameYOffset = 3.34f;
+        private const float CenterX = 1.3f;
+        private const float LocalY = -0.9f;
+        private const float OtherY = -1.65f;
+        private const float Z = 100f;
+        private const float LocalScale = 0.75f;
+        private const float OtherScale = 0.6f;
+        private const float LabelXOffset = -1.55f;
+        private const float LocalTitleYOffset = 3.65f;
+        private const float LocalNameYOffset = 3.32f;
+        private const float OtherTitleYOffset = 2.90f;
+        private const float OtherNameYOffset = 2.61f;
+        private const float LabelZOffset = -0.5f;
         private static readonly Vector2 LocalLabelSize = new Vector2(250f, 125f);
         private static readonly Vector2 OtherLabelSize = new Vector2(250f, 125f);
+        private static readonly float[] OtherOffsets = { 3.8f, 7f };
         private static readonly string[] OwnedObjectNames =
         {
+            "MDENRoomCharacterLabels",
+            "MDENRoomCharacterOther0",
+            "MDENRoomCharacterOther1",
+            "MDENRoomCharacterOther2",
+            "MDENRoomCharacterOther3",
             "MDENRoomCharacterRightA",
             "MDENRoomCharacterRightB",
             "MDENRoomCharacterPrev",
             "MDENRoomCharacterNext",
             "MDENRoomLocalTitle",
             "MDENRoomLocalName",
-            "MDENRoomRightATitle",
-            "MDENRoomRightAName",
-            "MDENRoomRightBTitle",
-            "MDENRoomRightBName"
+            "MDENRoomOther0Title",
+            "MDENRoomOther0Name",
+            "MDENRoomOther1Title",
+            "MDENRoomOther1Name",
+            "MDENRoomOther2Title",
+            "MDENRoomOther2Name",
+            "MDENRoomOther3Title",
+            "MDENRoomOther3Name"
         };
-        private static Text _fontTemplate;
 
-        public static bool IsCreated => _localSlot != null;
+        private static GameObject _nativeMuseShow;
+        private static GameObject _nativeElfinShow;
+        private static readonly OtherCharacterSlot[] OtherSlots = CreateSlots();
+        private static SlotLabels _localLabels;
+        private static Vector3 _nativePosition;
+        private static Vector3 _nativeScale;
+        private static bool _created;
+        private static Text _fontTemplate;
+        private static readonly HashSet<string> WarningKeys = new HashSet<string>();
+
+        public static bool IsCreated => _created;
 
         public static bool Refresh(LobbySyncPush lobby)
         {
@@ -80,263 +80,368 @@ namespace MDEN.UI.Core
                 return true;
             }
 
+            if (!ShouldDisplay(lobby))
+            {
+                HideGeneratedObjects();
+                return true;
+            }
+
             if (!EnsureCreated())
             {
                 return false;
             }
 
             var localPlayer = GetLocalPlayer(lobby);
-            var others = GetOtherPlayers(lobby).ToList();
-            var pageCount = Math.Max(1, (int)Math.Ceiling(others.Count / 2f));
-            if (_pageIndex >= pageCount) _pageIndex = 0;
-            if (_pageIndex < 0) _pageIndex = pageCount - 1;
+            var otherPlayers = GetOtherPlayers(lobby).Take(MaxOtherSlots).ToList();
+            if (_nativeElfinShow != null) _nativeElfinShow.SetActive(false);
 
-            ApplySlot(_localSlot, localPlayer, true);
-            ApplySlot(_rightSlotA, others.Skip(_pageIndex * 2).FirstOrDefault(), false);
-            ApplySlot(_rightSlotB, others.Skip(_pageIndex * 2 + 1).FirstOrDefault(), false);
-            SetPageButtonsVisible(pageCount > 1);
+            if (otherPlayers.Count == 0)
+            {
+                SetTransform(_nativeMuseShow, CenterX, LocalY, LocalScale);
+                PrepareMuseShow(_nativeMuseShow, true);
+                ApplyLabels(_localLabels, _nativeMuseShow, localPlayer, true);
+                HideOtherSlots();
+                return true;
+            }
+
+            SetTransform(_nativeMuseShow, CenterX, LocalY, LocalScale);
+            PrepareMuseShow(_nativeMuseShow, true);
+            ApplyLabels(_localLabels, _nativeMuseShow, localPlayer, true);
+
+            var ready = true;
+            for (var i = 0; i < OtherSlots.Length; i++)
+            {
+                var player = i < otherPlayers.Count ? otherPlayers[i] : null;
+                if (!ApplyOtherSlot(OtherSlots[i], player, i))
+                {
+                    ready = false;
+                }
+            }
+
+            return ready;
+        }
+
+        public static void UpdateLabelPositions(LobbySyncPush lobby)
+        {
+            if (!ShouldDisplay(lobby))
+            {
+                HideGeneratedObjects();
+                return;
+            }
+
+            UpdateLabelPositionsForActiveSlots(lobby);
+        }
+
+        public static bool HasExpectedCharacterContent(LobbySyncPush lobby)
+        {
+            if (lobby == null || !ShouldDisplay(lobby)) return true;
+            if (!_created || _nativeMuseShow == null || _localLabels == null) return false;
+
+            var otherPlayers = GetOtherPlayers(lobby).Take(MaxOtherSlots).ToList();
+            if (otherPlayers.Count == 0)
+            {
+                return _nativeMuseShow.activeSelf &&
+                       _localLabels.HasPlayer &&
+                       OtherSlots.All(slot => !slot.IsActive);
+            }
+
+            if (!_nativeMuseShow.activeSelf || !_localLabels.HasPlayer) return false;
+            for (var i = 0; i < OtherSlots.Length; i++)
+            {
+                var player = i < otherPlayers.Count ? otherPlayers[i] : null;
+                if (!OtherSlots[i].HasExpectedContent(player)) return false;
+            }
+
             return true;
         }
 
         public static void Destroy()
         {
-            RestoreOriginal();
+            RestoreNativeMuseShow();
             DestroyGeneratedObjects();
-            _originalMuseShow = null;
-            _originalElfinShow = null;
-            _sourceButton = null;
-            _rolePanel = null;
-            _warningKeys.Clear();
-            _pageIndex = 0;
+            _nativeMuseShow = null;
+            _nativeElfinShow = null;
+            _fontTemplate = null;
+            WarningKeys.Clear();
+            _created = false;
         }
 
         public static void DestroyGeneratedObjects()
         {
-            DestroyObject(_rightSlotA);
-            DestroyObject(_rightSlotB);
-            DestroyObject(_leftButton);
-            DestroyObject(_rightButton);
-            _localLabels?.Destroy();
-            _rightLabelsA?.Destroy();
-            _rightLabelsB?.Destroy();
+            RestoreNativeMuseShow();
+            foreach (var slot in OtherSlots)
+            {
+                slot.Destroy();
+            }
 
-            _localSlot = null;
-            _rightSlotA = null;
-            _rightSlotB = null;
-            _leftButton = null;
-            _rightButton = null;
+            _localLabels?.Destroy();
             _localLabels = null;
-            _rightLabelsA = null;
-            _rightLabelsB = null;
-            _localGirlIndex = -1;
-            _rightGirlIndexA = -1;
-            _rightGirlIndexB = -1;
+            _created = false;
             DestroyOwnedObjectsByName();
+        }
+
+        private static bool ShouldDisplay(LobbySyncPush lobby)
+        {
+            return lobby != null &&
+                   LobbyManager.IsInLobby &&
+                   RoomSceneOverlay.IsHomeVisible;
         }
 
         private static bool EnsureCreated()
         {
-            if (_localSlot != null)
+            if (_created && _nativeMuseShow != null && _localLabels != null && !_localLabels.IsDestroyed)
             {
-                if (_localLabels == null || _localLabels.IsDestroyed ||
-                    _rightLabelsA == null || _rightLabelsA.IsDestroyed ||
-                    _rightLabelsB == null || _rightLabelsB.IsDestroyed)
-                {
-                    DestroyGeneratedObjects();
-                }
-                else
-                {
-                    return true;
-                }
+                return true;
             }
 
-            DestroyOwnedObjectsByName();
-            _originalMuseShow = GameObject.Find("UI/Standerd/PnlHome/MuseShow");
-            _originalElfinShow = GameObject.Find("UI/Standerd/PnlHome/ElfinShow");
-            _sourceButton = GameObject.Find("UI/Standerd/PnlMenu/Panels/PnlRole/MainShow/FancyScrollView/BtnPrevious");
-            _rolePanel = GameObject.Find("UI/Standerd/PnlMenu/Panels/PnlRole")?.GetComponent<PnlRole>();
-            if (_originalMuseShow == null || _sourceButton == null || _rolePanel == null)
+            DestroyGeneratedObjects();
+            _nativeMuseShow = FindHomeChildByName("MuseShow") ?? FindByPathIncludingInactive("UI/Standerd/PnlHome/MuseShow");
+            _nativeElfinShow = FindHomeChildByName("ElfinShow") ?? FindByPathIncludingInactive("UI/Standerd/PnlHome/ElfinShow");
+            if (_nativeMuseShow == null)
             {
-                WarnOnce("source-missing", "Room character display source objects are missing.");
+                WarnOnce("native-muse-missing", $"Native MuseShow is missing. Home children={DescribeHomeChildren()}");
                 return false;
             }
 
-            if (!_rolePanel.m_IsInit)
+            _nativePosition = _nativeMuseShow.transform.position;
+            _nativeScale = _nativeMuseShow.transform.localScale;
+            PrepareMuseShow(_nativeMuseShow, true);
+            _localLabels = SlotLabels.Create(_nativeMuseShow.transform.parent, "MDENRoomLocal", LocalLabelSize, 24, 36, ApplyGameFont);
+
+            for (var i = 0; i < OtherSlots.Length; i++)
             {
-                _rolePanel.Init();
+                var root = UnityEngine.Object.Instantiate(_nativeMuseShow, _nativeMuseShow.transform.parent);
+                root.name = $"MDENRoomCharacterOther{i}";
+                PrepareMuseShow(root, false);
+                root.SetActive(false);
+                OtherSlots[i].Bind(
+                    root,
+                    SlotLabels.Create(root.transform.parent, $"MDENRoomOther{i}", OtherLabelSize, 22, 32, ApplyGameFont));
             }
 
-            if (_rolePanel.fancyPanel == null)
-            {
-                WarnOnce("fancy-panel-missing", "Role fancy panel is missing.");
-                return false;
-            }
-
-            InitializeRoleCells();
-
-            _originalPosition = _originalMuseShow.transform.position;
-            _originalScale = _originalMuseShow.transform.localScale;
-
-            _localSlot = _originalMuseShow;
-            _rightSlotA = UnityEngine.Object.Instantiate(_originalMuseShow, _originalMuseShow.transform.parent);
-            _rightSlotB = UnityEngine.Object.Instantiate(_originalMuseShow, _originalMuseShow.transform.parent);
-            _rightSlotA.name = "MDENRoomCharacterRightA";
-            _rightSlotB.name = "MDENRoomCharacterRightB";
-
-            PrepareMuseShow(_localSlot);
-            PrepareMuseShow(_rightSlotA);
-            PrepareMuseShow(_rightSlotB);
-            CreatePageButtons();
-            CreateLabels();
-            if (_originalElfinShow != null) _originalElfinShow.SetActive(false);
+            _created = true;
             return true;
         }
 
-        private static void PrepareMuseShow(GameObject museShow)
+        private static bool ApplyOtherSlot(OtherCharacterSlot slot, RoomCharacterPlayer player, int slotIndex)
         {
+            if (slot == null) return false;
+            if (player == null)
+            {
+                slot.Hide();
+                return true;
+            }
+
+            var offsetIndex = Mathf.Min(slotIndex / 2, OtherOffsets.Length - 1);
+            var side = slotIndex % 2 == 0 ? 1f : -1f;
+            var x = CenterX + side * OtherOffsets[offsetIndex];
+            var sortingOrder = -(offsetIndex + 1);
+            slot.Show(player, x, OtherY, OtherScale, sortingOrder);
+
+            var girlIndex = player.GirlIndex < 0 ? 0 : player.GirlIndex;
+            if (slot.IsSameCharacter(girlIndex) && slot.HasCharacterPrefab) return true;
+
+            if (!ReplaceCharacter(slot, girlIndex))
+            {
+                slot.ResetCharacter();
+                return false;
+            }
+
+            return true;
+        }
+
+        private static bool ReplaceCharacter(OtherCharacterSlot slot, int girlIndex)
+        {
+            var prefabTransform = slot.PrefabTransform;
+            if (prefabTransform == null)
+            {
+                WarnOnce("prefab-transform-missing", "Character prefab transform is missing.");
+                return false;
+            }
+
+            var charInfo = GetCharacterInfo(girlIndex);
+            var assetName = charInfo?.mainShow;
+            if (string.IsNullOrEmpty(assetName))
+            {
+                WarnOnce($"asset-missing-{girlIndex}", $"Character mainShow asset is missing. girlIndex={girlIndex}");
+                return false;
+            }
+
+            var sourcePrefab = LoadCharacterPrefab(assetName);
+            if (sourcePrefab == null)
+            {
+                WarnOnce($"prefab-not-loaded-{assetName}", $"Character prefab is not loaded. asset={assetName}");
+                return false;
+            }
+
+            ClearCharacterPrefab(slot.Root);
+            var newShow = UnityEngine.Object.Instantiate(sourcePrefab, prefabTransform);
+            NormalizeCharacterPrefab(newShow, girlIndex, slot.SortingOrder);
+            RemoveSpecialCharacterExtras(newShow, girlIndex);
+            if (!HasVisibleCharacterContent(newShow))
+            {
+                WarnOnce($"visible-content-missing-{girlIndex}", $"Character has no visible content after load. girlIndex={girlIndex}");
+                DestroyObject(newShow);
+                return false;
+            }
+
+            var museComponent = prefabTransform.gameObject.GetComponent<MuseShow>();
+            if (museComponent != null) museComponent.m_MuseShow = newShow;
+            slot.SetCharacter(girlIndex, newShow);
+            MelonLogger.Msg($"Room character loaded: girlIndex={girlIndex}, asset={assetName}");
+            return true;
+        }
+
+        private static Il2CppAssets.Scripts.Database.CharacterInfo GetCharacterInfo(int girlIndex)
+        {
+            try
+            {
+                return Singleton<ConfigManager>.instance
+                    ?.GetConfigObject<DBConfigCharacter>()
+                    ?.GetCharacterInfoByIndex(girlIndex);
+            }
+            catch (Exception ex)
+            {
+                WarnOnce($"character-info-error-{girlIndex}", $"Failed to read character info. girlIndex={girlIndex}, error={ex.Message}");
+                return null;
+            }
+        }
+
+        private static GameObject LoadCharacterPrefab(string assetName)
+        {
+            try
+            {
+                var manager = ResourcesManager.instance;
+                return manager == null ? null : manager.LoadFromName<GameObject>(assetName);
+            }
+            catch (Exception ex)
+            {
+                WarnOnce($"prefab-load-error-{assetName}", $"Failed to load character prefab. asset={assetName}, error={ex.Message}");
+                return null;
+            }
+        }
+
+        private static void PrepareMuseShow(GameObject museShow, bool local)
+        {
+            if (museShow == null) return;
             museShow.SetActive(true);
+
             var interaction = museShow.transform.Find("BtnInteraction");
             if (interaction != null) interaction.gameObject.SetActive(false);
 
             var bubble = museShow.transform.Find("FirstTwnTalkBubble");
             if (bubble != null) bubble.gameObject.SetActive(false);
-        }
 
-        private static void ApplySlot(GameObject slot, RoomCharacterPlayer player, bool local)
-        {
-            if (slot == null) return;
-            slot.SetActive(player != null);
-            if (player == null)
-            {
-                SetLabelsVisible(slot, false);
-                SetCachedGirl(slot, -1);
-                return;
-            }
-
-            slot.transform.position = local ? LocalPosition : (slot == _rightSlotA ? RightPositionA : RightPositionB);
-            slot.transform.localScale = local ? LocalScale : OtherScale;
-            NormalizeSlotVisibility(slot);
-            ApplyLabels(slot, player, local);
-
-            var girlIndex = local
-                ? GetLocalDisplaySelection().GirlIndex
-                : player.GirlIndex;
-            if (girlIndex < 0) girlIndex = 0;
-
-            if (IsSameGirl(slot, girlIndex)) return;
-            
             if (!local)
             {
-                ReplaceGirl(slot, girlIndex);
+                ClearCharacterPrefab(museShow);
             }
-            SetCachedGirl(slot, girlIndex);
-        }
-
-        private static bool IsSameGirl(GameObject slot, int girlIndex)
-        {
-            if (slot == _localSlot) return _localGirlIndex == girlIndex;
-            if (slot == _rightSlotA) return _rightGirlIndexA == girlIndex;
-            if (slot == _rightSlotB) return _rightGirlIndexB == girlIndex;
-            return false;
-        }
-
-        private static void NormalizeSlotVisibility(GameObject slot)
-        {
-            if (slot == null) return;
-
-            var canvasGroups = slot.GetComponentsInChildren<CanvasGroup>(true);
-            if (canvasGroups != null)
+            else
             {
-                foreach (var canvasGroup in canvasGroups)
-                {
-                    if (canvasGroup == null) continue;
-                    canvasGroup.alpha = 1f;
-                }
-            }
-
-            var graphics = slot.GetComponentsInChildren<Graphic>(true);
-            if (graphics != null)
-            {
-                foreach (var graphic in graphics)
-                {
-                    if (graphic == null) continue;
-                    var color = graphic.color;
-                    color.a = 1f;
-                    graphic.color = color;
-                }
-            }
-
-            var renderers = slot.GetComponentsInChildren<Renderer>(true);
-            if (renderers != null)
-            {
-                foreach (var renderer in renderers)
-                {
-                    if (renderer == null) continue;
-                    renderer.enabled = true;
-                }
+                PruneDuplicateCharacterPrefabs(museShow);
             }
         }
 
-        private static void SetCachedGirl(GameObject slot, int girlIndex)
+        private static void SetTransform(GameObject target, float x, float y, float scale)
         {
-            if (slot == _localSlot) _localGirlIndex = girlIndex;
-            else if (slot == _rightSlotA) _rightGirlIndexA = girlIndex;
-            else if (slot == _rightSlotB) _rightGirlIndexB = girlIndex;
+            if (target == null) return;
+            target.transform.position = new Vector3(x, y, Z);
+            target.transform.localScale = new Vector3(scale, scale, scale);
         }
 
-        private static void ReplaceGirl(GameObject museShow, int girlIndex)
+        private static void RestoreNativeMuseShow()
         {
-            if (_rolePanel?.fancyPanel == null || girlIndex < 0 || museShow == null)
+            if (_nativeMuseShow != null)
             {
-                MelonLogger.Warning($"Skip replacing character. girlIndex={girlIndex}");
-                return;
+                _nativeMuseShow.transform.position = _nativePosition;
+                _nativeMuseShow.transform.localScale = _nativeScale;
+
+                var interaction = _nativeMuseShow.transform.Find("BtnInteraction");
+                if (interaction != null) interaction.gameObject.SetActive(true);
             }
 
-            var prefabTransform = museShow.transform.Find("ShowLocalization/SpinePerfab_other");
-            if (prefabTransform == null)
+            if (_nativeElfinShow != null)
             {
-                WarnOnce("prefab-transform-missing", "Character prefab transform is missing.");
-                return;
+                _nativeElfinShow.SetActive(true);
             }
+        }
 
-            var charInfo = _rolePanel.m_ConfigCharacter?.GetCharacterInfoByIndex(girlIndex);
-            if (charInfo == null)
+        private static void HideGeneratedObjects()
+        {
+            _localLabels?.SetPlayer(null);
+            HideOtherSlots();
+            RestoreNativeMuseShow();
+        }
+
+        private static void HideOtherSlots()
+        {
+            foreach (var slot in OtherSlots)
             {
-                WarnOnce($"info-missing-{girlIndex}", $"Character info not found. girlIndex={girlIndex}");
-                return;
+                slot.Hide();
             }
+        }
 
-            var subControl = _rolePanel.fancyPanel.GetCellComponent<PnlRoleSubControl>(charInfo.order - 1);
-            if (subControl == null)
+        private static void UpdateLabelPositionsForActiveSlots(LobbySyncPush lobby)
+        {
+            if (!_created || !ShouldDisplay(lobby)) return;
+
+            _localLabels?.UpdatePosition(_nativeMuseShow, true);
+            foreach (var slot in OtherSlots)
             {
-                WarnOnce($"cell-not-ready-{charInfo.order}", $"Character cell not ready. order={charInfo.order}");
-                return;
+                slot.UpdateLabels();
             }
-            if (!subControl.m_Init) subControl.Init();
+        }
 
-            var charApply = subControl.characterApply;
-            if (charApply == null)
+        private static void ClearCharacterPrefab(GameObject museShow)
+        {
+            var prefabTransform = museShow?.transform.Find("ShowLocalization/SpinePerfab_other");
+            if (prefabTransform == null) return;
+
+            for (var i = prefabTransform.childCount - 1; i >= 0; i--)
             {
-                WarnOnce($"apply-missing-{girlIndex}", $"Character apply is missing. girlIndex={girlIndex}");
-                return;
+                DestroyObject(prefabTransform.GetChild(i).gameObject);
             }
-
-            for (var i = 0; i < prefabTransform.childCount; i++)
-            {
-                UnityEngine.Object.Destroy(prefabTransform.GetChild(i).gameObject);
-            }
-
-            var newShow = UnityEngine.Object.Instantiate(charApply.gameObject, prefabTransform);
-            NormalizeCharacterVisibility(newShow, girlIndex);
-            RemoveSpecialCharacterExtras(newShow, girlIndex);
 
             var museComponent = prefabTransform.gameObject.GetComponent<MuseShow>();
-            if (museComponent != null) museComponent.m_MuseShow = newShow;
-
-            MelonLogger.Msg($"Room character replaced: girlIndex={girlIndex}, name={charInfo.characterName}, cos={charInfo.cosName}");
+            if (museComponent != null) museComponent.m_MuseShow = null;
         }
 
-        private static void NormalizeCharacterVisibility(GameObject root, int girlIndex)
+        private static void PruneDuplicateCharacterPrefabs(GameObject museShow)
+        {
+            var prefabTransform = museShow?.transform.Find("ShowLocalization/SpinePerfab_other");
+            if (prefabTransform == null || prefabTransform.childCount <= 1) return;
+
+            GameObject keptObject = null;
+            for (var i = prefabTransform.childCount - 1; i >= 0; i--)
+            {
+                var child = prefabTransform.GetChild(i);
+                if (child == null) continue;
+
+                if (keptObject == null && child.gameObject.activeSelf && HasVisibleCharacterContent(child.gameObject))
+                {
+                    keptObject = child.gameObject;
+                    break;
+                }
+            }
+
+            if (keptObject == null) return;
+
+            for (var i = prefabTransform.childCount - 1; i >= 0; i--)
+            {
+                var child = prefabTransform.GetChild(i);
+                if (child == null || child.gameObject == keptObject) continue;
+
+                DestroyObject(child.gameObject);
+            }
+
+            var museComponent = prefabTransform.gameObject.GetComponent<MuseShow>();
+            if (museComponent != null)
+            {
+                museComponent.m_MuseShow = keptObject;
+            }
+        }
+
+        private static void NormalizeCharacterPrefab(GameObject root, int girlIndex, int sortingOrder)
         {
             if (root == null) return;
 
@@ -346,19 +451,18 @@ namespace MDEN.UI.Core
                 ActivateHierarchy(root.transform);
             }
 
+            RemoveCharacterExpressionComponents(root);
+
             var renderers = root.GetComponentsInChildren<Renderer>(true);
-            if (renderers == null || renderers.Length == 0)
-            {
-                WarnOnce($"renderer-missing-{girlIndex}", $"Character has no renderer after clone. girlIndex={girlIndex}");
-            }
-            else
+            if (renderers != null)
             {
                 foreach (var renderer in renderers)
                 {
                     if (renderer == null) continue;
-                    renderer.enabled = true;
-                    renderer.sortingOrder = 0;
                     renderer.gameObject.SetActive(true);
+                    renderer.enabled = true;
+                    renderer.sortingOrder = sortingOrder;
+                    ResetRendererAlpha(renderer);
                 }
             }
 
@@ -373,9 +477,19 @@ namespace MDEN.UI.Core
                 }
             }
 
-            if (girlIndex == PirateRinGirlIndex)
+            var graphics = root.GetComponentsInChildren<Graphic>(true);
+            if (graphics != null)
             {
-                MelonLogger.Msg("Applied pirate Rin visibility normalization.");
+                foreach (var graphic in graphics)
+                {
+                    if (graphic == null) continue;
+                    graphic.enabled = true;
+                    graphic.gameObject.SetActive(true);
+                    var color = graphic.color;
+                    color.a = 1f;
+                    graphic.color = color;
+                    graphic.canvasRenderer.SetAlpha(1f);
+                }
             }
         }
 
@@ -413,177 +527,103 @@ namespace MDEN.UI.Core
             }
         }
 
-        private static void CreatePageButtons()
+        private static void RemoveCharacterExpressionComponents(GameObject root)
         {
-            _leftButton = UnityEngine.Object.Instantiate(_sourceButton, _originalMuseShow.transform.parent);
-            _rightButton = UnityEngine.Object.Instantiate(_sourceButton, _originalMuseShow.transform.parent);
-            _leftButton.name = "MDENRoomCharacterPrev";
-            _rightButton.name = "MDENRoomCharacterNext";
+            var behaviours = root.GetComponentsInChildren<MonoBehaviour>(true);
+            if (behaviours == null) return;
 
-            _leftButton.transform.position = new Vector3(-PageButtonGap, 0f, 100f);
-            _rightButton.transform.position = new Vector3(PageButtonGap, 0f, 100f);
-            _leftButton.transform.localScale = new Vector3(-0.56f, 0.56f, 0.56f);
-            _rightButton.transform.localScale = new Vector3(0.56f, 0.56f, 0.56f);
-
-            SetupPageButton(_leftButton, () =>
+            foreach (var behaviour in behaviours)
             {
-                _pageIndex--;
-                Refresh(LobbyManager.CurrentLobby);
-            });
-            SetupPageButton(_rightButton, () =>
-            {
-                _pageIndex++;
-                Refresh(LobbyManager.CurrentLobby);
-            });
+                if (behaviour == null) continue;
+                if (behaviour.GetType().Name == "CharacterExpression")
+                {
+                    UnityEngine.Object.Destroy(behaviour);
+                }
+            }
         }
 
-        private static void SetupPageButton(GameObject target, Action action)
+        private static bool HasVisibleCharacterContent(GameObject root)
         {
-            var image = target.GetComponent<Image>();
-            if (image != null)
+            if (root == null || !root.activeSelf) return false;
+
+            var renderers = root.GetComponentsInChildren<Renderer>(true);
+            if (renderers != null && renderers.Any(renderer =>
+                    renderer != null &&
+                    renderer.enabled &&
+                    renderer.gameObject.activeInHierarchy &&
+                    HasVisibleRendererAlpha(renderer)))
             {
-                image.color = new Color(0.8f, 0.2f, 0.8f, 1f);
+                return true;
             }
 
-            var button = target.GetComponent<Button>();
-            if (button == null) button = target.AddComponent<Button>();
-            button.onClick = new Button.ButtonClickedEvent();
-            button.onClick.AddListener((UnityAction)(() => action.Invoke()));
-
-            var eventTrigger = target.GetComponent<UnityEngine.EventSystems.EventTrigger>();
-            if (eventTrigger != null) UnityEngine.Object.Destroy(eventTrigger);
+            var graphics = root.GetComponentsInChildren<Graphic>(true);
+            return graphics != null && graphics.Any(graphic =>
+                graphic != null &&
+                graphic.enabled &&
+                graphic.gameObject.activeInHierarchy &&
+                graphic.color.a > 0.01f);
         }
 
-        private static void SetPageButtonsVisible(bool visible)
+        private static void ResetRendererAlpha(Renderer renderer)
         {
-            if (_leftButton != null) _leftButton.SetActive(visible);
-            if (_rightButton != null) _rightButton.SetActive(visible);
-        }
-
-        private static void CreateLabels()
-        {
-            var parent = _originalMuseShow.transform.parent;
-            _localLabels = CreateSlotLabels(parent, "MDENRoomLocal", LocalLabelSize, 24, 36);
-            _rightLabelsA = CreateSlotLabels(parent, "MDENRoomRightA", OtherLabelSize, 22, 32);
-            _rightLabelsB = CreateSlotLabels(parent, "MDENRoomRightB", OtherLabelSize, 22, 32);
-        }
-
-        private static SlotLabels CreateSlotLabels(
-            Transform parent,
-            string prefix,
-            Vector2 size,
-            int titleFontSize,
-            int nameFontSize)
-        {
-            var titleText = CreateLabelText(parent, prefix + "Title", size, titleFontSize, false);
-            var nameText = CreateLabelText(parent, prefix + "Name", size, nameFontSize, true);
-            return new SlotLabels(titleText, nameText);
-        }
-
-        private static Text CreateLabelText(
-            Transform parent,
-            string name,
-            Vector2 size,
-            int fontSize,
-            bool clickable)
-        {
-            var obj = new GameObject(name);
-            var rect = obj.AddComponent<RectTransform>();
-            rect.SetParent(parent);
-            rect.localScale = Vector3.one;
-            rect.sizeDelta = size;
-            rect.anchoredPosition3D = Vector3.zero;
-
-            var text = obj.AddComponent<Text>();
-            ApplyGameFont(text);
-            text.fontSize = fontSize;
-            text.alignment = TextAnchor.MiddleCenter;
-            text.horizontalOverflow = HorizontalWrapMode.Overflow;
-            text.verticalOverflow = VerticalWrapMode.Overflow;
-            text.raycastTarget = clickable;
-            text.supportRichText = true;
-            text.color = Color.white;
-
-            var shadow = obj.AddComponent<Shadow>();
-            shadow.effectDistance = new Vector2(2f, -2f);
-            shadow.effectColor = new Color(0f, 0f, 0f, 0.45f);
-
-            if (clickable)
+            try
             {
-                var button = obj.AddComponent<Button>();
-                button.targetGraphic = text;
-                button.transition = Selectable.Transition.ColorTint;
+                var materials = renderer.materials;
+                if (materials == null) return;
+
+                foreach (var material in materials)
+                {
+                    ResetMaterialAlpha(material, "_Color");
+                    ResetMaterialAlpha(material, "_TintColor");
+                }
             }
-
-            obj.SetActive(false);
-            return text;
-        }
-
-        private static void ApplyLabels(GameObject slot, RoomCharacterPlayer player, bool local)
-        {
-            var labels = GetLabels(slot);
-            if (labels == null) return;
-
-            labels.SetVisible(true);
-            var titleYOffset = local ? LocalTitleYOffset : OtherTitleYOffset;
-            var nameYOffset = local ? LocalNameYOffset : OtherNameYOffset;
-            var slotPosition = slot.transform.position;
-            var labelX = slotPosition.x + LabelXOffset;
-            var titlePosition = new Vector3(labelX, slotPosition.y + titleYOffset, slotPosition.z);
-            var namePosition = new Vector3(labelX, slotPosition.y + nameYOffset, slotPosition.z);
-            labels.SetPosition(titlePosition, namePosition);
-            labels.SetAsLastSibling();
-            labels.Title.text = FormatTitle(player.Title);
-            labels.Name.text = FormatName(player.Name);
-
-            var entry = ToPlayerSyncEntry(player);
-            labels.Button.onClick = new Button.ButtonClickedEvent();
-            labels.Button.onClick.AddListener((UnityAction)(() => UIManager.OpenWindow(new RoomPlayerProfileWindow(entry))));
-        }
-
-        private static void SetLabelsVisible(GameObject slot, bool visible)
-        {
-            var labels = GetLabels(slot);
-            labels?.SetVisible(visible);
-        }
-
-        private static SlotLabels GetLabels(GameObject slot)
-        {
-            if (slot == _localSlot) return _localLabels;
-            if (slot == _rightSlotA) return _rightLabelsA;
-            if (slot == _rightSlotB) return _rightLabelsB;
-            return null;
-        }
-
-        private static string FormatTitle(string title)
-        {
-            return string.IsNullOrWhiteSpace(title)
-                ? "<color=#ffffff88>[无头衔]</color>"
-                : $"<color=#{Constants.ColorYellow}>[{EscapeRichText(title)}]</color>";
-        }
-
-        private static string FormatName(string name)
-        {
-            return string.IsNullOrWhiteSpace(name)
-                ? $"<b><color=#{Constants.ColorPink}>Unknown</color></b>"
-                : $"<b><color=#{Constants.ColorPink}>{EscapeRichText(name)}</color></b>";
-        }
-
-        private static string EscapeRichText(string value)
-        {
-            return value?.Replace("<", "＜").Replace(">", "＞") ?? string.Empty;
-        }
-
-        private static PlayerSyncEntry ToPlayerSyncEntry(RoomCharacterPlayer player)
-        {
-            return new PlayerSyncEntry
+            catch
             {
-                Uid = player.Uid,
-                Name = player.Name,
-                Title = player.Title,
-                PingMS = player.PingMS,
-                Status = player.Status
-            };
+                // 部分原生材质没有可写颜色属性，跳过即可。
+            }
+        }
+
+        private static void ResetMaterialAlpha(Material material, string propertyName)
+        {
+            if (material == null || !material.HasProperty(propertyName)) return;
+
+            var color = material.GetColor(propertyName);
+            color.a = 1f;
+            material.SetColor(propertyName, color);
+        }
+
+        private static bool HasVisibleRendererAlpha(Renderer renderer)
+        {
+            try
+            {
+                var materials = renderer.materials;
+                if (materials == null || materials.Length == 0) return true;
+
+                var checkedColor = false;
+                foreach (var material in materials)
+                {
+                    if (material == null) continue;
+                    if (HasVisibleMaterialColor(material, "_Color", ref checkedColor) ||
+                        HasVisibleMaterialColor(material, "_TintColor", ref checkedColor))
+                    {
+                        return true;
+                    }
+                }
+
+                return !checkedColor;
+            }
+            catch
+            {
+                return true;
+            }
+        }
+
+        private static bool HasVisibleMaterialColor(Material material, string propertyName, ref bool checkedColor)
+        {
+            if (!material.HasProperty(propertyName)) return false;
+
+            checkedColor = true;
+            return material.GetColor(propertyName).a > 0.01f;
         }
 
         private static RoomCharacterPlayer GetLocalPlayer(LobbySyncPush lobby)
@@ -597,7 +637,8 @@ namespace MDEN.UI.Core
                     Title = PlayerManager.CurrentProfile?.Title,
                     GirlIndex = GetLocalDisplaySelection().GirlIndex,
                     ElfinIndex = GetLocalDisplaySelection().ElfinIndex,
-                    Status = (byte)PlayerStatus.InLobby
+                    Status = (byte)PlayerStatus.InLobby,
+                    IsHost = IsSameUid(uid, lobby.HostUid)
                 };
         }
 
@@ -607,6 +648,7 @@ namespace MDEN.UI.Core
             foreach (var player in GetPlayers(lobby))
             {
                 if (IsSameUid(player.Uid, currentUid)) continue;
+                if (player.Status == (byte)PlayerStatus.Offline) continue;
                 yield return player;
             }
         }
@@ -635,7 +677,8 @@ namespace MDEN.UI.Core
                         PingMS = player.PingMS,
                         Status = player.Status,
                         GirlIndex = GetGirlIndex(uid, character),
-                        ElfinIndex = GetElfinIndex(uid, character)
+                        ElfinIndex = GetElfinIndex(uid, character),
+                        IsHost = IsSameUid(uid, lobby.HostUid)
                     };
                 }
 
@@ -656,27 +699,9 @@ namespace MDEN.UI.Core
                     Title = IsSameUid(uid, PlayerManager.CurrentUid) ? PlayerManager.CurrentProfile?.Title : null,
                     GirlIndex = GetGirlIndex(uid, character),
                     ElfinIndex = GetElfinIndex(uid, character),
-                    Status = (byte)(IsSameUid(uid, PlayerManager.CurrentUid) ? PlayerStatus.InLobby : PlayerStatus.Offline)
+                    Status = (byte)(IsSameUid(uid, PlayerManager.CurrentUid) ? PlayerStatus.InLobby : PlayerStatus.Offline),
+                    IsHost = IsSameUid(uid, lobby.HostUid)
                 };
-            }
-        }
-
-        private static void InitializeRoleCells()
-        {
-            var fancyPanel = _rolePanel.fancyPanel;
-            var scrollView = fancyPanel?.m_FancyScrollView;
-            if (scrollView == null) return;
-
-            for (var i = 0; i < scrollView.itemCount; i++)
-            {
-                scrollView.ScrollToDataIndex(i, 0, true);
-            }
-
-            var localSelection = GameAccountManager.GetCurrentSelection();
-            var localInfo = _rolePanel.m_ConfigCharacter?.GetCharacterInfoByIndex(localSelection.GirlIndex);
-            if (localInfo != null)
-            {
-                scrollView.ScrollToDataIndex(localInfo.order - 1, 0, true);
             }
         }
 
@@ -728,6 +753,62 @@ namespace MDEN.UI.Core
             return player?.Title;
         }
 
+        private static PlayerSyncEntry ToPlayerSyncEntry(RoomCharacterPlayer player)
+        {
+            return new PlayerSyncEntry
+            {
+                Uid = player.Uid,
+                Name = player.Name,
+                Title = player.Title,
+                PingMS = player.PingMS,
+                Status = player.Status
+            };
+        }
+
+        private static void ApplyLabels(SlotLabels labels, GameObject slot, RoomCharacterPlayer player, bool local)
+        {
+            if (labels == null || slot == null)
+            {
+                return;
+            }
+
+            if (player == null)
+            {
+                labels.SetPlayer(null);
+                return;
+            }
+
+            labels.SetPlayer(player);
+            labels.UpdatePosition(slot, local);
+            var entry = ToPlayerSyncEntry(player);
+            labels.Button.onClick = new Button.ButtonClickedEvent();
+            labels.Button.onClick.AddListener((UnityAction)(() => UIManager.OpenWindow(new RoomPlayerWindow(entry))));
+        }
+
+        private static string FormatTitle(string title)
+        {
+            return string.IsNullOrWhiteSpace(title)
+                ? string.Empty
+                : $"<color=#{Constants.ColorYellow}>[{EscapeRichText(title)}]</color>";
+        }
+
+        private static string FormatName(string name)
+        {
+            var displayName = string.IsNullOrWhiteSpace(name) ? "Unknown" : Truncate(EscapeRichText(name), 12);
+            return $"<b><color=#{Constants.ColorPink}>{displayName}</color></b>";
+        }
+
+        private static string Truncate(string value, int maxLength)
+        {
+            if (string.IsNullOrEmpty(value) || value.Length <= maxLength) return value;
+            return value.Substring(0, maxLength) + "...";
+        }
+
+        private static string EscapeRichText(string value)
+        {
+            return value?.Replace("<", "＜").Replace(">", "＞") ?? string.Empty;
+        }
+
         private static string NormalizeUid(string uid)
         {
             return uid?.Trim();
@@ -738,25 +819,91 @@ namespace MDEN.UI.Core
             return string.Equals(NormalizeUid(left), NormalizeUid(right), StringComparison.OrdinalIgnoreCase);
         }
 
-        private static void RestoreOriginal()
+        private static float GetScreenScale()
         {
-            if (_originalMuseShow != null)
+            return Mathf.Max(0.85f, Screen.height / 1080f);
+        }
+
+        private static GameObject FindByPathIncludingInactive(string path)
+        {
+            if (string.IsNullOrEmpty(path)) return null;
+
+            var parts = path.Split('/');
+            if (parts.Length == 0) return null;
+
+            var current = GameObject.Find(parts[0]);
+            if (current == null) return null;
+
+            var transform = current.transform;
+            for (var i = 1; i < parts.Length; i++)
             {
-                _originalMuseShow.transform.position = _originalPosition;
-                _originalMuseShow.transform.localScale = _originalScale;
-                var interaction = _originalMuseShow.transform.Find("BtnInteraction");
-                if (interaction != null) interaction.gameObject.SetActive(true);
+                transform = transform.Find(parts[i]);
+                if (transform == null) return null;
             }
 
-            if (_originalElfinShow != null)
+            return transform.gameObject;
+        }
+
+        private static GameObject FindHomeChildByName(string objectName)
+        {
+            if (string.IsNullOrWhiteSpace(objectName)) return null;
+
+            var home = FindByPathIncludingInactive("UI/Standerd/PnlHome") ?? FindSceneObjectByName("PnlHome");
+            if (home == null) return null;
+
+            return FindChildByName(home.transform, objectName);
+        }
+
+        private static GameObject FindSceneObjectByName(string objectName)
+        {
+            var objects = UnityEngine.Resources.FindObjectsOfTypeAll<GameObject>();
+            foreach (var obj in objects)
             {
-                _originalElfinShow.SetActive(true);
+                if (obj == null || obj.name != objectName) continue;
+                if (!obj.scene.IsValid() || !obj.scene.isLoaded) continue;
+                return obj;
             }
+
+            return null;
+        }
+
+        private static GameObject FindChildByName(Transform root, string objectName)
+        {
+            if (root == null) return null;
+            if (root.name == objectName) return root.gameObject;
+
+            for (var i = 0; i < root.childCount; i++)
+            {
+                var match = FindChildByName(root.GetChild(i), objectName);
+                if (match != null) return match;
+            }
+
+            return null;
+        }
+
+        private static string DescribeHomeChildren()
+        {
+            var home = FindByPathIncludingInactive("UI/Standerd/PnlHome") ?? FindSceneObjectByName("PnlHome");
+            if (home == null) return "PnlHome not found";
+
+            var names = new List<string>();
+            var limit = Mathf.Min(home.transform.childCount, 24);
+            for (var i = 0; i < limit; i++)
+            {
+                names.Add(home.transform.GetChild(i).name);
+            }
+
+            if (home.transform.childCount > limit)
+            {
+                names.Add("...");
+            }
+
+            return string.Join(", ", names);
         }
 
         private static void WarnOnce(string key, string message)
         {
-            if (_warningKeys.Add(key))
+            if (WarningKeys.Add(key))
             {
                 MelonLogger.Warning(message);
             }
@@ -809,11 +956,10 @@ namespace MDEN.UI.Core
 
         private static void DestroyObject(GameObject obj)
         {
-            if (obj != null)
-            {
-                obj.SetActive(false);
-                UnityEngine.Object.Destroy(obj);
-            }
+            if (obj == null) return;
+
+            obj.SetActive(false);
+            UnityEngine.Object.Destroy(obj);
         }
 
         private static void DestroyOwnedObjectsByName()
@@ -822,8 +968,246 @@ namespace MDEN.UI.Core
             {
                 var obj = GameObject.Find(objectName);
                 if (obj == null) continue;
+                DestroyObject(obj);
+            }
+        }
+
+        private static OtherCharacterSlot[] CreateSlots()
+        {
+            var slots = new OtherCharacterSlot[MaxOtherSlots];
+            for (var i = 0; i < slots.Length; i++)
+            {
+                slots[i] = new OtherCharacterSlot();
+            }
+
+            return slots;
+        }
+
+        private sealed class OtherCharacterSlot
+        {
+            private int _girlIndex = -1;
+            private string _uid;
+            private GameObject _currentShow;
+
+            public GameObject Root { get; private set; }
+            public SlotLabels Labels { get; private set; }
+            public int SortingOrder { get; private set; }
+            public bool IsActive => Root != null && Root.activeSelf;
+            public bool HasCharacterPrefab => _currentShow != null && _currentShow.activeSelf && HasVisibleCharacterContent(_currentShow);
+            public Transform PrefabTransform => Root?.transform.Find("ShowLocalization/SpinePerfab_other");
+
+            public void Bind(GameObject root, SlotLabels labels)
+            {
+                Root = root;
+                Labels = labels;
+                _girlIndex = -1;
+                _uid = null;
+                _currentShow = null;
+            }
+
+            public void Show(RoomCharacterPlayer player, float x, float y, float scale, int sortingOrder)
+            {
+                if (Root == null) return;
+
+                Root.SetActive(true);
+                SetTransform(Root, x, y, scale);
+                SortingOrder = sortingOrder;
+                SetRendererSorting(Root, sortingOrder);
+                ApplyLabels(Labels, Root, player, false);
+                _uid = player.Uid;
+            }
+
+            public void Hide()
+            {
+                if (Root != null) Root.SetActive(false);
+                Labels?.SetPlayer(null);
+                _uid = null;
+                _girlIndex = -1;
+            }
+
+            public bool IsSameCharacter(int girlIndex)
+            {
+                return _girlIndex == girlIndex;
+            }
+
+            public void SetCharacter(int girlIndex, GameObject currentShow)
+            {
+                _girlIndex = girlIndex;
+                _currentShow = currentShow;
+            }
+
+            public void ResetCharacter()
+            {
+                _girlIndex = -1;
+                _currentShow = null;
+            }
+
+            public bool HasExpectedContent(RoomCharacterPlayer player)
+            {
+                if (player == null) return !IsActive && (Labels == null || !Labels.HasPlayer);
+                return IsActive &&
+                       IsSameUid(_uid, player.Uid) &&
+                       Labels != null &&
+                       Labels.HasPlayer &&
+                       HasCharacterPrefab;
+            }
+
+            public void UpdateLabels()
+            {
+                Labels?.UpdatePosition(Root, false);
+            }
+
+            public void Destroy()
+            {
+                DestroyObject(Root);
+                Labels?.Destroy();
+                Root = null;
+                Labels = null;
+                _girlIndex = -1;
+                _uid = null;
+                _currentShow = null;
+            }
+
+            private static void SetRendererSorting(GameObject root, int sortingOrder)
+            {
+                var renderers = root?.GetComponentsInChildren<Renderer>(true);
+                if (renderers == null) return;
+
+                foreach (var renderer in renderers)
+                {
+                    if (renderer == null) continue;
+                    renderer.sortingOrder = sortingOrder;
+                }
+            }
+        }
+
+        private sealed class SlotLabels
+        {
+            private readonly Text _title;
+            private readonly Text _name;
+            private string _uid;
+
+            private SlotLabels(Text title, Text name)
+            {
+                _title = title;
+                _name = name;
+                Button = name.GetComponent<Button>();
+            }
+
+            public bool HasPlayer => !string.IsNullOrEmpty(_uid);
+            public Button Button { get; }
+            public bool IsDestroyed => _title == null || _name == null || Button == null;
+
+            public static SlotLabels Create(
+                Transform parent,
+                string prefix,
+                Vector2 size,
+                int titleFontSize,
+                int nameFontSize,
+                Action<Text> applyFont)
+            {
+                var title = CreateText(parent, prefix + "Title", size, titleFontSize, false, applyFont);
+                var name = CreateText(parent, prefix + "Name", size, nameFontSize, true, applyFont);
+                return new SlotLabels(title, name);
+            }
+
+            public void SetPlayer(RoomCharacterPlayer player)
+            {
+                if (player == null)
+                {
+                    _uid = null;
+                    SetVisible(false);
+                    return;
+                }
+
+                _uid = player.Uid;
+                _title.text = FormatTitle(player.Title);
+                _name.text = FormatName(player.Name);
+                SetVisible(true);
+            }
+
+            public void UpdatePosition(GameObject slot, bool local)
+            {
+                if (slot == null || !slot.activeSelf || !HasPlayer)
+                {
+                    SetVisible(false);
+                    return;
+                }
+
+                var titleYOffset = local ? LocalTitleYOffset : OtherTitleYOffset;
+                var nameYOffset = local ? LocalNameYOffset : OtherNameYOffset;
+                var slotPosition = slot.transform.position;
+                var labelX = slotPosition.x + LabelXOffset;
+                var labelZ = slotPosition.z + LabelZOffset;
+                SetPosition(
+                    new Vector3(labelX, slotPosition.y + titleYOffset, labelZ),
+                    new Vector3(labelX, slotPosition.y + nameYOffset, labelZ));
+                SetAsLastSibling();
+                SetVisible(true);
+            }
+
+            public void Destroy()
+            {
+                if (_title != null) UnityEngine.Object.Destroy(_title.gameObject);
+                if (_name != null) UnityEngine.Object.Destroy(_name.gameObject);
+            }
+
+            private static Text CreateText(
+                Transform parent,
+                string name,
+                Vector2 size,
+                int fontSize,
+                bool clickable,
+                Action<Text> applyFont)
+            {
+                var obj = new GameObject(name);
+                var rect = obj.AddComponent<RectTransform>();
+                rect.SetParent(parent);
+                rect.localScale = Vector3.one;
+                rect.sizeDelta = size;
+                rect.anchoredPosition3D = Vector3.zero;
+
+                var text = obj.AddComponent<Text>();
+                applyFont(text);
+                text.fontSize = fontSize;
+                text.alignment = TextAnchor.MiddleCenter;
+                text.horizontalOverflow = HorizontalWrapMode.Overflow;
+                text.verticalOverflow = VerticalWrapMode.Overflow;
+                text.raycastTarget = clickable;
+                text.supportRichText = true;
+                text.color = Color.white;
+
+                var shadow = obj.AddComponent<Shadow>();
+                shadow.effectDistance = new Vector2(2f, -2f);
+                shadow.effectColor = new Color(0f, 0f, 0f, 0.45f);
+
+                if (clickable)
+                {
+                    var button = obj.AddComponent<Button>();
+                    button.targetGraphic = text;
+                    button.transition = Selectable.Transition.ColorTint;
+                }
+
                 obj.SetActive(false);
-                UnityEngine.Object.Destroy(obj);
+                return text;
+            }
+
+            private void SetVisible(bool visible)
+            {
+                if (_title != null) _title.gameObject.SetActive(visible && !string.IsNullOrEmpty(_title.text));
+                if (_name != null) _name.gameObject.SetActive(visible);
+            }
+
+            private void SetPosition(Vector3 titlePosition, Vector3 namePosition)
+            {
+                if (_title != null) _title.transform.position = titlePosition;
+                if (_name != null) _name.transform.position = namePosition;
+            }
+
+            private void SetAsLastSibling()
+            {
+                if (_title != null) _title.transform.SetAsLastSibling();
+                if (_name != null) _name.transform.SetAsLastSibling();
             }
         }
 
@@ -836,45 +1220,7 @@ namespace MDEN.UI.Core
             public byte Status { get; set; }
             public int GirlIndex { get; set; }
             public int ElfinIndex { get; set; }
-        }
-
-        private sealed class SlotLabels
-        {
-            public SlotLabels(Text title, Text name)
-            {
-                Title = title;
-                Name = name;
-                Button = name.GetComponent<Button>();
-            }
-
-            public Text Title { get; }
-            public Text Name { get; }
-            public Button Button { get; }
-            public bool IsDestroyed => Title == null || Name == null || Button == null;
-
-            public void SetVisible(bool visible)
-            {
-                if (Title != null) Title.gameObject.SetActive(visible);
-                if (Name != null) Name.gameObject.SetActive(visible);
-            }
-
-            public void SetPosition(Vector3 titlePosition, Vector3 namePosition)
-            {
-                if (Title != null) Title.transform.position = titlePosition;
-                if (Name != null) Name.transform.position = namePosition;
-            }
-
-            public void SetAsLastSibling()
-            {
-                if (Title != null) Title.transform.SetAsLastSibling();
-                if (Name != null) Name.transform.SetAsLastSibling();
-            }
-
-            public void Destroy()
-            {
-                if (Title != null) UnityEngine.Object.Destroy(Title.gameObject);
-                if (Name != null) UnityEngine.Object.Destroy(Name.gameObject);
-            }
+            public bool IsHost { get; set; }
         }
     }
 }

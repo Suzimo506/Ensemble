@@ -1,5 +1,6 @@
 using System;
 using Il2CppAssets.Scripts.PeroTools.Nice.Events;
+using Il2CppAssets.Scripts.UI.Controls;
 using MDEN.Managers;
 using MDEN.Protocol.Messages.Lobby;
 using MelonLoader;
@@ -288,6 +289,7 @@ namespace MDEN.UI.Displays
             catch (Exception ex)
             {
                 MelonLogger.Warning($"Set ready failed: {ex.Message}");
+                MainThreadDispatcher.Enqueue(() => ShowText.ShowInfo($"准备失败：{ex.Message}"));
             }
             finally
             {

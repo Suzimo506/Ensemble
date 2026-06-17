@@ -10,6 +10,7 @@ namespace MDEN.UI.Core
     {
         private const int MaxRefreshRetries = 120;
         private const int EntranceFallbackDelayFrames = 20;
+        private const int CharacterRepairCooldownFrames = 30;
         private static readonly RoomPlayerListDisplay PlayerList = new RoomPlayerListDisplay();
         private static readonly RoomChatDisplay Chat = new RoomChatDisplay();
         private static readonly RoomReadyDisplay ReadyDisplay = new RoomReadyDisplay();
@@ -22,6 +23,7 @@ namespace MDEN.UI.Core
         private static bool _entranceFallbackCompleted;
         private static readonly HashSet<int> EntranceAnnouncedLobbyIds = new HashSet<int>();
         private static bool _characterNotReadyLogged;
+        private static int _characterRepairCooldownFrames;
         private static bool _nativeInputBlockedByChat;
 
         public static void Initialize()
@@ -107,6 +109,7 @@ namespace MDEN.UI.Core
         public static void RebuildRoomCharacters()
         {
             RoomCharacterDisplay.DestroyGeneratedObjects();
+            _characterRepairCooldownFrames = 0;
             RequestRefresh();
         }
 
@@ -117,6 +120,8 @@ namespace MDEN.UI.Core
             ReadyDisplay.Update();
             StageDesignerTextController.Update();
             RoomSceneOverlay.UpdateVisibility();
+            RoomCharacterDisplay.UpdateLabelPositions(LobbyManager.CurrentLobby);
+            RepairRoomCharactersIfNeeded();
         }
 
         public static bool IsChatConsumingInput => Chat.IsConsumingInput;
@@ -158,6 +163,7 @@ namespace MDEN.UI.Core
             if (characterReady)
             {
                 _characterNotReadyLogged = false;
+                _characterRepairCooldownFrames = 0;
             }
             else
             {
@@ -170,7 +176,7 @@ namespace MDEN.UI.Core
 
             RoomSceneOverlay.Refresh(lobby);
 
-            if (NeedsRefreshRetry() && retryCount < MaxRefreshRetries)
+            if ((NeedsRefreshRetry() || !characterReady) && retryCount < MaxRefreshRetries)
             {
                 ScheduleRefreshRetry(lobby, retryCount);
             }
@@ -205,12 +211,29 @@ namespace MDEN.UI.Core
             return !Chat.IsCreated || !RoomSceneOverlay.IsCreated || !RoomCharacterDisplay.IsCreated;
         }
 
+        private static void RepairRoomCharactersIfNeeded()
+        {
+            var lobby = LobbyManager.CurrentLobby;
+            if (_characterRepairCooldownFrames > 0)
+            {
+                _characterRepairCooldownFrames--;
+                return;
+            }
+
+            if (lobby == null || !LobbyManager.IsInLobby || !RoomSceneOverlay.IsHomeVisible) return;
+            if (RoomCharacterDisplay.HasExpectedCharacterContent(lobby)) return;
+
+            _characterRepairCooldownFrames = CharacterRepairCooldownFrames;
+            RequestRefresh();
+        }
+
         public static void Destroy()
         {
             _pendingRetryGeneration++;
             _retryDelayFrames = 0;
             ResetEntranceFallback();
             _characterNotReadyLogged = false;
+            _characterRepairCooldownFrames = 0;
             PlayerList.Destroy();
             Chat.Destroy();
             ReadyDisplay.Destroy();
@@ -228,6 +251,7 @@ namespace MDEN.UI.Core
             _retryDelayFrames = 0;
             ResetEntranceFallback(false);
             _characterNotReadyLogged = false;
+            _characterRepairCooldownFrames = 0;
             PlayerList.Destroy();
             Chat.ResetSceneObjects();
             ReadyDisplay.Destroy();

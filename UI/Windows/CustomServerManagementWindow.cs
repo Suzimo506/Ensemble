@@ -90,7 +90,7 @@ namespace MDEN.UI.Windows
             }
             else if (button == _btnJoin)
             {
-                await JoinServerAsync(selectedServer.Address);
+                await JoinServerAsync(selectedServer.Address, selectedServer.Name);
             }
             else if (button == _btnRename)
             {
@@ -137,14 +137,14 @@ namespace MDEN.UI.Windows
             return null;
         }
 
-        private async Task JoinServerAsync(string address)
+        private async Task JoinServerAsync(string address, string serverDisplayName)
         {
             using var _ = UIManager.LockUI("Connecting to server...");
 
             try
             {
                 GameAccountManager.RefreshSnapshot();
-                var response = await ConnectionManager.ConnectAndLoginAsync(address);
+                var response = await ConnectionManager.ConnectAndLoginAsync(address, serverDisplayName, false);
                 if (IsDisposed) return;
 
                 MelonLogger.Msg($"Connected to {address}, server version: {response.Version}");

@@ -12,6 +12,8 @@ namespace MDEN.Network
 {
     public class NetworkClient
     {
+        private const int ConnectTimeoutMs = 8000;
+        private const int SendTimeoutMs = 8000;
         private static NetworkClient _instance;
         public static NetworkClient Instance => _instance ??= new NetworkClient();
 
@@ -34,7 +36,14 @@ namespace MDEN.Network
             try
             {
                 _tcpClient = new TcpClient();
-                await _tcpClient.ConnectAsync(host, port);
+                var connectTask = _tcpClient.ConnectAsync(host, port);
+                var timeoutTask = Task.Delay(ConnectTimeoutMs);
+                if (await Task.WhenAny(connectTask, timeoutTask) != connectTask)
+                {
+                    throw new TimeoutException("Connect timed out.");
+                }
+
+                await connectTask;
                 _stream = _tcpClient.GetStream();
                 _isConnected = true;
                 _ = ReceiveLoopAsync();
@@ -128,17 +137,36 @@ namespace MDEN.Network
         {
             if (!_isConnected || _stream == null) return;
 
-            await _sendSemaphore.WaitAsync();
+            if (!await _sendSemaphore.WaitAsync(SendTimeoutMs))
+            {
+                Disconnect(true);
+                throw new TimeoutException("Timed out waiting for send lock.");
+            }
+
             try
             {
                 var bytes = _framer.Encode(envelope);
-                await _stream.WriteAsync(bytes, 0, bytes.Length);
-                await _stream.FlushAsync();
+                var writeTask = _stream.WriteAsync(bytes, 0, bytes.Length);
+                if (await Task.WhenAny(writeTask, Task.Delay(SendTimeoutMs)) != writeTask)
+                {
+                    throw new TimeoutException("Send timed out.");
+                }
+
+                await writeTask;
+
+                var flushTask = _stream.FlushAsync();
+                if (await Task.WhenAny(flushTask, Task.Delay(SendTimeoutMs)) != flushTask)
+                {
+                    throw new TimeoutException("Flush timed out.");
+                }
+
+                await flushTask;
             }
             catch (Exception ex)
             {
                 MelonLogger.Error($"Failed to send data: {ex.Message}");
-                Disconnect();
+                Disconnect(true);
+                throw;
             }
             finally
             {

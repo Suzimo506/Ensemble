@@ -508,7 +508,7 @@ namespace MDEN.UI.Displays
             {
                 if (!_entries.TryGetValue(_entryOrder[i], out var text) || text == null) continue;
                 var rect = text.GetComponent<RectTransform>();
-                rect.anchoredPosition = new Vector2(24f, 30f + EntryHeight * i);
+                rect.anchoredPosition = new Vector2(24f, 30f + EntryHeight * (_entryOrder.Count - 1 - i));
             }
         }
 

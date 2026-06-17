@@ -24,6 +24,7 @@ namespace MDEN.UI.Windows
         private ForumObject _btnJoinServer;
         private static List<ApiServerEntry> _officialServerData = new List<ApiServerEntry>();
         private static List<Tuple<string, string>> _officialNodeDisplayData = new List<Tuple<string, string>>();
+        private static List<string> _officialNodePlainNames = new List<string>();
         private static Dictionary<string, string> _customServerStatusDescriptions = new Dictionary<string, string>();
         private static bool _hasFetchedNodes = false;
 
@@ -153,6 +154,7 @@ namespace MDEN.UI.Windows
                 _hasFetchedNodes = true;
 
                 var displayData = new List<Tuple<string, string>>();
+                var plainNames = new List<string>();
                 foreach (var server in servers)
                 {
                     var info = await ServerManager.PingServerAsync(server.Address);
@@ -169,8 +171,8 @@ namespace MDEN.UI.Windows
                         else displayName = info.NodeId;
                     }
 
-                    displayName = $"<color={Constants.ColorYellow}>{displayName}</color>";
-                    displayData.Add(new Tuple<string, string>(displayName, desc));
+                    plainNames.Add(displayName);
+                    displayData.Add(new Tuple<string, string>($"<color={Constants.ColorYellow}>{displayName}</color>", desc));
                 }
 
                 var customStatusDescriptions = new Dictionary<string, string>();
@@ -185,6 +187,7 @@ namespace MDEN.UI.Windows
 
                 _officialServerData = servers;
                 _officialNodeDisplayData = displayData;
+                _officialNodePlainNames = plainNames;
                 _customServerStatusDescriptions = customStatusDescriptions;
                 CloudSyncIndicator.Finish(true);
 
@@ -194,6 +197,7 @@ namespace MDEN.UI.Windows
                 MelonLogger.Warning($"Fetch official nodes failed: {e.Message}");
                 _officialServerData = new List<ApiServerEntry>();
                 _officialNodeDisplayData = new List<Tuple<string, string>>();
+                _officialNodePlainNames = new List<string>();
                 _customServerStatusDescriptions = new Dictionary<string, string>();
                 CloudSyncIndicator.Finish(false);
             }
@@ -389,11 +393,11 @@ namespace MDEN.UI.Windows
                 var input = new InputWindow();
                 input.OnCompletion += async (w) => 
                 {
-                    var res = input.Result;
-                    if (!string.IsNullOrEmpty(res))
-                    {
-                        await JoinServerAsync(res);
-                    }
+                var res = input.Result;
+                if (!string.IsNullOrEmpty(res))
+                {
+                    await JoinServerAsync(res, res, false);
+                }
 
                     // 即使没输入也得把窗体重建回来
                     RebuildWindowOnMainThread();
@@ -413,7 +417,7 @@ namespace MDEN.UI.Windows
                 var officialAddress = GetOfficialServerAddressFromObjectIndex(objectIndex);
                 if (!string.IsNullOrEmpty(officialAddress))
                 {
-                    await JoinServerAsync(officialAddress);
+                    await JoinServerAsync(officialAddress, GetOfficialServerNameFromObjectIndex(objectIndex), true);
                     return;
                 }
 
@@ -444,14 +448,25 @@ namespace MDEN.UI.Windows
             return null;
         }
 
-        private async Task JoinServerAsync(string address)
+        private string GetOfficialServerNameFromObjectIndex(int objectIndex)
+        {
+            var officialIndex = objectIndex - 2;
+            if (officialIndex >= 0 && officialIndex < _officialNodePlainNames.Count)
+            {
+                return _officialNodePlainNames[officialIndex];
+            }
+
+            return null;
+        }
+
+        private async Task JoinServerAsync(string address, string serverDisplayName = null, bool isOfficialServer = false)
         {
             using var _ = UIManager.LockUI("Connecting to server...");
 
             try
             {
                 GameAccountManager.RefreshSnapshot();
-                var response = await ConnectionManager.ConnectAndLoginAsync(address);
+                var response = await ConnectionManager.ConnectAndLoginAsync(address, serverDisplayName, isOfficialServer);
                 if (IsDisposed) return;
 
                 MelonLogger.Msg($"Connected to {address}, server version: {response.Version}");

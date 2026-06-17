@@ -1,6 +1,9 @@
+using System.Collections.Generic;
 using System.Linq;
 using LocalizeLib;
 using MDEN.Managers;
+using MDEN.Protocol.Enums;
+using MDEN.Protocol.Models;
 using MDEN.UI.Core;
 using PopupLib.UI.Components;
 using PopupLib.UI.Windows;
@@ -12,6 +15,7 @@ namespace MDEN.UI.Windows
     {
         private ForumWindow _window;
         private ForumObject _btnLeave;
+        private readonly Dictionary<ForumObject, PlayerSyncEntry> _playerItems = new Dictionary<ForumObject, PlayerSyncEntry>();
         private int _lastSelectedIndex = -1;
 
         public override void Show()
@@ -39,12 +43,13 @@ namespace MDEN.UI.Windows
         private void BuildList()
         {
             _window.ForumObjects.Clear();
+            _playerItems.Clear();
             _lastSelectedIndex = -1;
 
             var lobby = LobbyManager.CurrentLobby;
             var summary = lobby == null
                 ? "Not in lobby."
-                : $"房主: {lobby.HostName ?? lobby.HostUid}\n人数: {lobby.Players?.Length ?? 0}/{lobby.MaxPlayers}\n状态: {(lobby.IsPlaying ? "游戏中" : "等待中")}";
+                : BuildRoomSummary(lobby);
 
             _btnLeave = new ForumObject(new LocalString("- 退出房间 -"), new LocalString("离开当前联机房间"));
             _btnLeave.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("HomePanel.png")?.texture;
@@ -65,6 +70,14 @@ namespace MDEN.UI.Windows
                     var item = new ForumObject(new LocalString(name), new LocalString($"UID: {player.Uid}"));
                     item.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("PlayerCard.png")?.texture;
                     _window.ForumObjects.Add(item);
+                    _playerItems[item] = new PlayerSyncEntry
+                    {
+                        Uid = player.Uid,
+                        Name = displayName,
+                        Title = player.Title,
+                        PingMS = player.PingMS,
+                        Status = player.Status
+                    };
                 }
             }
             else if (lobby?.Players != null)
@@ -78,8 +91,79 @@ namespace MDEN.UI.Windows
                     var item = new ForumObject(new LocalString(name), new LocalString($"UID: {uid}"));
                     item.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("PlayerCard.png")?.texture;
                     _window.ForumObjects.Add(item);
+                    _playerItems[item] = new PlayerSyncEntry
+                    {
+                        Uid = uid,
+                        Name = displayName,
+                        Title = uid == PlayerManager.CurrentUid ? PlayerManager.CurrentProfile?.Title : null
+                    };
                 }
             }
+        }
+
+        private static string BuildRoomSummary(MDEN.Protocol.Messages.Lobby.LobbySyncPush lobby)
+        {
+            var hostName = EscapeRichText(lobby.HostName ?? lobby.HostUid ?? "Unknown");
+            return $"房主: {Highlight(hostName, Constants.ColorPink)}\n" +
+                   $"人数: {Highlight($"{GetPlayerCount(lobby)}/{lobby.MaxPlayers}", Constants.ColorCyan)}\n" +
+                   $"歌曲列表: {Highlight($"{GetPlaylistCount(lobby)}/{lobby.PlaylistSize}", Constants.ColorYellow)}\n" +
+                   $"获胜方式: {Highlight(GetGoalName(lobby.Goal), Constants.ColorYellow)}\n" +
+                   $"结算功能: {Highlight(lobby.SettlementEnabled ? "开启" : "关闭", Constants.ColorYellow)}\n" +
+                   $"状态: {Highlight(GetLobbyStatus(lobby), lobby.IsPlaying ? Constants.ColorPink : Constants.ColorBlue)}";
+        }
+
+        private static int GetPlayerCount(MDEN.Protocol.Messages.Lobby.LobbySyncPush lobby)
+        {
+            if (lobby.PlayerDetails != null && lobby.PlayerDetails.Length > 0)
+            {
+                return lobby.PlayerDetails
+                    .Where(player => !string.IsNullOrEmpty(player?.Uid))
+                    .Select(player => player.Uid)
+                    .Distinct()
+                    .Count();
+            }
+
+            return lobby.Players?
+                .Where(uid => !string.IsNullOrEmpty(uid))
+                .Distinct()
+                .Count() ?? 0;
+        }
+
+        private static int GetPlaylistCount(MDEN.Protocol.Messages.Lobby.LobbySyncPush lobby)
+        {
+            return lobby.Playlist?
+                .Where(entry => !string.IsNullOrEmpty(entry))
+                .Distinct()
+                .Count() ?? 0;
+        }
+
+        private static string GetGoalName(byte goal)
+        {
+            return (LobbyGoal)goal switch
+            {
+                LobbyGoal.Score => "分数",
+                LobbyGoal.Custom => "自定义",
+                _ => "准确率"
+            };
+        }
+
+        private static string GetLobbyStatus(MDEN.Protocol.Messages.Lobby.LobbySyncPush lobby)
+        {
+            if (lobby.IsPlaying) return "游戏中";
+            if (lobby.Locked) return "已锁定";
+            return "等待中";
+        }
+
+        private static string Highlight(string value, string color)
+        {
+            return $"<color={color}>{value}</color>";
+        }
+
+        private static string EscapeRichText(string value)
+        {
+            return string.IsNullOrEmpty(value)
+                ? string.Empty
+                : value.Replace("&", "&amp;").Replace("<", "&lt;").Replace(">", "&gt;");
         }
 
         private async void OnSelectionChanged(PopupLib.UI.Windows.Interfaces.IListWindow window, int objectIndex)
@@ -96,6 +180,13 @@ namespace MDEN.UI.Windows
             if (button == _btnLeave)
             {
                 await LeaveLobbyAsync();
+                return;
+            }
+
+            if (_playerItems.TryGetValue(button, out var player))
+            {
+                Close();
+                UIManager.OpenWindow(new RoomPlayerWindow(player));
             }
         }
 

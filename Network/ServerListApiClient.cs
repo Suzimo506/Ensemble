@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Net.Http;
 using System.Net.Sockets;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -76,23 +77,19 @@ namespace MDEN.Network
 
                 var stream = client.GetStream();
                 var req = new ClientEnvelope { Op = OpCodes.ServerInfoReq, ReqId = 1, Payload = new ServerInfoRequest() };
-                
-                var bytes = JsonSerializer.SerializeToUtf8Bytes(req);
-                var lengthBytes = BitConverter.GetBytes((uint)bytes.Length);
-                await stream.WriteAsync(lengthBytes, 0, 4);
+                var framer = new PacketFramer();
+                var bytes = framer.Encode(req);
                 await stream.WriteAsync(bytes, 0, bytes.Length);
 
                 var headerBuf = new byte[4];
-                int read = await stream.ReadAsync(headerBuf, 0, 4);
-                if (read < 4) return null;
+                if (await ReadExactAsync(stream, headerBuf, 4) < 4) return null;
 
                 uint len = BitConverter.ToUInt32(headerBuf, 0);
                 var payloadBuf = new byte[len];
-                read = await stream.ReadAsync(payloadBuf, 0, (int)len);
-                if (read < len) return null;
+                if (await ReadExactAsync(stream, payloadBuf, (int)len) < len) return null;
 
-                var respEnv = JsonSerializer.Deserialize<ServerEnvelope>(payloadBuf);
-                if (respEnv != null && respEnv.Op == OpCodes.ServerInfoResp)
+                var respEnv = JsonSerializer.Deserialize<ServerEnvelope>(payloadBuf, ProtocolJson.Options);
+                if (respEnv != null && respEnv.Op == OpCodes.ServerInfoResp && respEnv.Success)
                 {
                     return JsonSerializer.Deserialize<ServerInfoResponse>(((JsonElement)respEnv.Payload).GetRawText());
                 }
@@ -103,6 +100,20 @@ namespace MDEN.Network
             }
 
             return null;
+        }
+
+        private static async Task<int> ReadExactAsync(NetworkStream stream, byte[] buffer, int count)
+        {
+            int totalRead = 0;
+            using var timeout = new CancellationTokenSource(2000);
+            while (totalRead < count)
+            {
+                int read = await stream.ReadAsync(buffer, totalRead, count - totalRead, timeout.Token);
+                if (read == 0) break;
+                totalRead += read;
+            }
+
+            return totalRead;
         }
     }
 }

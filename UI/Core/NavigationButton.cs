@@ -16,14 +16,25 @@ namespace MDEN.UI.Core
         private static GameObject _myRoomBtn;
         private static GameObject _playlistBtn;
         private static GameObject _startBtn;
+        private static GameObject _serverLabelObj;
+        private static Text _serverLabel;
         private const float NavigationButtonOffset = 132f;
         private const float LeftNavigationOffset = 192f;
+        private const float ServerLabelOptionOffset = 420f;
+        private const float ServerLabelWidth = 280f;
+        private const float NavigationIconCenterOffset = 10f;
+        private const string NavigationButtonSpriteName = "PcSprButton_Img.png";
+        private const string MultiplayerIconSpriteName = "多人联机.png";
+        private const string MyRoomIconSpriteName = "我的房间.png";
+        private const string PlaylistIconSpriteName = "歌曲列表.png";
+        private const string StartIconSpriteName = "Play_Img.png";
         // 绑定到原生 UI 生命周期中调用
         public static void Create()
         {
             if (_multiplayerBtn != null)
             {
                 RefreshRoomButton();
+                RefreshServerLabel();
                 return;
             }
 
@@ -32,6 +43,7 @@ namespace MDEN.UI.Core
             {
                 _multiplayerBtn = existing;
                 RefreshRoomButton();
+                RefreshServerLabel();
                 return;
             }
 
@@ -58,7 +70,7 @@ namespace MDEN.UI.Core
             var img = _multiplayerBtn.GetComponent<Image>();
             if (img != null)
             {
-                img.sprite = ResourceManager.GetSprite("PcSprButton_Img.png");
+                ApplyNavigationButtonBackground(img);
             }
             // 替换前景图标
             var iconTrans = _multiplayerBtn.transform.Find("ImgIcon");
@@ -67,12 +79,7 @@ namespace MDEN.UI.Core
                 var iconImg = iconTrans.GetComponent<Image>();
                 if (iconImg != null)
                 {
-                    iconImg.sprite = ResourceManager.GetSprite("Globe_Img.png");
-                }
-                var iconRect = iconTrans.GetComponent<RectTransform>();
-                if (iconRect != null)
-                {
-                    CenterIcon(iconRect);
+                    ApplyNavigationIcon(iconImg, MultiplayerIconSpriteName, false);
                 }
             }
             // 清理原生绑定的按键事件，防止误触发原生设置
@@ -96,6 +103,7 @@ namespace MDEN.UI.Core
             
             MelonLogger.Msg("Lobby entrance button injected successfully.");
             RefreshRoomButton();
+            RefreshServerLabel();
         }
 
         public static void RefreshRoomButton()
@@ -105,6 +113,8 @@ namespace MDEN.UI.Core
                 _myRoomBtn = null;
                 _playlistBtn = null;
                 _startBtn = null;
+                _serverLabelObj = null;
+                _serverLabel = null;
                 return;
             }
 
@@ -118,6 +128,119 @@ namespace MDEN.UI.Core
                 DestroyRoomButton();
                 DestroyRoomActionButtons();
             }
+
+            RefreshServerLabel();
+        }
+
+        public static void RefreshServerLabel()
+        {
+            if (!ConnectionManager.IsLoggedIn || string.IsNullOrWhiteSpace(ConnectionManager.CurrentServerDisplayName))
+            {
+                DestroyServerLabel();
+                return;
+            }
+
+            EnsureServerLabel();
+            if (_serverLabelObj == null || _serverLabel == null) return;
+
+            _serverLabelObj.SetActive(true);
+            var serverName = EscapeRichText(ConnectionManager.CurrentServerDisplayName);
+            _serverLabel.text = $"<color={Constants.ColorYellow}>{serverName}</color>";
+        }
+
+        private static void EnsureServerLabel()
+        {
+            if (_serverLabelObj != null && _serverLabel != null)
+            {
+                PositionServerLabel();
+                return;
+            }
+
+            var topPanel = GameObject.Find("UI/Standerd/PnlNavigation/Top")?.transform;
+            var source = GameObject.Find("UI/Standerd/PnlNavigation/Top/BtnOption");
+            if (topPanel == null || source == null) return;
+
+            _serverLabelObj = new GameObject("TxtMDENCurrentServerNode");
+            var rect = _serverLabelObj.AddComponent<RectTransform>();
+            rect.SetParent(topPanel, false);
+            rect.localScale = Vector3.one;
+
+            _serverLabel = _serverLabelObj.AddComponent<Text>();
+            ApplyGameFont(_serverLabel);
+            _serverLabel.fontSize = 28;
+            _serverLabel.alignment = TextAnchor.MiddleRight;
+            _serverLabel.horizontalOverflow = HorizontalWrapMode.Overflow;
+            _serverLabel.verticalOverflow = VerticalWrapMode.Overflow;
+            _serverLabel.supportRichText = true;
+            _serverLabel.raycastTarget = false;
+            _serverLabel.color = Color.white;
+
+            var shadow = _serverLabelObj.AddComponent<Shadow>();
+            shadow.effectDistance = new Vector2(2f, -2f);
+            shadow.effectColor = new Color(0f, 0f, 0f, 0.35f);
+
+            PositionServerLabel();
+        }
+
+        private static void PositionServerLabel()
+        {
+            if (_serverLabelObj == null) return;
+
+            var rect = _serverLabelObj.GetComponent<RectTransform>();
+            var sourceRect = GameObject.Find("UI/Standerd/PnlNavigation/Top/BtnOption")?.GetComponent<RectTransform>();
+            if (rect == null || sourceRect == null) return;
+
+            rect.localScale = Vector3.one;
+            rect.anchorMin = sourceRect.anchorMin;
+            rect.anchorMax = sourceRect.anchorMax;
+            rect.pivot = new Vector2(1f, sourceRect.pivot.y);
+            rect.anchoredPosition = new Vector2(
+                sourceRect.anchoredPosition.x - ServerLabelOptionOffset,
+                sourceRect.anchoredPosition.y);
+            rect.sizeDelta = new Vector2(ServerLabelWidth, Mathf.Max(58f, sourceRect.sizeDelta.y));
+            rect.SetAsLastSibling();
+        }
+
+        private static void DestroyServerLabel()
+        {
+            if (_serverLabelObj != null)
+            {
+                GameObject.Destroy(_serverLabelObj);
+            }
+
+            _serverLabelObj = null;
+            _serverLabel = null;
+        }
+
+        private static void ApplyGameFont(Text text)
+        {
+            if (text == null) return;
+
+            var template = FindFontTemplate();
+            if (template == null || template.font == null) return;
+
+            text.font = template.font;
+            text.material = template.material;
+            text.lineSpacing = template.lineSpacing;
+        }
+
+        private static Text FindFontTemplate()
+        {
+            var allTexts = Resources.FindObjectsOfTypeAll<Text>();
+            foreach (var text in allTexts)
+            {
+                if (text != null && text != _serverLabel && text.font != null)
+                {
+                    return text;
+                }
+            }
+
+            return null;
+        }
+
+        private static string EscapeRichText(string value)
+        {
+            return value?.Replace("<", "＜").Replace(">", "＞") ?? string.Empty;
         }
 
         private static void CreateRoomButton()
@@ -140,8 +263,13 @@ namespace MDEN.UI.Core
             var img = _myRoomBtn.GetComponent<Image>();
             if (img != null)
             {
-                img.sprite = ResourceManager.GetSprite("PcSprButton_Img.png");
-                img.color = new Color(0.52f, 0.25f, 0.95f, 1f);
+                ApplyNavigationButtonBackground(img);
+            }
+
+            var icon = _myRoomBtn.transform.Find("ImgIcon")?.GetComponent<Image>();
+            if (icon != null)
+            {
+                ApplyNavigationIcon(icon, MyRoomIconSpriteName, false);
             }
 
             var button = _myRoomBtn.GetComponent<Button>();
@@ -202,7 +330,7 @@ namespace MDEN.UI.Core
             catch (Exception ex)
             {
                 MelonLogger.Warning($"Start lobby prepare failed: {ex.Message}");
-                MainThreadDispatcher.Enqueue(() => ShowText.ShowInfo(ex.Message));
+                MainThreadDispatcher.Enqueue(() => ShowText.ShowInfo($"开始失败：{ex.Message}"));
             }
         }
 
@@ -235,23 +363,13 @@ namespace MDEN.UI.Core
             var image = buttonObj.GetComponent<Image>();
             if (image != null)
             {
-                image.sprite = ResourceManager.GetSprite("PcSprButton_Img.png");
-                image.color = position == 1
-                    ? new Color(0.52f, 0.25f, 0.95f, 1f)
-                    : new Color(1f, 0.92f, 0.08f, 1f);
+                ApplyNavigationButtonBackground(image);
             }
 
             var icon = buttonObj.transform.Find("ImgIcon")?.GetComponent<Image>();
             if (icon != null)
             {
-                icon.sprite = ResourceManager.GetSprite(position == 1 ? "Playlist_Img.png" : "Play_Img.png");
-                icon.preserveAspect = true;
-                var iconRect = icon.GetComponent<RectTransform>();
-                if (iconRect != null)
-                {
-                    CenterIcon(iconRect);
-                    iconRect.localScale = new Vector3(-Mathf.Abs(iconRect.localScale.x), iconRect.localScale.y, iconRect.localScale.z);
-                }
+                ApplyNavigationIcon(icon, position == 1 ? PlaylistIconSpriteName : StartIconSpriteName, true);
             }
 
             RemoveNativeBindings(buttonObj);
@@ -275,12 +393,38 @@ namespace MDEN.UI.Core
             if (eventTrigger != null) GameObject.Destroy(eventTrigger);
         }
 
-        private static void CenterIcon(RectTransform iconRect)
+        private static void ApplyNavigationButtonBackground(Image image)
+        {
+            if (image == null) return;
+
+            image.sprite = ResourceManager.GetSprite(NavigationButtonSpriteName);
+        }
+
+        private static void ApplyNavigationIcon(Image icon, string spriteName, bool mirrorParent)
+        {
+            if (icon == null) return;
+
+            icon.sprite = ResourceManager.GetSprite(spriteName);
+            icon.preserveAspect = false;
+
+            var iconRect = icon.GetComponent<RectTransform>();
+            if (iconRect != null)
+            {
+                CenterIcon(iconRect, mirrorParent);
+            }
+        }
+
+        private static void CenterIcon(RectTransform iconRect, bool mirrorParent)
         {
             iconRect.anchorMin = new Vector2(0.5f, 0.5f);
             iconRect.anchorMax = new Vector2(0.5f, 0.5f);
             iconRect.pivot = new Vector2(0.5f, 0.5f);
-            iconRect.anchoredPosition = Vector2.zero;
+            iconRect.anchoredPosition = new Vector2(mirrorParent ? 0f : NavigationIconCenterOffset, 0f);
+            var scale = iconRect.localScale;
+            iconRect.localScale = new Vector3(
+                mirrorParent ? -Mathf.Abs(scale.x) : Mathf.Abs(scale.x),
+                scale.y,
+                scale.z);
         }
 
         private static void DestroyRoomActionButtons()
@@ -304,6 +448,8 @@ namespace MDEN.UI.Core
             _myRoomBtn = null;
             _playlistBtn = null;
             _startBtn = null;
+            _serverLabelObj = null;
+            _serverLabel = null;
         }
     }
 }

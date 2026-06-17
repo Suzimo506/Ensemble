@@ -1,10 +1,7 @@
-using System;
-using System.Threading.Tasks;
 using LocalizeLib;
 using MDEN.Managers;
 using MDEN.Protocol.Models;
 using MDEN.UI.Core;
-using MelonLoader;
 using PopupLib.UI.Components;
 using PopupLib.UI.Windows;
 using UnityEngine;
@@ -16,6 +13,7 @@ namespace MDEN.UI.Windows
         private readonly PlayerSyncEntry _player;
         private ForumWindow _window;
         private ForumObject _btnBack;
+        private ForumObject _btnAddFriend;
         private ForumObject _btnKick;
         private ForumObject _btnTransferHost;
         private ForumObject _btnBanChartSelect;
@@ -55,13 +53,14 @@ namespace MDEN.UI.Windows
             _window.ForumObjects.Clear();
 
             _btnBack = CreateButton("- 返回 -", "回到我的房间");
-            _btnKick = CreateButton("- 踢出 -", "将该玩家踢出房间");
-            _btnTransferHost = CreateButton("- 移交房主 -", "将房主权限移交给该玩家");
-            _btnBanChartSelect = CreateButton("- 禁止选谱 -", "禁止该玩家选择谱面");
-            _btnMute = CreateButton("- 禁言 -", "禁止该玩家发送聊天消息");
+            _btnAddFriend = CreateButton("添加好友", $"向 {GetDisplayName()} 发送好友请求");
+            _btnKick = CreateButton("踢出", "将该玩家踢出房间");
+            _btnTransferHost = CreateButton("移交房主", "将房主权限移交给该玩家");
+            _btnBanChartSelect = CreateButton("禁止选谱", "禁止该玩家选择谱面");
+            _btnMute = CreateButton("禁言", "禁止该玩家发送聊天消息");
 
             _btnInfo = CreateButton(
-                string.IsNullOrEmpty(_player?.Name) ? "玩家信息" : _player.Name,
+                GetDisplayName(),
                 $"UID: {_player?.Uid}\nPing: {_player?.PingMS ?? 0}ms\n状态: {_player?.Status ?? 0}");
         }
 
@@ -73,7 +72,7 @@ namespace MDEN.UI.Windows
             return button;
         }
 
-        private async void OnSelectionChanged(PopupLib.UI.Windows.Interfaces.IListWindow window, int objectIndex)
+        private void OnSelectionChanged(PopupLib.UI.Windows.Interfaces.IListWindow window, int objectIndex)
         {
             if (_window == null || objectIndex < 0 || objectIndex >= _window.ForumObjects.Count) return;
 
@@ -91,54 +90,12 @@ namespace MDEN.UI.Windows
                 return;
             }
 
-            if (button == _btnInfo) return;
-
-            if (!IsHost())
-            {
-                MelonLogger.Warning("No permission for room owner action.");
-                return;
-            }
-
-            if (button == _btnKick)
-            {
-                await ExecuteOwnerActionAsync("Kick player", () => LobbyManager.KickPlayerAsync(_player.Uid));
-            }
-            else if (button == _btnTransferHost)
-            {
-                await ExecuteOwnerActionAsync("Transfer host", () => LobbyManager.TransferHostAsync(_player.Uid));
-            }
-            else if (button == _btnBanChartSelect)
-            {
-                await ExecuteOwnerActionAsync("Ban chart select", () => LobbyManager.SetChartSelectBannedAsync(_player.Uid, true));
-            }
-            else if (button == _btnMute)
-            {
-                await ExecuteOwnerActionAsync("Mute player", () => LobbyManager.SetMutedAsync(_player.Uid, true));
-            }
+            return;
         }
 
-        private static bool IsHost()
+        private string GetDisplayName()
         {
-            return LobbyManager.CurrentLobby?.HostUid == PlayerManager.CurrentUid;
-        }
-
-        private async Task ExecuteOwnerActionAsync(string actionName, Func<Task> action)
-        {
-            if (string.IsNullOrEmpty(_player?.Uid)) return;
-
-            using var _ = UIManager.LockUI(actionName);
-            try
-            {
-                await action.Invoke();
-                if (IsDisposed) return;
-
-                Close();
-                UIManager.OpenWindow(new MyRoomWindow());
-            }
-            catch (Exception ex)
-            {
-                MelonLogger.Warning($"{actionName} failed: {ex.Message}");
-            }
+            return string.IsNullOrEmpty(_player?.Name) ? "玩家信息" : _player.Name;
         }
 
         private void OnInternalShowInjectTitle(PopupLib.UI.Windows.Abstract.BaseWindow w)

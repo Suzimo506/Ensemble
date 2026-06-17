@@ -62,6 +62,8 @@ namespace MDEN.UI.Displays
         private const float InputVerticalPadding = 2f;
         private static readonly Color BackgroundDefaultColor = new Color(0f, 0f, 0f, 0.15f);
         private static readonly Color BackgroundFocusedColor = new Color(0f, 0f, 0f, 0.32f);
+        private static readonly Color InputDefaultColor = new Color(0f, 0f, 0f, 0.15f);
+        private static readonly Color InputFocusedColor = new Color(0f, 0f, 0f, 0.4f);
         private static readonly Color InputClearButtonBgColor = new Color(0.42f, 0.16f, 0.66f, 0.95f);
         private static readonly Color InputClearButtonIconColor = new Color(0.88f, 0.46f, 1f, 1f);
         private const string WhiteTextColor = "ffffffff";
@@ -298,7 +300,7 @@ namespace MDEN.UI.Displays
             var bgImg = inputObj.GetComponent<Image>();
             if (bgImg == null) bgImg = inputObj.AddComponent<Image>();
             bgImg.type = Image.Type.Sliced;
-            bgImg.color = new Color(0f, 0f, 0f, 0.4f);
+            bgImg.color = InputDefaultColor;
 
             var rect = inputObj.GetComponent<RectTransform>();
             rect.anchorMin = new Vector2(0f, 1f);
@@ -1056,6 +1058,12 @@ namespace MDEN.UI.Displays
 
             if (clearButton != null)
                 clearButton.gameObject.SetActive(hasText);
+
+            var inputBackground = inputField.GetComponent<Image>();
+            if (inputBackground != null)
+            {
+                inputBackground.color = hidePlaceholder ? InputFocusedColor : InputDefaultColor;
+            }
         }
 
         private void UpdateBackgroundFocusState(bool focused)

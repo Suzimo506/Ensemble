@@ -1,4 +1,5 @@
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 using LocalizeLib;
 using MDEN.Managers;
@@ -13,11 +14,15 @@ namespace MDEN.UI.Windows
 {
     public class RoomListWindow : MDENWindowBase
     {
+        private const int AutoRefreshIntervalMs = 3000;
+
         private ForumWindow _window;
         private ForumObject _btnBack;
         private ForumObject _btnRefresh;
         private ForumObject _btnCreateRoom;
         private LobbyListEntry[] _lobbies = new LobbyListEntry[0];
+        private CancellationTokenSource _autoRefreshCts;
+        private bool _refreshInProgress;
         private int _lastSelectedIndex = -1;
 
         public override async void Show()
@@ -39,9 +44,14 @@ namespace MDEN.UI.Windows
                 }
 
                 RemoveInjectedTitle();
+                StopAutoRefresh();
             });
 
             await RefreshLobbiesAsync();
+            if (!IsDisposed)
+            {
+                StartAutoRefresh();
+            }
         }
 
         private void OnInternalShowInjectTitle(PopupLib.UI.Windows.Abstract.BaseWindow w)
@@ -192,12 +202,28 @@ namespace MDEN.UI.Windows
 
         private async Task RefreshLobbiesAsync()
         {
-            using var _ = UIManager.LockUI("Fetching lobby list...");
+            await RefreshLobbiesAsync(true, true);
+        }
+
+        private async Task RefreshLobbiesAsync(bool showLock, bool forceRebuild)
+        {
+            if (_refreshInProgress) return;
+            _refreshInProgress = true;
+            IDisposable uiLock = null;
 
             try
             {
-                _lobbies = await LobbyManager.RefreshLobbiesAsync();
+                if (showLock)
+                {
+                    uiLock = UIManager.LockUI("Fetching lobby list...");
+                }
+
+                var lobbies = await LobbyManager.RefreshLobbiesAsync();
                 if (IsDisposed) return;
+                var changed = forceRebuild || !AreLobbyListsEqual(_lobbies, lobbies);
+                _lobbies = lobbies;
+                if (!changed) return;
+
                 MainThreadDispatcher.Enqueue(() =>
                 {
                     if (IsDisposed) return;
@@ -208,6 +234,78 @@ namespace MDEN.UI.Windows
             {
                 MelonLogger.Warning($"Fetch lobby list failed: {ex.Message}");
             }
+            finally
+            {
+                uiLock?.Dispose();
+                _refreshInProgress = false;
+            }
+        }
+
+        private void StartAutoRefresh()
+        {
+            StopAutoRefresh();
+            _autoRefreshCts = new CancellationTokenSource();
+            _ = AutoRefreshLoopAsync(_autoRefreshCts.Token);
+        }
+
+        private void StopAutoRefresh()
+        {
+            try { _autoRefreshCts?.Cancel(); } catch { }
+            try { _autoRefreshCts?.Dispose(); } catch { }
+            _autoRefreshCts = null;
+        }
+
+        private async Task AutoRefreshLoopAsync(CancellationToken cancellationToken)
+        {
+            while (!cancellationToken.IsCancellationRequested && !IsDisposed)
+            {
+                try
+                {
+                    await Task.Delay(AutoRefreshIntervalMs, cancellationToken);
+                    if (cancellationToken.IsCancellationRequested || IsDisposed) return;
+
+                    await RefreshLobbiesAsync(false, false);
+                }
+                catch (TaskCanceledException)
+                {
+                    return;
+                }
+                catch (Exception ex)
+                {
+                    MelonLogger.Warning($"Auto refresh lobby list failed: {ex.Message}");
+                }
+            }
+        }
+
+        private static bool AreLobbyListsEqual(LobbyListEntry[] left, LobbyListEntry[] right)
+        {
+            left ??= new LobbyListEntry[0];
+            right ??= new LobbyListEntry[0];
+            if (left.Length != right.Length) return false;
+
+            for (var i = 0; i < left.Length; i++)
+            {
+                if (!AreLobbyEntriesEqual(left[i], right[i])) return false;
+            }
+
+            return true;
+        }
+
+        private static bool AreLobbyEntriesEqual(LobbyListEntry left, LobbyListEntry right)
+        {
+            if (left == null || right == null) return left == right;
+
+            return left.Id == right.Id &&
+                left.Name == right.Name &&
+                left.HostUid == right.HostUid &&
+                left.HostName == right.HostName &&
+                left.PlayType == right.PlayType &&
+                left.ChartSelection == right.ChartSelection &&
+                left.Goal == right.Goal &&
+                left.MaxPlayers == right.MaxPlayers &&
+                left.PlayerCount == right.PlayerCount &&
+                left.IsPlaying == right.IsPlaying &&
+                left.Locked == right.Locked;
         }
 
         private async Task JoinLobbyAsync(LobbyListEntry lobby)
@@ -249,6 +347,7 @@ namespace MDEN.UI.Windows
                 _window.ForceClose();
                 _window = null;
             }
+            StopAutoRefresh();
         }
     }
 }

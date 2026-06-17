@@ -1,5 +1,6 @@
 using Il2Cpp;
 using Il2CppAssets.Scripts.Database;
+using MDEN.Patches;
 using MelonLoader;
 
 namespace MDEN.UI.Core
@@ -15,7 +16,10 @@ namespace MDEN.UI.Core
             if (lobby == null || !lobby.IsPlaying)
             {
                 Reset();
-                Managers.BattleManager.Reset();
+                if (!BattlePatch.IsHoldingBattleResult)
+                {
+                    Managers.BattleManager.Reset();
+                }
                 return;
             }
 

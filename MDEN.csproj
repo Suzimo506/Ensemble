@@ -61,6 +61,9 @@
     <Reference Include="Il2CppPeroTools2.Account">
       <HintPath>$(MD_NET6_DIRECTORY)\MelonLoader\Il2CppAssemblies\Il2CppPeroTools2.Account.dll</HintPath>
     </Reference>
+    <Reference Include="Il2CppPeroTools2.Resources">
+      <HintPath>$(MD_NET6_DIRECTORY)\MelonLoader\Il2CppAssemblies\Il2CppPeroTools2.Resources.dll</HintPath>
+    </Reference>
     <Reference Include="Il2CppSirenix.Serialization">
       <HintPath>$(MD_NET6_DIRECTORY)\MelonLoader\Il2CppAssemblies\Il2CppSirenix.Serialization.dll</HintPath>
     </Reference>

@@ -3,6 +3,7 @@ using System.Threading.Tasks;
 using MDEN.Network;
 using MDEN.Protocol;
 using MDEN.Protocol.Messages.Auth;
+using MDEN.UI.Core;
 using MelonLoader;
 
 namespace MDEN.Managers
@@ -10,10 +11,12 @@ namespace MDEN.Managers
     public static class ConnectionManager
     {
         public static string CurrentServerAddress { get; private set; }
+        public static string CurrentServerDisplayName { get; private set; }
+        public static bool CurrentServerIsOfficial { get; private set; }
         public static string SessionToken { get; private set; }
         public static bool IsLoggedIn { get; private set; }
 
-        public static async Task<LoginResponse> ConnectAndLoginAsync(string address)
+        public static async Task<LoginResponse> ConnectAndLoginAsync(string address, string serverDisplayName = null, bool isOfficialServer = false)
         {
             var endpoint = ParseAddress(address);
             var account = GameAccountManager.GetCurrentAccount();
@@ -47,9 +50,14 @@ namespace MDEN.Managers
             SessionToken = response.Token;
             IsLoggedIn = true;
             CurrentServerAddress = $"{endpoint.Host}:{endpoint.Port}";
+            CurrentServerDisplayName = string.IsNullOrWhiteSpace(serverDisplayName)
+                ? CurrentServerAddress
+                : serverDisplayName.Trim();
+            CurrentServerIsOfficial = isOfficialServer;
             _ = SyncLocalProfileAsync();
             PlayerManager.SyncSelectionFireAndForget(selection);
             PlayerManager.SyncChartStateFireAndForget();
+            MainThreadDispatcher.Enqueue(NavigationButton.RefreshServerLabel);
             return response;
         }
 
@@ -57,19 +65,25 @@ namespace MDEN.Managers
         {
             IsLoggedIn = false;
             CurrentServerAddress = null;
+            CurrentServerDisplayName = null;
+            CurrentServerIsOfficial = false;
             SessionToken = null;
             PlayerManager.ClearSession();
             LobbyManager.ClearSession();
             NetworkClient.Instance.Disconnect();
+            MainThreadDispatcher.Enqueue(NavigationButton.RefreshServerLabel);
         }
 
         public static void MarkDisconnectedByRemote()
         {
             IsLoggedIn = false;
             CurrentServerAddress = null;
+            CurrentServerDisplayName = null;
+            CurrentServerIsOfficial = false;
             SessionToken = null;
             PlayerManager.ClearSession();
             LobbyManager.ClearSession();
+            MainThreadDispatcher.Enqueue(NavigationButton.RefreshServerLabel);
         }
 
         private static ServerEndpoint ParseAddress(string address)

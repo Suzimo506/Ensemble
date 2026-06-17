@@ -5,6 +5,7 @@ using Il2CppAssets.Scripts.UI.Panels;
 using MDEN.Managers;
 using MDEN.Protocol.Models;
 using MDEN.UI.Displays;
+using MelonLoader;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -14,6 +15,8 @@ namespace MDEN.UI.Core
     {
         private const string ResultEntryName = "MDENBattleResultEntry";
         private static readonly TimeSpan CellDelay = TimeSpan.FromMilliseconds(300);
+        private const int PnlMessageRetryCount = 20;
+        private const int PnlMessageRetryDelayMs = 150;
         private static PnlMessage _pnlMessage;
 
         public static bool ShowingResults { get; private set; }
@@ -25,7 +28,17 @@ namespace MDEN.UI.Core
             var orderedPlayers = BattleLobbyDisplay
                 .OrderPlayers(players ?? Array.Empty<BattlePlayerEntry>())
                 .ToArray();
-            if (orderedPlayers.Length == 0) return;
+            if (orderedPlayers.Length == 0)
+            {
+                MelonLogger.Warning("Battle result skipped: no player snapshot.");
+                return;
+            }
+
+            if (!await WaitForPnlMessageAsync())
+            {
+                MelonLogger.Warning("Battle result skipped: PnlMessage is not ready.");
+                return;
+            }
 
             ShowingResults = true;
             MainThreadDispatcher.Enqueue(() => Enable(true));
@@ -66,6 +79,17 @@ namespace MDEN.UI.Core
         {
             MainThreadDispatcher.Enqueue(() => AddEntry(text));
             await Task.Delay(CellDelay);
+        }
+
+        private static async Task<bool> WaitForPnlMessageAsync()
+        {
+            for (var i = 0; i < PnlMessageRetryCount; i++)
+            {
+                if (GetPnlMessage() != null) return true;
+                await Task.Delay(PnlMessageRetryDelayMs);
+            }
+
+            return false;
         }
 
         private static void AddEntry(string text)
