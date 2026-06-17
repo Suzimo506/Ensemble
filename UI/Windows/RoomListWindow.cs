@@ -278,18 +278,10 @@ namespace MDEN.UI.Windows
                 if (lobbyIndex >= 0 && lobbyIndex < _lobbies.Length)
                 {
                     var selectedLobby = _lobbies[lobbyIndex];
-                    if (LobbyManager.IsInLobby && LobbyManager.CurrentLobby?.Id != selectedLobby.Id)
+                    if (IsCurrentLobby(selectedLobby))
                     {
-                        NativeConfirmDialog.Show(
-                            "切换房间",
-                            $"确认离开当前房间并加入「{selectedLobby.Name}」吗？",
-                            confirmed =>
-                            {
-                                if (confirmed)
-                                {
-                                    _ = JoinLobbyAsync(selectedLobby);
-                                }
-                            });
+                        Close();
+                        UIManager.OpenWindow(new MyRoomWindow());
                         return;
                     }
 
@@ -302,6 +294,21 @@ namespace MDEN.UI.Windows
                     if (selectedLobby.IsPrivate)
                     {
                         ShowPasswordInput(selectedLobby);
+                        return;
+                    }
+
+                    if (NeedsSwitchConfirm(selectedLobby))
+                    {
+                        NativeConfirmDialog.Show(
+                            "切换房间",
+                            $"确认离开当前房间并加入「{selectedLobby.Name}」吗？",
+                            confirmed =>
+                            {
+                                if (confirmed)
+                                {
+                                    _ = JoinLobbyAsync(selectedLobby);
+                                }
+                            });
                         return;
                     }
 
@@ -320,9 +327,45 @@ namespace MDEN.UI.Windows
             var input = new InputWindow();
             input.OnCompletion += (w) =>
             {
-                _ = JoinLobbyAsync(lobby, input.Result?.Trim());
+                var password = input.Result?.Trim();
+                if (string.IsNullOrEmpty(password))
+                {
+                    MainThreadDispatcher.Enqueue(RebuildWindow);
+                    return;
+                }
+
+                if (NeedsSwitchConfirm(lobby))
+                {
+                    NativeConfirmDialog.Show(
+                        "切换房间",
+                        $"确认离开当前房间并加入「{lobby.Name}」吗？",
+                        confirmed =>
+                        {
+                            if (confirmed)
+                            {
+                                _ = JoinLobbyAsync(lobby, password);
+                            }
+                            else
+                            {
+                                MainThreadDispatcher.Enqueue(RebuildWindow);
+                            }
+                        });
+                    return;
+                }
+
+                _ = JoinLobbyAsync(lobby, password);
             };
             input.Show();
+        }
+
+        private static bool NeedsSwitchConfirm(LobbyListEntry lobby)
+        {
+            return LobbyManager.IsInLobby && LobbyManager.CurrentLobby?.Id != lobby.Id;
+        }
+
+        private static bool IsCurrentLobby(LobbyListEntry lobby)
+        {
+            return LobbyManager.IsInLobby && LobbyManager.CurrentLobby?.Id == lobby.Id;
         }
 
         private int GetLobbyStartIndex()
