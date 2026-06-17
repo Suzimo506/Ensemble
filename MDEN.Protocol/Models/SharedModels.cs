@@ -1,7 +1,8 @@
 namespace MDEN.Protocol.Models
 {
     /// <summary>
-    /// 房间同步推送中的简要玩家信�?    /// </summary>
+    /// 房间同步推送中的简要玩家信息
+    /// </summary>
     public class PlayerSyncEntry
     {
         public string Uid { get; set; }
@@ -31,7 +32,8 @@ namespace MDEN.Protocol.Models
     }
 
     /// <summary>
-    /// 房间列表中的简要房间信�?    /// </summary>
+    /// 房间列表中的简要房间信息
+    /// </summary>
     public class LobbyListEntry
     {
         public int Id { get; set; }
@@ -42,7 +44,12 @@ namespace MDEN.Protocol.Models
         public byte ChartSelection { get; set; }
         public byte Goal { get; set; }
         public ushort MaxPlayers { get; set; }
+        public ushort PlaylistSize { get; set; }
+        public int PlaylistCount { get; set; }
+        public bool SettlementEnabled { get; set; }
         public int PlayerCount { get; set; }
+        public bool IsPrivate { get; set; }
+        public bool JoinLocked { get; set; }
         public bool IsPlaying { get; set; }
         public bool Locked { get; set; }
     }

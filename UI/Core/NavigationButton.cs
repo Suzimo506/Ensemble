@@ -96,7 +96,7 @@ namespace MDEN.UI.Core
                 button.onClick.AddListener((UnityAction)new Action(() => 
                 {
                     UIManager.OpenWindow(LobbyManager.IsInLobby
-                        ? new RoomListWindow()
+                        ? new RoomListWindow(true)
                         : new MainMenuWindow());
                 }));
             }

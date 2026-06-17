@@ -3,15 +3,16 @@ using System.Text.Json.Serialization;
 namespace MDEN.Protocol.Messages.Chat
 {
     /// <summary>
-    /// 客户端发送聊天消�?(Notify, 即发即忘)
-    /// 服务端通过会话自动补充发送者信�?    /// </summary>
+    /// 客户端发送聊天消息 (Notify, 即发即忘)
+    /// 服务端通过会话自动补充发送者信息
+    /// </summary>
     public class ChatNotifyMsg
     {
         public string Message { get; set; }
     }
 
     /// <summary>
-    /// 服务端广播聊天消�?(Push)
+    /// 服务端广播聊天消息 (Push)
     /// </summary>
     public class ChatPushMsg
     {

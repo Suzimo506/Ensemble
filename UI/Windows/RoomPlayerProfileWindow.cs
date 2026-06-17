@@ -97,8 +97,42 @@ namespace MDEN.UI.Windows
             var button = _window.ForumObjects[objectIndex];
             if (button == _btnAddFriend)
             {
-                MelonLogger.Msg($"Friend action placeholder: {_player.Uid}");
+                if (string.IsNullOrWhiteSpace(_player.Uid) || _player.Uid == PlayerManager.CurrentUid)
+                {
+                    Il2CppAssets.Scripts.UI.Controls.ShowText.ShowInfo("目标玩家无效");
+                    return;
+                }
+
+                _ = SendFriendRequestAsync();
             }
+        }
+
+        private async Task SendFriendRequestAsync()
+        {
+            using var _ = UIManager.LockUI("处理中...");
+            try
+            {
+                var response = await SocialManager.SendFriendRequestAsync(_player.Uid);
+                MainThreadDispatcher.Enqueue(() =>
+                    Il2CppAssets.Scripts.UI.Controls.ShowText.ShowInfo(GetFriendActionMessage(response?.Action ?? 0)));
+            }
+            catch (Exception ex)
+            {
+                MelonLogger.Warning($"Friend action failed: {_player.Uid}, {ex.Message}");
+                MainThreadDispatcher.Enqueue(() => Il2CppAssets.Scripts.UI.Controls.ShowText.ShowInfo(ex.Message));
+            }
+        }
+
+        private static string GetFriendActionMessage(int action)
+        {
+            return action switch
+            {
+                1 => "好友请求已发送",
+                2 => "已添加好友",
+                3 => "已删除好友",
+                4 => "已取消好友请求",
+                _ => "好友状态未变化"
+            };
         }
 
         private void OnInternalShowInjectTitle(PopupLib.UI.Windows.Abstract.BaseWindow w)

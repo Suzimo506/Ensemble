@@ -4,7 +4,7 @@ using MDEN.Network;
 using MDEN.UI.Core;
 using System;
 
-[assembly: MelonInfo(typeof(MDEN.Main), "MDEN", "1.0.0", "MDEN Team")]
+[assembly: MelonInfo(typeof(MDEN.Main), "MDEN", "0.3.2", "MDEN Team")]
 [assembly: MelonGame("PeroPeroGames", "MuseDash")]
 
 namespace MDEN
@@ -19,6 +19,7 @@ namespace MDEN
             ReconnectionManager.Instance.Init();
             LobbyManager.Init();
             ChatManager.Init();
+            SocialManager.Init();
             ChartManager.Initialize();
             BattleManager.Init();
             SettlementManager.Init();
@@ -44,6 +45,7 @@ namespace MDEN
                 NavigationButton.Create();
                 RoomHudController.Refresh();
                 RoomHudController.RequestRefresh();
+                VersionCheckManager.CheckOnce();
             }
             else if (sceneName == "GameMain")
             {

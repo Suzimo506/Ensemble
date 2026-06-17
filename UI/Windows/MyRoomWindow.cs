@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using LocalizeLib;
 using MDEN.Managers;
 using MDEN.Protocol.Enums;
@@ -15,6 +16,8 @@ namespace MDEN.UI.Windows
     {
         private ForumWindow _window;
         private ForumObject _btnLeave;
+        private ForumObject _btnJoinLock;
+        private ForumObject _btnPassword;
         private readonly Dictionary<ForumObject, PlayerSyncEntry> _playerItems = new Dictionary<ForumObject, PlayerSyncEntry>();
         private int _lastSelectedIndex = -1;
 
@@ -54,6 +57,26 @@ namespace MDEN.UI.Windows
             _btnLeave = new ForumObject(new LocalString("- 退出房间 -"), new LocalString("离开当前联机房间"));
             _btnLeave.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("HomePanel.png")?.texture;
             _window.ForumObjects.Add(_btnLeave);
+
+            if (lobby?.HostUid == PlayerManager.CurrentUid)
+            {
+                _btnJoinLock = new ForumObject(
+                    new LocalString(lobby.JoinLocked ? "- 手动解锁 -" : "- 手动上锁 -"),
+                    new LocalString(lobby.JoinLocked ? "解锁后其他玩家可以加入房间" : "上锁后其他玩家不能加入房间"));
+                _btnJoinLock.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("OptionsPanel.png")?.texture;
+                _window.ForumObjects.Add(_btnJoinLock);
+
+                _btnPassword = new ForumObject(
+                    new LocalString(lobby.IsPrivate ? "- 修改/清除密码 -" : "- 设置密码 -"),
+                    new LocalString(lobby.IsPrivate ? "当前房间需要密码加入，输入空内容可清除密码" : "设置后房间列表会显示（私密），加入时需要输入密码"));
+                _btnPassword.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("SocialNetwork.png")?.texture;
+                _window.ForumObjects.Add(_btnPassword);
+            }
+            else
+            {
+                _btnJoinLock = null;
+                _btnPassword = null;
+            }
 
             var info = new ForumObject(new LocalString(lobby?.Name ?? "我的房间"), new LocalString(summary));
             info.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("RoomList.png")?.texture;
@@ -111,7 +134,9 @@ namespace MDEN.UI.Windows
                    $"歌曲列表: {Highlight($"{GetPlaylistCount(lobby)}/{lobby.PlaylistSize}", Constants.ColorYellow)}\n" +
                    $"获胜方式: {Highlight(GetGoalName(lobby.Goal), Constants.ColorYellow)}\n" +
                    $"结算功能: {Highlight(lobby.SettlementEnabled ? "开启" : "关闭", Constants.ColorYellow)}\n" +
-                   $"状态: {Highlight(GetLobbyStatus(lobby), lobby.IsPlaying ? Constants.ColorPink : Constants.ColorBlue)}";
+                   $"加入限制: {Highlight(lobby.JoinLocked ? "已上锁" : "开放", lobby.JoinLocked ? Constants.ColorYellow : RoomListWindow.WaitingStatusColor)}\n" +
+                   $"密码: {Highlight(lobby.IsPrivate ? "已设置" : "无", lobby.IsPrivate ? Constants.ColorYellow : RoomListWindow.WaitingStatusColor)}\n" +
+                   $"状态: {RoomListWindow.GetColoredLobbyStatus(lobby.IsPlaying, lobby.Locked, lobby.JoinLocked)}";
         }
 
         private static int GetPlayerCount(MDEN.Protocol.Messages.Lobby.LobbySyncPush lobby)
@@ -149,13 +174,6 @@ namespace MDEN.UI.Windows
             };
         }
 
-        private static string GetLobbyStatus(MDEN.Protocol.Messages.Lobby.LobbySyncPush lobby)
-        {
-            if (lobby.IsPlaying) return "游戏中";
-            if (lobby.Locked) return "已锁定";
-            return "等待中";
-        }
-
         private static string Highlight(string value, string color)
         {
             return $"<color={color}>{value}</color>";
@@ -168,7 +186,7 @@ namespace MDEN.UI.Windows
                 : value.Replace("&", "&amp;").Replace("<", "&lt;").Replace(">", "&gt;");
         }
 
-        private async void OnSelectionChanged(PopupLib.UI.Windows.Interfaces.IListWindow window, int objectIndex)
+        private void OnSelectionChanged(PopupLib.UI.Windows.Interfaces.IListWindow window, int objectIndex)
         {
             if (_window == null || objectIndex < 0 || objectIndex >= _window.ForumObjects.Count) return;
 
@@ -181,7 +199,33 @@ namespace MDEN.UI.Windows
             var button = _window.ForumObjects[objectIndex];
             if (button == _btnLeave)
             {
-                await LeaveLobbyAsync();
+                NativeConfirmDialog.Show(
+                    string.Empty,
+                    "是否退出房间？",
+                    confirmed =>
+                    {
+                        if (confirmed)
+                        {
+                            _ = LeaveLobbyAsync();
+                        }
+                    });
+                return;
+            }
+
+            if (button == _btnJoinLock)
+            {
+                var lobby = LobbyManager.CurrentLobby;
+                if (!CanChangeRoomSettings(lobby)) return;
+
+                _ = UpdateLobbySettingsAsync(!lobby.JoinLocked, false, null);
+                return;
+            }
+
+            if (button == _btnPassword)
+            {
+                if (!CanChangeRoomSettings(LobbyManager.CurrentLobby)) return;
+
+                ShowPasswordInput();
                 return;
             }
 
@@ -189,6 +233,73 @@ namespace MDEN.UI.Windows
             {
                 Close();
                 UIManager.OpenWindow(new RoomPlayerWindow(player));
+            }
+        }
+
+        private static bool CanChangeRoomSettings(MDEN.Protocol.Messages.Lobby.LobbySyncPush lobby)
+        {
+            if (lobby == null) return false;
+            if (lobby.HostUid == PlayerManager.CurrentUid) return true;
+
+            Il2CppAssets.Scripts.UI.Controls.ShowText.ShowInfo("只有房主可以修改房间设置");
+            return false;
+        }
+
+        private void ShowPasswordInput()
+        {
+            if (_window != null)
+            {
+                _window.ForceClose();
+            }
+
+            var input = new InputWindow();
+            input.OnCompletion += (w) =>
+            {
+                var value = input.Result?.Trim();
+                if (value != null && value.Length > 16)
+                {
+                    MelonLoader.MelonLogger.Warning("Lobby password is too long. Max length is 16.");
+                    MainThreadDispatcher.Enqueue(RebuildWindow);
+                    return;
+                }
+
+                _ = UpdateLobbySettingsAsync(LobbyManager.CurrentLobby?.JoinLocked == true, true, value);
+            };
+            input.Show();
+        }
+
+        private async Task UpdateLobbySettingsAsync(bool joinLocked, bool updatePassword, string password)
+        {
+            using var _ = UIManager.LockUI("处理中...");
+
+            try
+            {
+                await LobbyManager.SetLobbySettingsAsync(joinLocked, updatePassword, password);
+                ApplyLocalLobbySettings(joinLocked, updatePassword, password);
+                if (IsDisposed) return;
+
+                MainThreadDispatcher.Enqueue(() =>
+                {
+                    if (IsDisposed) return;
+                    RebuildWindow();
+                });
+            }
+            catch (System.Exception ex)
+            {
+                MelonLoader.MelonLogger.Warning($"Update lobby settings failed: {ex.Message}");
+                MainThreadDispatcher.Enqueue(RebuildWindow);
+            }
+        }
+
+        private static void ApplyLocalLobbySettings(bool joinLocked, bool updatePassword, string password)
+        {
+            var lobby = LobbyManager.CurrentLobby;
+            if (lobby == null) return;
+
+            lobby.JoinLocked = joinLocked;
+            if (updatePassword)
+            {
+                lobby.IsPrivate = !string.IsNullOrWhiteSpace(password);
             }
         }
 
@@ -276,6 +387,22 @@ namespace MDEN.UI.Windows
                 _window.ForceClose();
                 _window = null;
             }
+        }
+
+        private void RebuildWindow()
+        {
+            if (_window == null) return;
+
+            _window.OnSelectionChanged -= OnSelectionChanged;
+            _window.OnInternalShow -= OnInternalShowInjectTitle;
+            _window.ForceClose();
+            _window = new ForumWindow();
+            _window.AutoReset = true;
+            BuildList();
+            _window.OnSelectionChanged += OnSelectionChanged;
+            _window.OnInternalShow += OnInternalShowInjectTitle;
+            _window.Show();
+            _lastSelectedIndex = -1;
         }
     }
 }

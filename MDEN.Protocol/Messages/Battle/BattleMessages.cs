@@ -3,7 +3,7 @@ using MDEN.Protocol.Models;
 namespace MDEN.Protocol.Messages.Battle
 {
     /// <summary>
-    /// 客户端上报自身对战数�?(Notify, 即发即忘)
+    /// 客户端上报自身对战数据 (Notify, 即发即忘)
     /// </summary>
     public class BattleDataNotifyMsg
     {
@@ -19,7 +19,7 @@ namespace MDEN.Protocol.Messages.Battle
     }
 
     /// <summary>
-    /// 服务端广播给房间内所有人的对战数�?(Push)
+    /// 服务端广播给房间内所有人的对战数据 (Push)
     /// </summary>
     public class BattleDataPushMsg
     {

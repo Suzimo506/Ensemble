@@ -83,6 +83,19 @@ namespace MDEN.Protocol.Messages.Lobby
     {
     }
 
+    public class LobbySettingsRequest
+    {
+        public bool JoinLocked { get; set; }
+        public bool UpdatePassword { get; set; }
+
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public string Password { get; set; }
+    }
+
+    public class LobbySettingsResponse
+    {
+    }
+
     public class LobbyLockRequest
     {
         public bool Locked { get; set; }
@@ -111,12 +124,15 @@ namespace MDEN.Protocol.Messages.Lobby
         public ushort PlaylistSize { get; set; }
         public bool SettlementEnabled { get; set; }
         public bool IsPrivate { get; set; }
+        public bool JoinLocked { get; set; }
         public bool Locked { get; set; }
         public bool IsPlaying { get; set; }
         public ushort CurrentPlaylistEntry { get; set; }
         public string CurrentBattleEntry { get; set; }
         public string[] Players { get; set; }
         public string[] ReadyPlayers { get; set; }
+        public string[] MutedPlayers { get; set; }
+        public string[] ChartSelectBannedPlayers { get; set; }
         public string[] Playlist { get; set; }
         public PlayerSyncEntry[] PlayerDetails { get; set; }
         public LobbyPlayerCharacterEntry[] PlayerCharacters { get; set; }

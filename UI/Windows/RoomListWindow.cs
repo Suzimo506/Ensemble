@@ -3,6 +3,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using LocalizeLib;
 using MDEN.Managers;
+using MDEN.Protocol.Enums;
 using MDEN.Protocol.Models;
 using MDEN.UI.Core;
 using MelonLoader;
@@ -15,6 +16,9 @@ namespace MDEN.UI.Windows
     public class RoomListWindow : MDENWindowBase
     {
         private const int AutoRefreshIntervalMs = 3000;
+        public const string WaitingStatusColor = "66ff66ff";
+        private const string PlayingStatusColor = "ff5555ff";
+        private const string LockedStatusColor = Constants.ColorYellow;
 
         private ForumWindow _window;
         private ForumObject _btnBack;
@@ -24,6 +28,16 @@ namespace MDEN.UI.Windows
         private CancellationTokenSource _autoRefreshCts;
         private bool _refreshInProgress;
         private int _lastSelectedIndex = -1;
+        private readonly bool _readOnly;
+
+        public RoomListWindow()
+        {
+        }
+
+        public RoomListWindow(bool readOnly)
+        {
+            _readOnly = readOnly;
+        }
 
         public override async void Show()
         {
@@ -112,17 +126,31 @@ namespace MDEN.UI.Windows
             _window.ForumObjects.Clear();
             _lastSelectedIndex = -1;
 
-            _btnBack = new ForumObject(new LocalString("- 返回 -"), new LocalString("回到节点列表"));
-            _btnBack.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("OptionsPanel.png")?.texture;
-            _window.ForumObjects.Add(_btnBack);
+            if (!_readOnly)
+            {
+                _btnBack = new ForumObject(new LocalString("- 返回 -"), new LocalString("回到节点列表"));
+                _btnBack.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("OptionsPanel.png")?.texture;
+                _window.ForumObjects.Add(_btnBack);
+            }
+            else
+            {
+                _btnBack = null;
+            }
 
             _btnRefresh = new ForumObject(new LocalString("- 刷新 -"), new LocalString("重新获取当前服务器的房间列表"));
             _btnRefresh.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("RoomList.png")?.texture;
             _window.ForumObjects.Add(_btnRefresh);
 
-            _btnCreateRoom = new ForumObject(new LocalString("- 创建房间 -"), new LocalString("创建新的联机房间"));
-            _btnCreateRoom.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("HomePanel.png")?.texture;
-            _window.ForumObjects.Add(_btnCreateRoom);
+            if (!_readOnly)
+            {
+                _btnCreateRoom = new ForumObject(new LocalString("- 创建房间 -"), new LocalString("创建新的联机房间"));
+                _btnCreateRoom.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("HomePanel.png")?.texture;
+                _window.ForumObjects.Add(_btnCreateRoom);
+            }
+            else
+            {
+                _btnCreateRoom = null;
+            }
 
             if (_lobbies.Length == 0)
             {
@@ -134,13 +162,78 @@ namespace MDEN.UI.Windows
 
             foreach (var lobby in _lobbies)
             {
-                var status = lobby.IsPlaying ? "游戏中" : lobby.Locked ? "已锁定" : "等待中";
-                var name = $"<color={Constants.ColorYellow}>{lobby.Name}</color>";
-                var desc = $"房主: {lobby.HostName ?? lobby.HostUid}\n人数: <color={Constants.ColorCyan}>{lobby.PlayerCount}/{lobby.MaxPlayers}</color>\n状态: {status}";
+                var privateSuffix = lobby.IsPrivate ? "（私密）" : string.Empty;
+                var name = $"<color={Constants.ColorYellow}>{EscapeRichText(lobby.Name)}{privateSuffix}</color>";
+                var desc = BuildLobbyDescription(lobby);
                 var item = new ForumObject(new LocalString(name), new LocalString(desc));
                 item.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("RoomList.png")?.texture;
                 _window.ForumObjects.Add(item);
             }
+        }
+
+        private static string BuildLobbyDescription(LobbyListEntry lobby)
+        {
+            var host = EscapeRichText(lobby.HostName ?? lobby.HostUid ?? "Unknown");
+            return $"房主: <color={Constants.ColorPink}>{host}</color>\n" +
+                   $"人数: <color={Constants.ColorCyan}>{lobby.PlayerCount}/{lobby.MaxPlayers}</color>\n" +
+                   $"歌曲列表: <color={Constants.ColorYellow}>{lobby.PlaylistCount}/{lobby.PlaylistSize}</color>\n" +
+                   $"玩法: <color={Constants.ColorBlue}>{GetPlayTypeName(lobby.PlayType)}</color>\n" +
+                   $"选谱: <color={Constants.ColorBlue}>{GetChartSelectionName(lobby.ChartSelection)}</color>\n" +
+                   $"获胜方式: <color={Constants.ColorYellow}>{GetGoalName(lobby.Goal)}</color>\n" +
+                   $"结算功能: <color={Constants.ColorYellow}>{(lobby.SettlementEnabled ? "开启" : "关闭")}</color>\n" +
+                   $"加入限制: {ColorText(lobby.JoinLocked ? "已上锁" : "开放", lobby.JoinLocked ? LockedStatusColor : WaitingStatusColor)}\n" +
+                   $"密码: {ColorText(lobby.IsPrivate ? "需要" : "无", lobby.IsPrivate ? LockedStatusColor : WaitingStatusColor)}\n" +
+                   $"状态: {GetColoredLobbyStatus(lobby.IsPlaying, lobby.Locked, lobby.JoinLocked)}";
+        }
+
+        private static string GetGoalName(byte goal)
+        {
+            return (LobbyGoal)goal switch
+            {
+                LobbyGoal.Score => "分数",
+                LobbyGoal.Custom => "自定义",
+                _ => "准确率"
+            };
+        }
+
+        private static string GetPlayTypeName(byte playType)
+        {
+            return (LobbyPlayType)playType switch
+            {
+                LobbyPlayType.VanillaOnly => "仅官方谱",
+                LobbyPlayType.CustomOnly => "仅自定义谱",
+                _ => "全部"
+            };
+        }
+
+        private static string GetChartSelectionName(byte chartSelection)
+        {
+            return (LobbyChartSelection)chartSelection switch
+            {
+                LobbyChartSelection.Playlist => "列表轮换",
+                LobbyChartSelection.Random => "随机",
+                _ => "房主歌单"
+            };
+        }
+
+        public static string GetColoredLobbyStatus(bool isPlaying, bool locked, bool joinLocked = false)
+        {
+            if (isPlaying) return ColorText("游戏中", PlayingStatusColor);
+            if (joinLocked) return ColorText("已上锁", LockedStatusColor);
+            if (locked) return ColorText("已锁定", LockedStatusColor);
+            return ColorText("等待中", WaitingStatusColor);
+        }
+
+        private static string ColorText(string value, string color)
+        {
+            return $"<color={color}>{value}</color>";
+        }
+
+        private static string EscapeRichText(string value)
+        {
+            return string.IsNullOrEmpty(value)
+                ? string.Empty
+                : value.Replace("&", "&amp;").Replace("<", "&lt;").Replace(">", "&gt;");
         }
 
         private async void OnSelectionChanged(PopupLib.UI.Windows.Interfaces.IListWindow window, int objectIndex)
@@ -165,7 +258,7 @@ namespace MDEN.UI.Windows
             {
                 await RefreshLobbiesAsync();
             }
-            else if (button == _btnCreateRoom)
+            else if (!_readOnly && button == _btnCreateRoom)
             {
                 Close();
                 UIManager.OpenWindow(new CreateRoomWindow());
@@ -176,7 +269,12 @@ namespace MDEN.UI.Windows
             }
             else
             {
-                var lobbyIndex = objectIndex - 3;
+                if (_readOnly)
+                {
+                    return;
+                }
+
+                var lobbyIndex = objectIndex - GetLobbyStartIndex();
                 if (lobbyIndex >= 0 && lobbyIndex < _lobbies.Length)
                 {
                     var selectedLobby = _lobbies[lobbyIndex];
@@ -195,9 +293,41 @@ namespace MDEN.UI.Windows
                         return;
                     }
 
+                    if (selectedLobby.JoinLocked)
+                    {
+                        Il2CppAssets.Scripts.UI.Controls.ShowText.ShowInfo("房间已上锁");
+                        return;
+                    }
+
+                    if (selectedLobby.IsPrivate)
+                    {
+                        ShowPasswordInput(selectedLobby);
+                        return;
+                    }
+
                     await JoinLobbyAsync(selectedLobby);
                 }
             }
+        }
+
+        private void ShowPasswordInput(LobbyListEntry lobby)
+        {
+            if (_window != null)
+            {
+                _window.ForceClose();
+            }
+
+            var input = new InputWindow();
+            input.OnCompletion += (w) =>
+            {
+                _ = JoinLobbyAsync(lobby, input.Result?.Trim());
+            };
+            input.Show();
+        }
+
+        private int GetLobbyStartIndex()
+        {
+            return _readOnly ? 1 : 3;
         }
 
         private async Task RefreshLobbiesAsync()
@@ -303,23 +433,30 @@ namespace MDEN.UI.Windows
                 left.ChartSelection == right.ChartSelection &&
                 left.Goal == right.Goal &&
                 left.MaxPlayers == right.MaxPlayers &&
+                left.PlaylistSize == right.PlaylistSize &&
+                left.PlaylistCount == right.PlaylistCount &&
+                left.SettlementEnabled == right.SettlementEnabled &&
                 left.PlayerCount == right.PlayerCount &&
+                left.IsPrivate == right.IsPrivate &&
+                left.JoinLocked == right.JoinLocked &&
                 left.IsPlaying == right.IsPlaying &&
                 left.Locked == right.Locked;
         }
 
-        private async Task JoinLobbyAsync(LobbyListEntry lobby)
+        private async Task JoinLobbyAsync(LobbyListEntry lobby, string password = null)
         {
             using var _ = UIManager.LockUI("Joining lobby...");
 
             try
             {
-                await LobbyManager.JoinLobbyAsync(lobby.Id);
+                await LobbyManager.JoinLobbyAsync(lobby.Id, password);
                 MelonLogger.Msg($"Joined lobby: {lobby.Id}");
             }
             catch (Exception ex)
             {
                 MelonLogger.Warning($"Join lobby failed: {ex.Message}");
+                if (IsDisposed) return;
+                MainThreadDispatcher.Enqueue(RebuildWindow);
             }
         }
 

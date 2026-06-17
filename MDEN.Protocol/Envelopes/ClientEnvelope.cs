@@ -14,7 +14,7 @@ namespace MDEN.Protocol.Envelopes
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public uint? ReqId { get; set; }
 
-        /// <summary>具体消息体，结构�?OpCode 决定</summary>
+        /// <summary>具体消息体，结构由 OpCode 决定</summary>
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public object Payload { get; set; }
     }

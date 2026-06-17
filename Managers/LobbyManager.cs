@@ -6,6 +6,8 @@ using MDEN.Protocol;
 using MDEN.Protocol.Enums;
 using MDEN.Protocol.Messages.Lobby;
 using MDEN.Protocol.Models;
+using MDEN.UI.Core;
+using MDEN.UI.Windows;
 using MelonLoader;
 
 namespace MDEN.Managers
@@ -31,7 +33,12 @@ namespace MDEN.Managers
             return CurrentLobbies;
         }
 
-        public static async Task JoinLobbyAsync(int lobbyId)
+        public static Task JoinLobbyAsync(int lobbyId)
+        {
+            return JoinLobbyAsync(lobbyId, null);
+        }
+
+        public static async Task JoinLobbyAsync(int lobbyId, string password)
         {
             EnsureReady();
             _pendingJoinLobbyId = lobbyId;
@@ -43,7 +50,7 @@ namespace MDEN.Managers
             {
                 await NetworkClient.Instance.SendRequestAsync<JoinLobbyRequest, JoinLobbyResponse>(
                     OpCodes.JoinLobbyReq,
-                    new JoinLobbyRequest { LobbyId = lobbyId });
+                    new JoinLobbyRequest { LobbyId = lobbyId, Password = password });
             }
             catch
             {
@@ -147,9 +154,18 @@ namespace MDEN.Managers
                 new LobbyBanChartSelectRequest { TargetUid = targetUid, Banned = banned });
         }
 
+        public static async Task SetLobbySettingsAsync(bool joinLocked, bool updatePassword, string password)
+        {
+            EnsureReady();
+            await NetworkClient.Instance.SendRequestAsync<LobbySettingsRequest, LobbySettingsResponse>(
+                OpCodes.LobbySettingsReq,
+                new LobbySettingsRequest { JoinLocked = joinLocked, UpdatePassword = updatePassword, Password = password });
+        }
+
         public static void Init()
         {
             PushDispatcher.Instance.Register<LobbySyncPush>(OpCodes.LobbySyncPush, OnLobbySync);
+            PushDispatcher.Instance.Register<LobbyKickedPush>(OpCodes.LobbyKickedPush, OnLobbyKicked);
         }
 
         public static void ClearSession()
@@ -177,6 +193,8 @@ namespace MDEN.Managers
                 MaxPlayers = request.MaxPlayers,
                 PlaylistSize = request.PlaylistSize,
                 SettlementEnabled = request.SettlementEnabled,
+                IsPrivate = !string.IsNullOrWhiteSpace(request.Password),
+                JoinLocked = false,
                 PlayType = request.PlayType,
                 ChartSelection = request.ChartSelection,
                 Goal = request.Goal,
@@ -226,6 +244,21 @@ namespace MDEN.Managers
             CurrentLobby = push;
             MelonLogger.Msg($"Lobby sync received: {push.Id}, players: {push.Players?.Length ?? 0}/{push.MaxPlayers}");
             NotifyCurrentLobbyChanged();
+        }
+
+        private static void OnLobbyKicked(LobbyKickedPush push)
+        {
+            var reason = string.IsNullOrWhiteSpace(push?.Reason) ? "你已被移出房间" : push.Reason;
+            _pendingJoinLobbyId = null;
+            CurrentLobby = null;
+            NotifyCurrentLobbyChanged();
+            MainThreadDispatcher.Enqueue(() =>
+            {
+                Il2CppAssets.Scripts.UI.Controls.ShowText.ShowInfo(reason);
+                NavigationButton.RefreshRoomButton();
+                RoomHudController.Refresh();
+                UIManager.OpenWindow(new RoomListWindow());
+            });
         }
 
         private static void NotifyCurrentLobbyChanged()

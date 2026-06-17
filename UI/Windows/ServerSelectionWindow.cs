@@ -257,7 +257,8 @@ namespace MDEN.UI.Windows
         {
             if (info == null) return "获取信息失败或服务器离线";
 
-            return $"当前在线: <color={Constants.ColorYellow}>{info.PlayerCount}</color> 人\n房间数量: <color={Constants.ColorCyan}>{info.RoomCount}</color> 个";
+            var version = string.IsNullOrWhiteSpace(info.Version) ? "未知" : info.Version;
+            return $"版本: <color={Constants.ColorBlue}>{version}</color>\n当前在线: <color={Constants.ColorYellow}>{info.PlayerCount}</color> 人\n房间数量: <color={Constants.ColorCyan}>{info.RoomCount}</color> 个";
         }
 
         private static string BuildCustomServerDescription(CustomServerInfo server)

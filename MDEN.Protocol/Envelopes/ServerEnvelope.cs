@@ -1,4 +1,3 @@
-using System.Text.Json;
 using System.Text.Json.Serialization;
 
 namespace MDEN.Protocol.Envelopes
@@ -8,23 +7,23 @@ namespace MDEN.Protocol.Envelopes
     /// </summary>
     public class ServerEnvelope
     {
-        /// <summary>操作�?/summary>
+        /// <summary>操作码</summary>
         public ushort Op { get; set; }
 
         /// <summary>对应请求的ID，仅 Response 有值，Push 时为 null</summary>
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public uint? ReqId { get; set; }
 
-        /// <summary>�?Response 有意义，标识请求是否成功</summary>
+        /// <summary>仅 Response 有意义，标识请求是否成功</summary>
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
         public bool Success { get; set; }
 
-        /// <summary>具体消息�?(反序列化时为 JsonElement)</summary>
+        /// <summary>具体消息体 (反序列化时为 JsonElement)</summary>
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public object Payload { get; set; }
 
         /// <summary>
-        /// 创建一�?Response 信封
+        /// 创建一个 Response 信封
         /// </summary>
         public static ServerEnvelope Response(ushort opCode, uint reqId, bool success, object payload = null)
         {
@@ -38,7 +37,7 @@ namespace MDEN.Protocol.Envelopes
         }
 
         /// <summary>
-        /// 创建一�?Push 信封
+        /// 创建一个 Push 信封
         /// </summary>
         public static ServerEnvelope Push(ushort opCode, object payload = null)
         {

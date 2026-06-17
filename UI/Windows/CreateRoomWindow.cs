@@ -21,6 +21,7 @@ namespace MDEN.UI.Windows
         private ForumObject _btnPlaylistSize;
         private ForumObject _btnGoal;
         private ForumObject _btnSettlement;
+        private ForumObject _btnPassword;
         private ForumObject _btnCreate;
         private int _lastSelectedIndex = -1;
 
@@ -29,6 +30,7 @@ namespace MDEN.UI.Windows
         private ushort _playlistSize = 12;
         private LobbyGoal _goal = LobbyGoal.Accuracy;
         private bool _settlementEnabled;
+        private string _password;
 
         public override void Show()
         {
@@ -81,6 +83,10 @@ namespace MDEN.UI.Windows
             _btnSettlement.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("OptionsPanel.png")?.texture;
             _window.ForumObjects.Add(_btnSettlement);
 
+            _btnPassword = new ForumObject(new LocalString("房间密码"), new LocalString($"密码: {HighlightValue(string.IsNullOrWhiteSpace(_password) ? "无" : "已设置")}\n输入空内容可清除密码，16字上限"));
+            _btnPassword.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("SocialNetwork.png")?.texture;
+            _window.ForumObjects.Add(_btnPassword);
+
             _btnCreate = new ForumObject(new LocalString($"<color={Constants.ColorYellow}>- 确认创建 -</color>"), new LocalString(BuildSummary()));
             _btnCreate.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("RoomList.png")?.texture;
             _window.ForumObjects.Add(_btnCreate);
@@ -126,6 +132,10 @@ namespace MDEN.UI.Windows
                 _settlementEnabled = !_settlementEnabled;
                 RebuildWindow();
             }
+            else if (button == _btnPassword)
+            {
+                ShowPasswordInput();
+            }
             else if (button == _btnCreate)
             {
                 await CreateLobbyAsync();
@@ -157,6 +167,31 @@ namespace MDEN.UI.Windows
             input.Show();
         }
 
+        private void ShowPasswordInput()
+        {
+            if (_window != null)
+            {
+                _window.ForceClose();
+            }
+
+            var input = new InputWindow();
+            input.OnCompletion += (w) =>
+            {
+                var value = input.Result?.Trim();
+                if (value != null && value.Length <= 16)
+                {
+                    _password = string.IsNullOrWhiteSpace(value) ? null : value;
+                }
+                else if (!string.IsNullOrEmpty(value))
+                {
+                    MelonLogger.Warning("Room password is too long. Max length is 16.");
+                }
+
+                RebuildWindow();
+            };
+            input.Show();
+        }
+
         private async Task CreateLobbyAsync()
         {
             if (!ConnectionManager.IsLoggedIn)
@@ -179,7 +214,8 @@ namespace MDEN.UI.Windows
                     ChartSelection = (byte)LobbyChartSelection.HostPlaylist,
                     Goal = (byte)_goal,
                     PlaylistSize = _playlistSize,
-                    SettlementEnabled = _settlementEnabled
+                    SettlementEnabled = _settlementEnabled,
+                    Password = _password
                 };
 
                 var lobbyId = await LobbyManager.CreateLobbyAsync(request);
@@ -228,7 +264,7 @@ namespace MDEN.UI.Windows
 
         private string BuildSummary()
         {
-            return $"名称: {HighlightValue(EscapeRichText(_roomName))}\n人数: {HighlightValue(_maxPlayers)}\n歌曲列表长度: {HighlightValue(_playlistSize)}\n获胜方式: {HighlightValue(GetGoalName())}\n结算功能: {HighlightValue(GetSettlementNamePlain())}";
+            return $"名称: {HighlightValue(EscapeRichText(_roomName))}\n人数: {HighlightValue(_maxPlayers)}\n歌曲列表长度: {HighlightValue(_playlistSize)}\n获胜方式: {HighlightValue(GetGoalName())}\n结算功能: {HighlightValue(GetSettlementNamePlain())}\n密码: {HighlightValue(string.IsNullOrWhiteSpace(_password) ? "无" : "已设置")}";
         }
 
         private string GetGoalName()
