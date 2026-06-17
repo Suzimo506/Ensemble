@@ -278,6 +278,10 @@ namespace MDEN.UI.Core
             }
 
             Chat.AddMessage(message);
+            if (!message.IsSystem)
+            {
+                RoomCharacterDisplay.ShowChatBubble(message.AuthorUid, message.Message);
+            }
         }
 
         private static void ScheduleEntranceFallback(MDEN.Protocol.Messages.Lobby.LobbySyncPush lobby, bool isNewLobbyEntry)

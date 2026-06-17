@@ -144,7 +144,7 @@ namespace MDEN.UI.Windows
             var text = newTitle.GetComponent<UnityEngine.UI.Text>();
             if (text != null)
             {
-                text.text = "歌曲列表";
+                text.text = GetTitleText();
                 text.alignment = TextAnchor.MiddleCenter;
             }
         }
@@ -159,6 +159,13 @@ namespace MDEN.UI.Windows
             }
         }
 
+        private string GetTitleText()
+        {
+            var lobby = LobbyManager.CurrentLobby;
+            var currentCount = lobby?.Playlist?.Length ?? _items?.Length ?? 0;
+            var maxCount = lobby?.PlaylistSize ?? 0;
+            return $"歌曲列表 {currentCount}/{maxCount}";
+        }
         private void RebuildWindow()
         {
             if (_window == null) return;

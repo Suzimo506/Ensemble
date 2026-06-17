@@ -383,6 +383,17 @@ namespace MDEN.UI.Displays
 
             if (!string.IsNullOrWhiteSpace(uid))
             {
+                var lobbyColor = GetLobbyPlayerColor(uid);
+                if (!string.IsNullOrEmpty(lobbyColor))
+                {
+                    lock (ColorLock)
+                    {
+                        PlayerColorCache[uid] = lobbyColor;
+                    }
+
+                    return lobbyColor;
+                }
+
                 lock (ColorLock)
                 {
                     if (PlayerColorCache.TryGetValue(uid, out var cachedColor))
@@ -395,6 +406,20 @@ namespace MDEN.UI.Displays
             }
 
             return ColorWhite;
+        }
+
+        private static string GetLobbyPlayerColor(string uid)
+        {
+            var details = LobbyManager.CurrentLobby?.PlayerDetails;
+            if (details == null) return null;
+
+            foreach (var player in details)
+            {
+                if (player?.Uid != uid) continue;
+                return NormalizeHexColor(player.ChatColor);
+            }
+
+            return null;
         }
 
         private static string FormatRank(BattlePlayerEntry player, int rank)

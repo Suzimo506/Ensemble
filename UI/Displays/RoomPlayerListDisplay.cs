@@ -78,6 +78,7 @@ namespace MDEN.UI.Displays
                         Uid = player.Uid,
                         Name = string.IsNullOrEmpty(player.Name) ? player.Uid : player.Name,
                         Title = GetDisplayTitle(player),
+                        ChatColor = GetDisplayColor(player),
                         PingMS = player.PingMS,
                         Status = player.Status
                     };
@@ -97,7 +98,8 @@ namespace MDEN.UI.Displays
                     Name = uid == PlayerManager.CurrentUid && !string.IsNullOrEmpty(PlayerManager.CurrentProfile?.Name)
                         ? PlayerManager.CurrentProfile.Name
                         : uid,
-                    Title = uid == PlayerManager.CurrentUid ? PlayerManager.CurrentProfile?.Title : null
+                    Title = uid == PlayerManager.CurrentUid ? PlayerManager.CurrentProfile?.Title : null,
+                    ChatColor = uid == PlayerManager.CurrentUid ? PlayerManager.CurrentProfile?.ChatColor : null
                 };
             }
         }
@@ -110,6 +112,16 @@ namespace MDEN.UI.Displays
             }
 
             return player?.Title;
+        }
+
+        private static string GetDisplayColor(PlayerSyncEntry player)
+        {
+            if (player?.Uid == PlayerManager.CurrentUid && !string.IsNullOrEmpty(PlayerManager.CurrentProfile?.ChatColor))
+            {
+                return PlayerManager.CurrentProfile.ChatColor;
+            }
+
+            return player?.ChatColor;
         }
     }
 }

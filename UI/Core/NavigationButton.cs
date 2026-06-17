@@ -24,9 +24,9 @@ namespace MDEN.UI.Core
         private const float ServerLabelWidth = 280f;
         private const float NavigationIconCenterOffset = 10f;
         private const string NavigationButtonSpriteName = "PcSprButton_Img.png";
-        private const string MultiplayerIconSpriteName = "多人联机.png";
-        private const string MyRoomIconSpriteName = "我的房间.png";
-        private const string PlaylistIconSpriteName = "歌曲列表.png";
+        private const string MultiplayerIconSpriteName = "Multiplayer_Img.png";
+        private const string MyRoomIconSpriteName = "MyRoom_Img.png";
+        private const string PlaylistIconSpriteName = "RoomPlaylist_Img.png";
         private const string StartIconSpriteName = "Play_Img.png";
         // 绑定到原生 UI 生命周期中调用
         public static void Create()
@@ -306,6 +306,7 @@ namespace MDEN.UI.Core
                 {
                     if (LobbyManager.CurrentLobby?.HostUid != PlayerManager.CurrentUid)
                     {
+                        ShowText.ShowInfo("只有房主可以开始游戏哦");
                         MelonLogger.Warning("No permission to start lobby.");
                         return;
                     }
@@ -402,19 +403,36 @@ namespace MDEN.UI.Core
 
         private static void ApplyNavigationIcon(Image icon, string spriteName, bool mirrorParent)
         {
-            if (icon == null) return;
+        if (icon == null) return;
 
-            icon.sprite = ResourceManager.GetSprite(spriteName);
-            icon.preserveAspect = false;
+        icon.sprite = ResourceManager.GetSprite(spriteName);
+        ApplyNativeNavigationIconStyle(icon);
+        icon.preserveAspect = false;
 
-            var iconRect = icon.GetComponent<RectTransform>();
-            if (iconRect != null)
-            {
-                CenterIcon(iconRect, mirrorParent);
-            }
+        var iconRect = icon.GetComponent<RectTransform>();
+        if (iconRect != null)
+        {
+            CenterIcon(iconRect, mirrorParent);
+        }
+    }
+
+    private static void ApplyNativeNavigationIconStyle(Image icon)
+    {
+        var nativeIcon = GameObject.Find("UI/Standerd/PnlNavigation/Top/BtnOption")?
+            .transform.Find("ImgIcon")?
+            .GetComponent<Image>();
+        if (nativeIcon != null)
+        {
+            icon.color = nativeIcon.color;
+            icon.material = nativeIcon.material;
+            return;
         }
 
-        private static void CenterIcon(RectTransform iconRect, bool mirrorParent)
+        icon.color = Color.white;
+        icon.material = null;
+    }
+
+    private static void CenterIcon(RectTransform iconRect, bool mirrorParent)
         {
             iconRect.anchorMin = new Vector2(0.5f, 0.5f);
             iconRect.anchorMax = new Vector2(0.5f, 0.5f);

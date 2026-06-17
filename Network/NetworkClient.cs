@@ -25,6 +25,7 @@ namespace MDEN.Network
         private bool _isConnected;
         private uint _nextReqId;
         private CancellationTokenSource _heartbeatCts;
+        private int _connectionId;
 
         public bool IsConnected => _isConnected;
 
@@ -35,6 +36,8 @@ namespace MDEN.Network
         {
             try
             {
+                Disconnect(false);
+
                 _tcpClient = new TcpClient();
                 var connectTask = _tcpClient.ConnectAsync(host, port);
                 var timeoutTask = Task.Delay(ConnectTimeoutMs);
@@ -46,7 +49,8 @@ namespace MDEN.Network
                 await connectTask;
                 _stream = _tcpClient.GetStream();
                 _isConnected = true;
-                _ = ReceiveLoopAsync();
+                var connectionId = unchecked(++_connectionId);
+                _ = ReceiveLoopAsync(connectionId, _stream);
                 StartHeartbeat();
                 return true;
             }
@@ -137,16 +141,20 @@ namespace MDEN.Network
         {
             if (!_isConnected || _stream == null) return;
 
+            var connectionId = _connectionId;
+            var stream = _stream;
             if (!await _sendSemaphore.WaitAsync(SendTimeoutMs))
             {
-                Disconnect(true);
+                DisconnectIfCurrent(connectionId, true);
                 throw new TimeoutException("Timed out waiting for send lock.");
             }
 
             try
             {
+                if (!IsCurrentConnection(connectionId) || !_isConnected || stream == null) return;
+
                 var bytes = _framer.Encode(envelope);
-                var writeTask = _stream.WriteAsync(bytes, 0, bytes.Length);
+                var writeTask = stream.WriteAsync(bytes, 0, bytes.Length);
                 if (await Task.WhenAny(writeTask, Task.Delay(SendTimeoutMs)) != writeTask)
                 {
                     throw new TimeoutException("Send timed out.");
@@ -154,7 +162,9 @@ namespace MDEN.Network
 
                 await writeTask;
 
-                var flushTask = _stream.FlushAsync();
+                if (!IsCurrentConnection(connectionId) || !_isConnected) return;
+
+                var flushTask = stream.FlushAsync();
                 if (await Task.WhenAny(flushTask, Task.Delay(SendTimeoutMs)) != flushTask)
                 {
                     throw new TimeoutException("Flush timed out.");
@@ -165,7 +175,7 @@ namespace MDEN.Network
             catch (Exception ex)
             {
                 MelonLogger.Error($"Failed to send data: {ex.Message}");
-                Disconnect(true);
+                DisconnectIfCurrent(connectionId, true);
                 throw;
             }
             finally
@@ -174,24 +184,35 @@ namespace MDEN.Network
             }
         }
 
-        private async Task ReceiveLoopAsync()
+        private async Task ReceiveLoopAsync(int connectionId, NetworkStream stream)
         {
             var buffer = new byte[4096];
+            var receiveFramer = new PacketFramer();
             try
             {
-                while (_isConnected && _stream != null)
+                while (IsCurrentConnection(connectionId) && _isConnected && stream != null)
                 {
-                    int bytesRead = await _stream.ReadAsync(buffer, 0, buffer.Length);
-                    if (bytesRead == 0)
+                    int bytesRead = await stream.ReadAsync(buffer, 0, buffer.Length);
+                    if (!IsCurrentConnection(connectionId))
                     {
-                        MelonLogger.Msg("Server disconnected.");
-                        Disconnect(true);
                         break;
                     }
 
-                    _framer.AppendData(buffer, 0, bytesRead);
-                    while (_framer.TryDecode(out ServerEnvelope envelope))
+                    if (bytesRead == 0)
                     {
+                        MelonLogger.Msg("Server disconnected.");
+                        DisconnectIfCurrent(connectionId, true);
+                        break;
+                    }
+
+                    receiveFramer.AppendData(buffer, 0, bytesRead);
+                    while (receiveFramer.TryDecode(out ServerEnvelope envelope))
+                    {
+                        if (!IsCurrentConnection(connectionId))
+                        {
+                            break;
+                        }
+
                         if (envelope.ReqId == null)
                         {
                             if (envelope.Payload is JsonElement pushPayload)
@@ -207,16 +228,29 @@ namespace MDEN.Network
             }
             catch (Exception ex)
             {
-                if (_isConnected)
+                if (IsCurrentConnection(connectionId) && _isConnected)
                 {
                     MelonLogger.Error($"Receive loop exception: {ex.Message}");
-                    Disconnect(true);
+                    DisconnectIfCurrent(connectionId, true);
                 }
             }
         }
 
+        private bool IsCurrentConnection(int connectionId)
+        {
+            return connectionId == _connectionId;
+        }
+
+        private void DisconnectIfCurrent(int connectionId, bool notifyDisconnected)
+        {
+            if (!IsCurrentConnection(connectionId)) return;
+
+            Disconnect(notifyDisconnected);
+        }
+
         private void CleanupConnection()
         {
+            unchecked { _connectionId++; }
             _isConnected = false;
             StopHeartbeat();
             try { _stream?.Close(); } catch { }

@@ -26,7 +26,6 @@ namespace MDEN.UI.Windows
         private static List<Tuple<string, string>> _officialNodeDisplayData = new List<Tuple<string, string>>();
         private static List<string> _officialNodePlainNames = new List<string>();
         private static Dictionary<string, string> _customServerStatusDescriptions = new Dictionary<string, string>();
-        private static bool _hasFetchedNodes = false;
 
         private int _lastSelectedIndex = -1;
         private bool _isRefreshingNodes;
@@ -46,11 +45,8 @@ namespace MDEN.UI.Windows
             _lastSelectedIndex = -1; // 在 Show 之后重置选择索引
             RegisterWindowCleanup();
 
-            if (!_hasFetchedNodes)
-            {
-                await RefreshNodesAsync();
-                await RebuildWindowOnMainThreadAsync();
-            }
+            await RefreshNodesAsync();
+            await RebuildWindowOnMainThreadAsync();
         }
 
         private void InjectTitle()
@@ -150,8 +146,6 @@ namespace MDEN.UI.Windows
                 {
                     servers.AddRange(fetchedServers);
                 }
-
-                _hasFetchedNodes = true;
 
                 var displayData = new List<Tuple<string, string>>();
                 var plainNames = new List<string>();

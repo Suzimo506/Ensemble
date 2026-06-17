@@ -85,6 +85,23 @@ namespace MDEN.Managers
             NotifyCurrentLobbyChanged();
         }
 
+        public static async Task RefreshLobbiesAfterReconnectAsync()
+        {
+            if (!NetworkClient.Instance.IsConnected || !ConnectionManager.IsLoggedIn)
+            {
+                return;
+            }
+
+            try
+            {
+                await RefreshLobbiesAsync();
+            }
+            catch (Exception ex)
+            {
+                MelonLogger.Warning($"Refresh lobbies after reconnect failed: {ex.Message}");
+            }
+        }
+
         public static async Task StartLobbyAsync()
         {
             await PlaylistManager.StartPrepareAsync();
@@ -177,6 +194,7 @@ namespace MDEN.Managers
                             Uid = currentUid,
                             Name = string.IsNullOrEmpty(currentName) ? currentUid : currentName,
                             Title = PlayerManager.CurrentProfile?.Title,
+                            ChatColor = PlayerManager.CurrentProfile?.ChatColor,
                             PingMS = 0,
                             Status = (byte)PlayerStatus.InLobby
                         }

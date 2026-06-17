@@ -5,6 +5,7 @@ using Il2CppAssets.Scripts.Database;
 using Il2CppAssets.Scripts.PeroTools.Commons;
 using Il2CppAssets.Scripts.PeroTools.Managers;
 using Il2CppAssets.Scripts.UI;
+using Il2CppAssets.Scripts.UI.Controls;
 using Il2CppPeroTools2.Resources;
 using MDEN.Managers;
 using MDEN.Protocol.Enums;
@@ -23,20 +24,22 @@ namespace MDEN.UI.Core
         private const int MaxOtherSlots = 4;
         private const int PirateRinGirlIndex = 32;
         private const float CenterX = 1.3f;
+        private const float LocalCharacterXOffset = 0.25f;
         private const float LocalY = -0.9f;
         private const float OtherY = -1.65f;
         private const float Z = 100f;
         private const float LocalScale = 0.75f;
         private const float OtherScale = 0.6f;
         private const float LabelXOffset = -1.55f;
+        private const float LocalLabelXOffset = LabelXOffset - LocalCharacterXOffset;
         private const float LocalTitleYOffset = 3.65f;
         private const float LocalNameYOffset = 3.32f;
-        private const float OtherTitleYOffset = 2.90f;
-        private const float OtherNameYOffset = 2.61f;
+        private const float OtherTitleYOffset = 3.20f;
+        private const float OtherNameYOffset = 2.91f;
         private const float LabelZOffset = -0.5f;
         private static readonly Vector2 LocalLabelSize = new Vector2(250f, 125f);
         private static readonly Vector2 OtherLabelSize = new Vector2(250f, 125f);
-        private static readonly float[] OtherOffsets = { 3.8f, 7f };
+        private static readonly float[] OtherOffsets = { 5.7f, 8.4f };
         private static readonly string[] OwnedObjectNames =
         {
             "MDENRoomCharacterLabels",
@@ -69,6 +72,7 @@ namespace MDEN.UI.Core
         private static bool _created;
         private static Text _fontTemplate;
         private static readonly HashSet<string> WarningKeys = new HashSet<string>();
+        private static readonly Dictionary<string, int> TalkBubbleGenerations = new Dictionary<string, int>();
 
         public static bool IsCreated => _created;
 
@@ -97,14 +101,14 @@ namespace MDEN.UI.Core
 
             if (otherPlayers.Count == 0)
             {
-                SetTransform(_nativeMuseShow, CenterX, LocalY, LocalScale);
+                SetTransform(_nativeMuseShow, CenterX + LocalCharacterXOffset, LocalY, LocalScale);
                 PrepareMuseShow(_nativeMuseShow, true);
                 ApplyLabels(_localLabels, _nativeMuseShow, localPlayer, true);
                 HideOtherSlots();
                 return true;
             }
 
-            SetTransform(_nativeMuseShow, CenterX, LocalY, LocalScale);
+            SetTransform(_nativeMuseShow, CenterX + LocalCharacterXOffset, LocalY, LocalScale);
             PrepareMuseShow(_nativeMuseShow, true);
             ApplyLabels(_localLabels, _nativeMuseShow, localPlayer, true);
 
@@ -162,8 +166,31 @@ namespace MDEN.UI.Core
             _nativeMuseShow = null;
             _nativeElfinShow = null;
             _fontTemplate = null;
+            TalkBubbleGenerations.Clear();
             WarningKeys.Clear();
             _created = false;
+        }
+
+        public static void ShowChatBubble(string uid, string message)
+        {
+            if (!_created || string.IsNullOrWhiteSpace(uid) || string.IsNullOrWhiteSpace(message)) return;
+
+            var normalizedUid = NormalizeUid(uid);
+            var target = FindCharacterRoot(normalizedUid);
+            if (target == null || !target.activeSelf) return;
+
+            var bubble = GetTalkBubble(target);
+            if (bubble == null) return;
+
+            var safeMessage = EscapeRichText(message.Trim().Replace("\r", " ").Replace("\n", " "));
+            if (string.IsNullOrWhiteSpace(safeMessage)) return;
+
+            bubble.gameObject.SetActive(true);
+            bubble.SetTalkTxt(safeMessage);
+            PlayChatExpression(target);
+
+            var generation = NextTalkBubbleGeneration(normalizedUid);
+            _ = HideTalkBubbleLater(normalizedUid, bubble, GetTalkBubbleDurationMs(safeMessage), generation);
         }
 
         public static void DestroyGeneratedObjects()
@@ -286,7 +313,12 @@ namespace MDEN.UI.Core
             }
 
             var museComponent = prefabTransform.gameObject.GetComponent<MuseShow>();
-            if (museComponent != null) museComponent.m_MuseShow = newShow;
+            if (museComponent != null)
+            {
+                museComponent.m_MuseShow = newShow;
+                BindCharacterExpression(slot.Root, museComponent);
+            }
+
             slot.SetCharacter(girlIndex, newShow);
             MelonLogger.Msg($"Room character loaded: girlIndex={girlIndex}, asset={assetName}");
             return true;
@@ -358,6 +390,8 @@ namespace MDEN.UI.Core
 
                 var interaction = _nativeMuseShow.transform.Find("BtnInteraction");
                 if (interaction != null) interaction.gameObject.SetActive(true);
+
+                HideTalkBubble(_nativeMuseShow);
             }
 
             if (_nativeElfinShow != null)
@@ -379,6 +413,141 @@ namespace MDEN.UI.Core
             {
                 slot.Hide();
             }
+        }
+
+        private static GameObject FindCharacterRoot(string uid)
+        {
+            if (IsSameUid(uid, PlayerManager.CurrentUid)) return _nativeMuseShow;
+
+            foreach (var slot in OtherSlots)
+            {
+                if (slot.IsPlayer(uid)) return slot.Root;
+            }
+
+            return null;
+        }
+
+        private static DefaultTalkBubble GetTalkBubble(GameObject museShow)
+        {
+            var bubble = museShow?.transform.Find("FirstTwnTalkBubble");
+            return bubble == null ? null : bubble.gameObject.GetComponent<DefaultTalkBubble>();
+        }
+
+        private static void PlayChatExpression(GameObject museShow)
+        {
+            var expression = museShow?.transform.Find("BtnInteraction")?.GetComponent<CharacterExpression>();
+            if (expression == null) return;
+
+            try
+            {
+                var expressionInfo = expression.expressionContainer?.RandomExpression();
+                var museComponent = museShow.transform.Find("ShowLocalization/SpinePerfab_other")?.gameObject.GetComponent<MuseShow>();
+                var apply = museComponent?.apply;
+                if (expressionInfo == null || apply == null) return;
+
+                apply.PlayCharacterApply(expressionInfo.animName, null);
+            }
+            catch (Exception ex)
+            {
+                WarnOnce($"chat-expression-{museShow.name}", $"Failed to play chat expression. target={museShow.name}, error={ex.Message}");
+            }
+        }
+
+        private static void BindCharacterExpression(GameObject museShow, MuseShow museComponent)
+        {
+            var expression = museShow?.transform.Find("BtnInteraction")?.GetComponent<CharacterExpression>();
+            if (expression == null || museComponent == null) return;
+
+            try
+            {
+                expression.SetMuseShow(museComponent);
+            }
+            catch (Exception ex)
+            {
+                WarnOnce($"character-expression-bind-{museShow.name}", $"Failed to bind character expression. target={museShow.name}, error={ex.Message}");
+            }
+        }
+
+        private static void HideTalkBubble(GameObject museShow)
+        {
+            var bubble = GetTalkBubble(museShow);
+            if (bubble == null) return;
+
+            try
+            {
+                bubble.EndTalk();
+            }
+            catch
+            {
+                // 原生气泡在场景切换时可能已经处于销毁边缘，隐藏失败可以忽略。
+            }
+
+            bubble.gameObject.SetActive(false);
+        }
+
+        private static int NextTalkBubbleGeneration(string uid)
+        {
+            if (!TalkBubbleGenerations.TryGetValue(uid, out var generation))
+            {
+                generation = 0;
+            }
+
+            generation++;
+            TalkBubbleGenerations[uid] = generation;
+            return generation;
+        }
+
+        private static async System.Threading.Tasks.Task HideTalkBubbleLater(string uid, DefaultTalkBubble bubble, int durationMs, int generation)
+        {
+            await System.Threading.Tasks.Task.Delay(durationMs);
+            MainThreadDispatcher.Enqueue(() =>
+            {
+                if (!TalkBubbleGenerations.TryGetValue(uid, out var currentGeneration) ||
+                    currentGeneration != generation ||
+                    bubble == null)
+                {
+                    return;
+                }
+
+                try
+                {
+                    bubble.EndTalk();
+                }
+                catch
+                {
+                    return;
+                }
+
+                _ = HideTalkBubbleObjectLater(uid, bubble, generation);
+            });
+        }
+
+        private static async System.Threading.Tasks.Task HideTalkBubbleObjectLater(string uid, DefaultTalkBubble bubble, int generation)
+        {
+            await System.Threading.Tasks.Task.Delay(300);
+            MainThreadDispatcher.Enqueue(() =>
+            {
+                if (!TalkBubbleGenerations.TryGetValue(uid, out var currentGeneration) ||
+                    currentGeneration != generation ||
+                    bubble == null)
+                {
+                    return;
+                }
+
+                bubble.gameObject.SetActive(false);
+            });
+        }
+
+        private static int GetTalkBubbleDurationMs(string message)
+        {
+            var wordCount = message.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries).Length;
+            var duration = wordCount * 500 + 800
+                + message.Count(c => c == ',' || c == '，') * 200
+                + message.Count(c => c == '.' || c == '。') * 400
+                + message.Count(c => c == '!' || c == '！') * 200
+                + message.Count(c => c == '?' || c == '？') * 300;
+
+            return Math.Max(1200, Math.Min(duration, 10000));
         }
 
         private static void UpdateLabelPositionsForActiveSlots(LobbySyncPush lobby)
@@ -635,6 +804,7 @@ namespace MDEN.UI.Core
                     Uid = uid,
                     Name = PlayerManager.CurrentProfile?.Name ?? uid,
                     Title = PlayerManager.CurrentProfile?.Title,
+                    ChatColor = PlayerManager.CurrentProfile?.ChatColor,
                     GirlIndex = GetLocalDisplaySelection().GirlIndex,
                     ElfinIndex = GetLocalDisplaySelection().ElfinIndex,
                     Status = (byte)PlayerStatus.InLobby,
@@ -674,6 +844,7 @@ namespace MDEN.UI.Core
                         Uid = uid,
                         Name = string.IsNullOrEmpty(player.Name) ? uid : player.Name,
                         Title = GetDisplayTitle(player),
+                        ChatColor = GetDisplayColor(player),
                         PingMS = player.PingMS,
                         Status = player.Status,
                         GirlIndex = GetGirlIndex(uid, character),
@@ -697,6 +868,7 @@ namespace MDEN.UI.Core
                     Uid = uid,
                     Name = uid,
                     Title = IsSameUid(uid, PlayerManager.CurrentUid) ? PlayerManager.CurrentProfile?.Title : null,
+                    ChatColor = IsSameUid(uid, PlayerManager.CurrentUid) ? PlayerManager.CurrentProfile?.ChatColor : null,
                     GirlIndex = GetGirlIndex(uid, character),
                     ElfinIndex = GetElfinIndex(uid, character),
                     Status = (byte)(IsSameUid(uid, PlayerManager.CurrentUid) ? PlayerStatus.InLobby : PlayerStatus.Offline),
@@ -753,6 +925,16 @@ namespace MDEN.UI.Core
             return player?.Title;
         }
 
+        private static string GetDisplayColor(PlayerSyncEntry player)
+        {
+            if (IsSameUid(player?.Uid, PlayerManager.CurrentUid) && !string.IsNullOrEmpty(PlayerManager.CurrentProfile?.ChatColor))
+            {
+                return PlayerManager.CurrentProfile.ChatColor;
+            }
+
+            return player?.ChatColor;
+        }
+
         private static PlayerSyncEntry ToPlayerSyncEntry(RoomCharacterPlayer player)
         {
             return new PlayerSyncEntry
@@ -760,6 +942,7 @@ namespace MDEN.UI.Core
                 Uid = player.Uid,
                 Name = player.Name,
                 Title = player.Title,
+                ChatColor = player.ChatColor,
                 PingMS = player.PingMS,
                 Status = player.Status
             };
@@ -792,10 +975,31 @@ namespace MDEN.UI.Core
                 : $"<color=#{Constants.ColorYellow}>[{EscapeRichText(title)}]</color>";
         }
 
-        private static string FormatName(string name)
+        private static string FormatName(string name, string chatColor)
         {
             var displayName = string.IsNullOrWhiteSpace(name) ? "Unknown" : Truncate(EscapeRichText(name), 12);
-            return $"<b><color=#{Constants.ColorPink}>{displayName}</color></b>";
+            return $"<b><color=#{NormalizeHexColor(chatColor) ?? Constants.ColorPink}>{displayName}</color></b>";
+        }
+
+        private static string NormalizeHexColor(string color)
+        {
+            if (string.IsNullOrWhiteSpace(color)) return null;
+
+            var value = color.Trim().TrimStart('#');
+            if (value.Length == 3)
+            {
+                value = $"{value[0]}{value[0]}{value[1]}{value[1]}{value[2]}{value[2]}";
+            }
+
+            if (value.Length == 6) value += "ff";
+            if (value.Length != 8) return null;
+
+            for (var i = 0; i < value.Length; i++)
+            {
+                if (!Uri.IsHexDigit(value[i])) return null;
+            }
+
+            return value;
         }
 
         private static string Truncate(string value, int maxLength)
@@ -1013,6 +1217,11 @@ namespace MDEN.UI.Core
                 SetTransform(Root, x, y, scale);
                 SortingOrder = sortingOrder;
                 SetRendererSorting(Root, sortingOrder);
+                if (!IsSameUid(_uid, player.Uid))
+                {
+                    HideTalkBubble(Root);
+                }
+
                 ApplyLabels(Labels, Root, player, false);
                 _uid = player.Uid;
             }
@@ -1020,9 +1229,15 @@ namespace MDEN.UI.Core
             public void Hide()
             {
                 if (Root != null) Root.SetActive(false);
+                HideTalkBubble(Root);
                 Labels?.SetPlayer(null);
                 _uid = null;
                 _girlIndex = -1;
+            }
+
+            public bool IsPlayer(string uid)
+            {
+                return IsActive && IsSameUid(_uid, uid);
             }
 
             public bool IsSameCharacter(int girlIndex)
@@ -1122,7 +1337,7 @@ namespace MDEN.UI.Core
 
                 _uid = player.Uid;
                 _title.text = FormatTitle(player.Title);
-                _name.text = FormatName(player.Name);
+                _name.text = FormatName(player.Name, player.ChatColor);
                 SetVisible(true);
             }
 
@@ -1137,7 +1352,7 @@ namespace MDEN.UI.Core
                 var titleYOffset = local ? LocalTitleYOffset : OtherTitleYOffset;
                 var nameYOffset = local ? LocalNameYOffset : OtherNameYOffset;
                 var slotPosition = slot.transform.position;
-                var labelX = slotPosition.x + LabelXOffset;
+                var labelX = slotPosition.x + (local ? LocalLabelXOffset : LabelXOffset);
                 var labelZ = slotPosition.z + LabelZOffset;
                 SetPosition(
                     new Vector3(labelX, slotPosition.y + titleYOffset, labelZ),
@@ -1216,6 +1431,7 @@ namespace MDEN.UI.Core
             public string Uid { get; set; }
             public string Name { get; set; }
             public string Title { get; set; }
+            public string ChatColor { get; set; }
             public ushort PingMS { get; set; }
             public byte Status { get; set; }
             public int GirlIndex { get; set; }

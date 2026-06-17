@@ -1,12 +1,13 @@
 namespace MDEN.Protocol.Models
 {
     /// <summary>
-    /// 房间同步推送中的简要玩家信�?    /// </summary>
+    /// 房间同步推送中的简要玩家信�?    /// </summary>
     public class PlayerSyncEntry
     {
         public string Uid { get; set; }
         public string Name { get; set; }
         public string Title { get; set; }
+        public string ChatColor { get; set; }
         public ushort PingMS { get; set; }
         public byte Status { get; set; }
     }
@@ -30,7 +31,7 @@ namespace MDEN.Protocol.Models
     }
 
     /// <summary>
-    /// 房间列表中的简要房间信�?    /// </summary>
+    /// 房间列表中的简要房间信�?    /// </summary>
     public class LobbyListEntry
     {
         public int Id { get; set; }

@@ -60,6 +60,7 @@ namespace MDEN.UI.Displays
         private const float InputLeftPadding = 10f;
         private const float InputRightPadding = 42f;
         private const float InputVerticalPadding = 2f;
+        private const int MaxMessages = 50;
         private static readonly Color BackgroundDefaultColor = new Color(0f, 0f, 0f, 0.15f);
         private static readonly Color BackgroundFocusedColor = new Color(0f, 0f, 0f, 0.32f);
         private static readonly Color InputDefaultColor = new Color(0f, 0f, 0f, 0.15f);
@@ -69,6 +70,7 @@ namespace MDEN.UI.Displays
         private const string WhiteTextColor = "ffffffff";
         private const string GreenTextColor = "66ff66ff";
         private const string RedTextColor = "ff5555ff";
+        private const string OrangeTextColor = "ff9f1aff";
         private const string PinkTextColor = Constants.ColorPink;
         private readonly Vector2 _entrySize = new Vector2(EntryWidth, FontSize + 8f);
 
@@ -243,16 +245,7 @@ namespace MDEN.UI.Displays
             if (message == null) return;
 
             _messages.Add(message);
-            if (_messages.Count > 50)
-            {
-                var oldest = _messages[0];
-                _messages.RemoveAt(0);
-                if (_textList.TryGetValue(oldest, out var oldText))
-                {
-                    if (oldText != null) UnityEngine.Object.Destroy(oldText.gameObject);
-                    _textList.Remove(oldest);
-                }
-            }
+            TrimExcessMessages();
 
             if (_frame == null || _scrollRect == null) return;
 
@@ -263,6 +256,23 @@ namespace MDEN.UI.Displays
             ResizeMessageText(text);
             UpdateLayout();
             ScrollToBottom();
+        }
+
+        private void TrimExcessMessages()
+        {
+            while (_messages.Count > MaxMessages)
+            {
+                var oldest = _messages[0];
+                _messages.RemoveAt(0);
+                if (!_textList.TryGetValue(oldest, out var oldText)) continue;
+
+                if (oldText != null)
+                {
+                    UnityEngine.Object.Destroy(oldText.gameObject);
+                }
+
+                _textList.Remove(oldest);
+            }
         }
 
         public void Update()
@@ -447,20 +457,56 @@ namespace MDEN.UI.Displays
         private void ConfigureMessageClick(Text text, ChatPushMsg msg)
         {
             var copyName = GetCopyableChartName(msg);
-            if (string.IsNullOrWhiteSpace(copyName)) return;
+            var previewChartName = GetPreviewableChartName(msg);
+            if (string.IsNullOrWhiteSpace(copyName) && string.IsNullOrWhiteSpace(previewChartName)) return;
 
             text.raycastTarget = true;
-            var trigger = text.gameObject.AddComponent<UnityEngine.EventSystems.EventTrigger>();
-            var clickEntry = new UnityEngine.EventSystems.EventTrigger.Entry
+            var shadow = text.gameObject.GetComponent<Shadow>() ?? text.gameObject.AddComponent<Shadow>();
+            shadow.effectColor = new Color(0f, 0f, 0f, 0.75f);
+            shadow.effectDistance = new Vector2(2f, -2f);
+            shadow.enabled = false;
+
+            var trigger = text.gameObject.GetComponent<UnityEngine.EventSystems.EventTrigger>()
+                ?? text.gameObject.AddComponent<UnityEngine.EventSystems.EventTrigger>();
+
+            AddMessageTrigger(trigger, UnityEngine.EventSystems.EventTriggerType.PointerDown, _ =>
             {
-                eventID = UnityEngine.EventSystems.EventTriggerType.PointerClick
+                shadow.enabled = true;
+            });
+            AddMessageTrigger(trigger, UnityEngine.EventSystems.EventTriggerType.PointerUp, _ =>
+            {
+                shadow.enabled = false;
+            });
+            AddMessageTrigger(trigger, UnityEngine.EventSystems.EventTriggerType.PointerExit, _ =>
+            {
+                shadow.enabled = false;
+            });
+            AddMessageTrigger(trigger, UnityEngine.EventSystems.EventTriggerType.PointerClick, _ =>
+            {
+                shadow.enabled = false;
+
+                if (!string.IsNullOrWhiteSpace(copyName))
+                {
+                    GUIUtility.systemCopyBuffer = copyName;
+                    ShowText.ShowInfo($"已复制谱面名: {copyName}");
+                    return;
+                }
+
+                JumpToPlaylistChartPreview(previewChartName);
+            });
+        }
+
+        private static void AddMessageTrigger(
+            UnityEngine.EventSystems.EventTrigger trigger,
+            UnityEngine.EventSystems.EventTriggerType eventType,
+            Action<UnityEngine.EventSystems.BaseEventData> action)
+        {
+            var entry = new UnityEngine.EventSystems.EventTrigger.Entry
+            {
+                eventID = eventType
             };
-            clickEntry.callback.AddListener((UnityAction<UnityEngine.EventSystems.BaseEventData>)new Action<UnityEngine.EventSystems.BaseEventData>(_ =>
-            {
-                GUIUtility.systemCopyBuffer = copyName;
-                ShowText.ShowInfo($"已复制谱面名: {copyName}");
-            }));
-            trigger.triggers.Add(clickEntry);
+            entry.callback.AddListener((UnityAction<UnityEngine.EventSystems.BaseEventData>)new Action<UnityEngine.EventSystems.BaseEventData>(action));
+            trigger.triggers.Add(entry);
         }
 
         private void UpdateLayout()
@@ -698,6 +744,16 @@ namespace MDEN.UI.Displays
                 return $"{SystemPrefix()} {ColorText("房主已停止游戏", RedTextColor)}";
             }
 
+            if (!string.IsNullOrWhiteSpace(msg.Message) && TryParsePlayerFinishedMessage(msg.Message, out var finishedPlayerName))
+            {
+                return $"{SystemPrefix()} {ColorText(EscapeRichText(finishedPlayerName), OrangeTextColor)} {ColorText("已完成", OrangeTextColor)}";
+            }
+
+            if (!string.IsNullOrWhiteSpace(msg.Message) && TryParseChartFinishedMessage(msg.Message, out var finishedChartName))
+            {
+                return $"{SystemPrefix()} {ColorText("已完成", PinkTextColor)} {ColorText(EscapeRichText(CleanChartNameForDisplay(finishedChartName)), PinkTextColor)}";
+            }
+
             if (!string.IsNullOrWhiteSpace(msg.Message) && msg.Message.EndsWith(" 已准备"))
             {
                 var playerName = msg.Message.Substring(0, msg.Message.Length - " 已准备".Length);
@@ -711,6 +767,30 @@ namespace MDEN.UI.Displays
             }
 
             return $"{SystemPrefix()} {EscapeRichText(msg.Message)}";
+        }
+
+        private static bool TryParsePlayerFinishedMessage(string message, out string playerName)
+        {
+            playerName = null;
+            if (string.IsNullOrWhiteSpace(message)) return false;
+
+            const string suffix = " 已完成";
+            if (!message.EndsWith(suffix)) return false;
+
+            playerName = StripRichTextForDisplay(message.Substring(0, message.Length - suffix.Length)).Trim();
+            return !string.IsNullOrWhiteSpace(playerName) && playerName != "已完成";
+        }
+
+        private static bool TryParseChartFinishedMessage(string message, out string chartName)
+        {
+            chartName = null;
+            if (string.IsNullOrWhiteSpace(message)) return false;
+
+            const string prefix = "已完成 ";
+            if (!message.StartsWith(prefix)) return false;
+
+            chartName = StripRichTextForDisplay(message.Substring(prefix.Length)).Trim();
+            return !string.IsNullOrWhiteSpace(chartName);
         }
 
         private static string GetCopyableChartName(ChatPushMsg msg)
@@ -732,6 +812,60 @@ namespace MDEN.UI.Displays
             return null;
         }
 
+        private static string GetPreviewableChartName(ChatPushMsg msg)
+        {
+            if (msg == null || !msg.IsSystem || msg.Message != "PlaylistAdd" || string.IsNullOrWhiteSpace(msg.ExtraData))
+            {
+                return null;
+            }
+
+            var parts = msg.ExtraData.Split(new[] { '#' }, 2);
+            return parts.Length == 2 ? CleanChartNameForDisplay(parts[1]) : null;
+        }
+
+        private static void JumpToPlaylistChartPreview(string chartName)
+        {
+            if (string.IsNullOrWhiteSpace(chartName)) return;
+
+            var target = FindPlaylistEntryByChartName(chartName);
+            if (target == null)
+            {
+                ShowText.ShowInfo("未在歌曲列表找到该谱面");
+                return;
+            }
+
+            ChartPreviewController.Preview(target);
+        }
+
+        private static PlaylistEntryViewModel FindPlaylistEntryByChartName(string chartName)
+        {
+            var normalizedTarget = NormalizeChartNameForMatch(chartName);
+            if (string.IsNullOrWhiteSpace(normalizedTarget)) return null;
+
+            var items = PlaylistManager.GetPlaylistItems();
+            for (var i = 0; i < items.Length; i++)
+            {
+                var item = items[i];
+                if (item == null) continue;
+
+                if (NormalizeChartNameForMatch(item.ChartName) == normalizedTarget ||
+                    NormalizeChartNameForMatch(item.DisplayName) == normalizedTarget)
+                {
+                    return item;
+                }
+            }
+
+            return null;
+        }
+
+        private static string NormalizeChartNameForMatch(string chartName)
+        {
+            if (string.IsNullOrWhiteSpace(chartName)) return string.Empty;
+
+            return CleanChartNameForDisplay(chartName)
+                .Trim()
+                .ToLowerInvariant();
+        }
         private static (string PlayerName, string ChartName)? ParsePlayerMissingChart(ChatPushMsg msg)
         {
             if (string.IsNullOrWhiteSpace(msg?.ExtraData)) return null;
@@ -854,6 +988,13 @@ namespace MDEN.UI.Displays
 
             if (!string.IsNullOrWhiteSpace(uid))
             {
+                var lobbyColor = GetLobbyPlayerColor(uid);
+                if (!string.IsNullOrEmpty(lobbyColor))
+                {
+                    _playerColorCache[uid] = lobbyColor;
+                    return lobbyColor;
+                }
+
                 if (_playerColorCache.TryGetValue(uid, out var cachedColor))
                 {
                     return cachedColor;
@@ -879,6 +1020,20 @@ namespace MDEN.UI.Displays
                 {
                     return player.Uid;
                 }
+            }
+
+            return null;
+        }
+
+        private static string GetLobbyPlayerColor(string uid)
+        {
+            var details = LobbyManager.CurrentLobby?.PlayerDetails;
+            if (details == null) return null;
+
+            foreach (var player in details)
+            {
+                if (player?.Uid != uid) continue;
+                return NormalizeHexColor(player.ChatColor);
             }
 
             return null;

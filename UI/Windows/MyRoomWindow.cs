@@ -75,6 +75,7 @@ namespace MDEN.UI.Windows
                         Uid = player.Uid,
                         Name = displayName,
                         Title = player.Title,
+                        ChatColor = player.ChatColor,
                         PingMS = player.PingMS,
                         Status = player.Status
                     };
@@ -95,7 +96,8 @@ namespace MDEN.UI.Windows
                     {
                         Uid = uid,
                         Name = displayName,
-                        Title = uid == PlayerManager.CurrentUid ? PlayerManager.CurrentProfile?.Title : null
+                        Title = uid == PlayerManager.CurrentUid ? PlayerManager.CurrentProfile?.Title : null,
+                        ChatColor = uid == PlayerManager.CurrentUid ? PlayerManager.CurrentProfile?.ChatColor : null
                     };
                 }
             }

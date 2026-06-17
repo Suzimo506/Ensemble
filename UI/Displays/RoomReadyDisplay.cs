@@ -231,7 +231,12 @@ namespace MDEN.UI.Displays
 
         public void Update()
         {
-            // The Cloud Message is static overlay, no sliding update needed
+            if (_notification == null || !_notification.activeInHierarchy) return;
+            if (RoomHudController.IsChatConsumingInput) return;
+            if (Input.GetKeyDown(KeyCode.RightBracket))
+            {
+                OnReadyClicked();
+            }
         }
 
         public void Destroy()

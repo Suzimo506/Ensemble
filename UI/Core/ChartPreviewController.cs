@@ -168,7 +168,7 @@ namespace MDEN.UI.Core
             return obj != null && obj.activeInHierarchy;
         }
 
-        private static void Preview(PlaylistEntryViewModel entry)
+        internal static void Preview(PlaylistEntryViewModel entry)
         {
             var musicInfo = ChartManager.GetMusicInfo(entry.ChartKey);
             if (musicInfo == null)

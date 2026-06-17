@@ -1,4 +1,5 @@
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 using MDEN.Network;
 using MDEN.Protocol;
@@ -15,8 +16,34 @@ namespace MDEN.Managers
         public static bool CurrentServerIsOfficial { get; private set; }
         public static string SessionToken { get; private set; }
         public static bool IsLoggedIn { get; private set; }
+        private static readonly SemaphoreSlim ConnectionSemaphore = new SemaphoreSlim(1, 1);
 
         public static async Task<LoginResponse> ConnectAndLoginAsync(string address, string serverDisplayName = null, bool isOfficialServer = false)
+        {
+            return await ConnectAndLoginAsync(address, serverDisplayName, isOfficialServer, false);
+        }
+
+        public static async Task<bool> ReconnectToCurrentServerAsync()
+        {
+            if (string.IsNullOrWhiteSpace(CurrentServerAddress))
+            {
+                return false;
+            }
+
+            try
+            {
+                await ConnectAndLoginAsync(CurrentServerAddress, CurrentServerDisplayName, CurrentServerIsOfficial, true);
+                await LobbyManager.RefreshLobbiesAfterReconnectAsync();
+                return true;
+            }
+            catch (Exception ex)
+            {
+                MelonLogger.Warning($"Reconnect failed: {ex.Message}");
+                return false;
+            }
+        }
+
+        private static async Task<LoginResponse> ConnectAndLoginAsync(string address, string serverDisplayName, bool isOfficialServer, bool isReconnect)
         {
             var endpoint = ParseAddress(address);
             var account = GameAccountManager.GetCurrentAccount();
@@ -26,64 +53,89 @@ namespace MDEN.Managers
                 : configuredName;
             var selection = GameAccountManager.GetCurrentSelection();
 
-            if (NetworkClient.Instance.IsConnected)
+            await ConnectionSemaphore.WaitAsync();
+            try
             {
-                NetworkClient.Instance.Disconnect();
-            }
-
-            var connected = await NetworkClient.Instance.ConnectAsync(endpoint.Host, endpoint.Port);
-            if (!connected)
-            {
-                throw new InvalidOperationException("Failed to connect to server.");
-            }
-
-            var response = await NetworkClient.Instance.SendRequestAsync<LoginRequest, LoginResponse>(
-                OpCodes.LoginReq,
-                new LoginRequest
+                if (NetworkClient.Instance.IsConnected)
                 {
-                    Uid = account.Uid,
-                    Name = displayName,
-                    IsReconnect = false
-                });
+                    NetworkClient.Instance.Disconnect();
+                }
 
-            PlayerManager.SetCurrentIdentity(account.Uid, displayName);
-            SessionToken = response.Token;
-            IsLoggedIn = true;
-            CurrentServerAddress = $"{endpoint.Host}:{endpoint.Port}";
-            CurrentServerDisplayName = string.IsNullOrWhiteSpace(serverDisplayName)
-                ? CurrentServerAddress
-                : serverDisplayName.Trim();
-            CurrentServerIsOfficial = isOfficialServer;
-            _ = SyncLocalProfileAsync();
-            PlayerManager.SyncSelectionFireAndForget(selection);
-            PlayerManager.SyncChartStateFireAndForget();
-            MainThreadDispatcher.Enqueue(NavigationButton.RefreshServerLabel);
-            return response;
+                ClearRuntimeSessionState();
+                if (!isReconnect)
+                {
+                    CurrentServerAddress = null;
+                    CurrentServerDisplayName = null;
+                    CurrentServerIsOfficial = false;
+                }
+
+                var connected = await NetworkClient.Instance.ConnectAsync(endpoint.Host, endpoint.Port);
+                if (!connected)
+                {
+                    throw new InvalidOperationException("Failed to connect to server.");
+                }
+
+                LoginResponse response;
+                try
+                {
+                    response = await NetworkClient.Instance.SendRequestAsync<LoginRequest, LoginResponse>(
+                        OpCodes.LoginReq,
+                        new LoginRequest
+                        {
+                            Uid = account.Uid,
+                            Name = displayName,
+                            IsReconnect = isReconnect
+                        });
+                }
+                catch
+                {
+                    NetworkClient.Instance.Disconnect();
+                    ClearRuntimeSessionState();
+                    throw;
+                }
+
+                PlayerManager.SetCurrentIdentity(account.Uid, displayName);
+                SessionToken = response.Token;
+                IsLoggedIn = true;
+                CurrentServerAddress = $"{endpoint.Host}:{endpoint.Port}";
+                CurrentServerDisplayName = string.IsNullOrWhiteSpace(serverDisplayName)
+                    ? CurrentServerAddress
+                    : serverDisplayName.Trim();
+                CurrentServerIsOfficial = isOfficialServer;
+                _ = SyncLocalProfileAsync();
+                PlayerManager.SyncSelectionFireAndForget(selection);
+                PlayerManager.SyncChartStateFireAndForget();
+                MainThreadDispatcher.Enqueue(NavigationButton.RefreshServerLabel);
+                return response;
+            }
+            finally
+            {
+                ConnectionSemaphore.Release();
+            }
         }
 
         public static void Disconnect()
         {
-            IsLoggedIn = false;
             CurrentServerAddress = null;
             CurrentServerDisplayName = null;
             CurrentServerIsOfficial = false;
-            SessionToken = null;
-            PlayerManager.ClearSession();
-            LobbyManager.ClearSession();
+            ClearRuntimeSessionState();
             NetworkClient.Instance.Disconnect();
             MainThreadDispatcher.Enqueue(NavigationButton.RefreshServerLabel);
         }
 
         public static void MarkDisconnectedByRemote()
         {
+            ClearRuntimeSessionState();
+            MainThreadDispatcher.Enqueue(NavigationButton.RefreshServerLabel);
+        }
+
+        private static void ClearRuntimeSessionState()
+        {
             IsLoggedIn = false;
-            CurrentServerAddress = null;
-            CurrentServerDisplayName = null;
-            CurrentServerIsOfficial = false;
             SessionToken = null;
             PlayerManager.ClearSession();
             LobbyManager.ClearSession();
-            MainThreadDispatcher.Enqueue(NavigationButton.RefreshServerLabel);
         }
 
         private static ServerEndpoint ParseAddress(string address)

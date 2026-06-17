@@ -291,6 +291,13 @@ namespace MDEN.UI.Core
 
             if (!string.IsNullOrWhiteSpace(uid))
             {
+                var lobbyColor = GetLobbyPlayerColor(uid);
+                if (!string.IsNullOrEmpty(lobbyColor))
+                {
+                    PlayerColorCache[uid] = lobbyColor;
+                    return lobbyColor;
+                }
+
                 if (PlayerColorCache.TryGetValue(uid, out var cachedColor))
                 {
                     return cachedColor;
@@ -300,6 +307,20 @@ namespace MDEN.UI.Core
             }
 
             return "ffffffff";
+        }
+
+        private static string GetLobbyPlayerColor(string uid)
+        {
+            var details = LobbyManager.CurrentLobby?.PlayerDetails;
+            if (details == null) return null;
+
+            foreach (var player in details)
+            {
+                if (player?.Uid != uid) continue;
+                return NormalizeHexColor(player.ChatColor);
+            }
+
+            return null;
         }
 
         private static async void RequestPlayerColor(string uid)
