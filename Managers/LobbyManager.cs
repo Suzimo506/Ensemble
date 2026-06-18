@@ -19,6 +19,7 @@ namespace MDEN.Managers
         public static bool IsInLobby => CurrentLobby != null;
         public static event Action<LobbySyncPush> CurrentLobbyChanged;
         private static readonly HashSet<int> IgnoredLobbySyncIds = new HashSet<int>();
+        private static readonly Dictionary<int, long> LobbySyncRevisions = new Dictionary<int, long>();
         private static int? _pendingJoinLobbyId;
 
         public static async Task<LobbyListEntry[]> RefreshLobbiesAsync()
@@ -184,6 +185,7 @@ namespace MDEN.Managers
             CurrentLobby = null;
             _pendingJoinLobbyId = null;
             IgnoredLobbySyncIds.Clear();
+            LobbySyncRevisions.Clear();
             NotifyCurrentLobbyChanged();
         }
 
@@ -191,12 +193,19 @@ namespace MDEN.Managers
         {
             _pendingJoinLobbyId = null;
             IgnoredLobbySyncIds.Remove(lobbyId);
+            if (CurrentLobby?.Id == lobbyId && CurrentLobby.Revision > 0)
+            {
+                RememberLobbySyncRevision(CurrentLobby);
+                return;
+            }
+
             var currentUid = PlayerManager.CurrentUid;
             var currentName = PlayerManager.CurrentProfile?.Name;
 
             CurrentLobby = new LobbySyncPush
             {
                 Id = lobbyId,
+                Revision = 0,
                 Name = request.Name,
                 HostUid = currentUid,
                 HostName = currentName,
@@ -229,6 +238,11 @@ namespace MDEN.Managers
                         }
                     }
             };
+            if (!LobbySyncRevisions.ContainsKey(lobbyId))
+            {
+                LobbySyncRevisions[lobbyId] = 0;
+            }
+
             NotifyCurrentLobbyChanged();
         }
 
@@ -250,9 +264,16 @@ namespace MDEN.Managers
                 return;
             }
 
+            if (IsStaleLobbySync(push))
+            {
+                MelonLogger.Msg($"Ignored stale lobby sync: {push.Id}, revision: {push.Revision}");
+                return;
+            }
+
             _pendingJoinLobbyId = null;
             IgnoredLobbySyncIds.Remove(push.Id);
             CurrentLobby = push;
+            RememberLobbySyncRevision(push);
             MelonLogger.Msg($"Lobby sync received: {push.Id}, players: {push.Players?.Length ?? 0}/{push.MaxPlayers}");
             NotifyCurrentLobbyChanged();
         }
@@ -275,6 +296,21 @@ namespace MDEN.Managers
         private static void NotifyCurrentLobbyChanged()
         {
             CurrentLobbyChanged?.Invoke(CurrentLobby);
+        }
+
+        private static bool IsStaleLobbySync(LobbySyncPush push)
+        {
+            if (push.Revision <= 0) return false;
+            return LobbySyncRevisions.TryGetValue(push.Id, out var latestRevision) &&
+                   push.Revision <= latestRevision;
+        }
+
+        private static void RememberLobbySyncRevision(LobbySyncPush push)
+        {
+            if (push.Revision > 0)
+            {
+                LobbySyncRevisions[push.Id] = push.Revision;
+            }
         }
 
         private static void EnsureReady()

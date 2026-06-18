@@ -146,7 +146,7 @@ namespace MDEN.UI.Core
             if (!RoomSceneOverlay.IsHomeReady)
             {
                 RoomSceneOverlay.Hide();
-                RoomCharacterDisplay.DestroyGeneratedObjects();
+                RoomCharacterDisplay.HideGeneratedObjects();
                 ScheduleRefreshRetry(lobby, retryCount);
                 return;
             }
@@ -154,7 +154,7 @@ namespace MDEN.UI.Core
             if (!RoomSceneOverlay.IsHomeVisible)
             {
                 RoomSceneOverlay.Hide();
-                RoomCharacterDisplay.DestroyGeneratedObjects();
+                RoomCharacterDisplay.HideGeneratedObjects();
                 ScheduleRefreshRetry(lobby, retryCount);
                 return;
             }

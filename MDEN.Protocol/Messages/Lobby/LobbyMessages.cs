@@ -118,6 +118,7 @@ namespace MDEN.Protocol.Messages.Lobby
     public class LobbySyncPush
     {
         public int Id { get; set; }
+        public long Revision { get; set; }
         public string Name { get; set; }
         public string HostUid { get; set; }
         public string HostName { get; set; }

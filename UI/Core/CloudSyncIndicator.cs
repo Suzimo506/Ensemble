@@ -31,10 +31,10 @@ namespace MDEN.UI.Core
             var imgBase = _message.transform.Find("ImgBase");
             if (imgBase == null) return;
 
-            _pending = imgBase.Find("Synchronizing")?.gameObject;
-            _completed = imgBase.Find("SynchronizingCompleted")?.gameObject;
-            _failed = imgBase.Find("SynchronizingFail")?.gameObject;
-            _pendingText = _pending?.transform.Find("TxtSynchronizing")?.GetComponent<Text>();
+            _pending = GetTransformGameObject(imgBase.Find("Synchronizing"));
+            _completed = GetTransformGameObject(imgBase.Find("SynchronizingCompleted"));
+            _failed = GetTransformGameObject(imgBase.Find("SynchronizingFail"));
+            _pendingText = GetChildComponent<Text>(_pending, "TxtSynchronizing");
 
             RemoveComponent(_pending, "OnCustomEvent");
             RemoveComponent(_completed, "OnCustomEvent");
@@ -133,6 +133,18 @@ namespace MDEN.UI.Core
             {
                 target.SetActive(active);
             }
+        }
+
+        private static GameObject GetTransformGameObject(Transform transform)
+        {
+            return transform == null ? null : transform.gameObject;
+        }
+
+        private static T GetChildComponent<T>(GameObject obj, string path) where T : Component
+        {
+            if (obj == null || string.IsNullOrEmpty(path)) return null;
+            var child = obj.transform.Find(path);
+            return child == null ? null : child.GetComponent<T>();
         }
 
         private static void RemoveComponent(GameObject target, string typeName)

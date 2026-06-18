@@ -209,7 +209,9 @@ namespace MDEN.Patches
             var healthBar = GameObject.Find("UI_2D/Standard/PnlBattle/PnlBattleUI/PnlBattleOthers/Below");
             if (healthBar == null)
             {
-                healthBar = GameObject.Find("PnlBattleOthers")?.transform.Find("Below")?.gameObject;
+                var battleOthers = GameObject.Find("PnlBattleOthers");
+                var below = battleOthers == null ? null : battleOthers.transform.Find("Below");
+                healthBar = below == null ? null : below.gameObject;
             }
 
             if (healthBar != null)

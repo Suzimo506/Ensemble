@@ -28,7 +28,8 @@ namespace MDEN.UI.Displays
         {
             if (Frame != null) return;
 
-            var parent = GameObject.Find(FrameParentPath)?.transform;
+            var parentObj = GameObject.Find(FrameParentPath);
+            var parent = parentObj == null ? null : parentObj.transform;
             if (parent == null) return;
 
             Frame = new GameObject(GetType().Name);
@@ -47,7 +48,7 @@ namespace MDEN.UI.Displays
             ClearEntries();
             if (Frame != null)
             {
-                UnityEngine.Object.Destroy(Frame);
+                DestroyObject(Frame);
                 Frame = null;
             }
         }
@@ -82,10 +83,7 @@ namespace MDEN.UI.Displays
         {
             foreach (var text in _entries.Values)
             {
-                if (text != null)
-                {
-                    UnityEngine.Object.Destroy(text.gameObject);
-                }
+                DestroyComponentObject(text);
             }
 
             _entries.Clear();
@@ -126,7 +124,7 @@ namespace MDEN.UI.Displays
         {
             if (_entries.TryGetValue(key, out var text) && text != null)
             {
-                UnityEngine.Object.Destroy(text.gameObject);
+                DestroyComponentObject(text);
             }
 
             _entries.Remove(key);
@@ -145,6 +143,18 @@ namespace MDEN.UI.Displays
                 rect.anchoredPosition = new Vector2(0f, y);
                 y += EntryHeight * Direction;
             }
+        }
+
+        private static void DestroyObject(GameObject obj)
+        {
+            if (obj == null) return;
+            UnityEngine.Object.Destroy(obj);
+        }
+
+        private static void DestroyComponentObject(Component component)
+        {
+            if (component == null) return;
+            DestroyObject(component.gameObject);
         }
     }
 }

@@ -61,7 +61,15 @@ namespace MDEN.UI.Displays
             var nestedRaycaster = _notification.GetComponent<GraphicRaycaster>();
             if (nestedRaycaster == null) _notification.AddComponent<GraphicRaycaster>();
 
-            _imgBase = _notification.transform.Find("ImgBase").gameObject;
+            var imgBaseTransform = _notification.transform.Find("ImgBase");
+            if (imgBaseTransform == null)
+            {
+                UnityEngine.Object.Destroy(_notification);
+                _notification = null;
+                return;
+            }
+
+            _imgBase = imgBaseTransform.gameObject;
 
             var baseRect = _imgBase.GetComponent<RectTransform>();
             baseRect.anchorMin = new Vector2(1f, 0.5f);
@@ -71,13 +79,29 @@ namespace MDEN.UI.Displays
             baseRect.sizeDelta = new Vector2(350f, 370f);
             baseRect.localScale = Vector3.one;
 
-            var messageBase = _imgBase.transform.Find("Synchronizing").GetComponent<RectTransform>();
+            var messageBaseTransform = _imgBase.transform.Find("Synchronizing");
+            var messageBase = messageBaseTransform == null
+                ? null
+                : messageBaseTransform.GetComponent<RectTransform>();
+            if (messageBase == null)
+            {
+                Destroy();
+                return;
+            }
+
             messageBase.pivot = new Vector2(0.5f, 1f);
             messageBase.anchorMin = messageBase.pivot;
             messageBase.anchorMax = messageBase.pivot;
             messageBase.gameObject.SetActive(true);
 
-            _message = messageBase.Find("TxtSynchronizing").GetComponent<Text>();
+            var messageTextTransform = messageBase.Find("TxtSynchronizing");
+            _message = messageTextTransform == null ? null : messageTextTransform.GetComponent<Text>();
+            if (_message == null)
+            {
+                Destroy();
+                return;
+            }
+
             ApplyGameFont(_message);
             _message.alignment = TextAnchor.UpperRight;
             _message.verticalOverflow = VerticalWrapMode.Overflow;
@@ -188,16 +212,19 @@ namespace MDEN.UI.Displays
             _buttonEquipText.text = "使用推荐";
             _buttonEquipText.color = Color.white;
 
-            UnityEngine.Object.Destroy(_imgBase.transform.Find("Synchronizing/TxtSynchronizing/ImgSynchronizing")?.gameObject);
-            UnityEngine.Object.Destroy(_imgBase.transform.Find("SynchronizingFail")?.gameObject);
+            DestroyTransformObject(_imgBase.transform.Find("Synchronizing/TxtSynchronizing/ImgSynchronizing"));
+            DestroyTransformObject(_imgBase.transform.Find("SynchronizingFail"));
             var closeObj = _imgBase.transform.Find("SynchronizingCompleted");
-            if (closeObj != null)
-            {
-                UnityEngine.Object.Destroy(closeObj.gameObject);
-            }
+            DestroyTransformObject(closeObj);
 
             var customEventMsg = messageBase.GetComponent<OnCustomEvent>();
             if (customEventMsg != null) UnityEngine.Object.Destroy(customEventMsg);
+        }
+
+        private static void DestroyTransformObject(Transform transform)
+        {
+            if (transform == null) return;
+            UnityEngine.Object.Destroy(transform.gameObject);
         }
 
         public void Refresh(LobbySyncPush lobby)

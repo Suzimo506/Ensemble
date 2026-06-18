@@ -74,7 +74,7 @@ namespace MDEN.UI.Displays
             Clear();
             if (_frame != null)
             {
-                UnityEngine.Object.Destroy(_frame);
+                DestroyObject(_frame);
                 _frame = null;
             }
         }
@@ -113,10 +113,7 @@ namespace MDEN.UI.Displays
         {
             foreach (var text in _entries.Values)
             {
-                if (text != null)
-                {
-                    UnityEngine.Object.Destroy(text.gameObject);
-                }
+                DestroyComponentObject(text);
             }
 
             _entries.Clear();
@@ -483,7 +480,7 @@ namespace MDEN.UI.Displays
 
                 if (_entries.TryGetValue(uid, out var text) && text != null)
                 {
-                    UnityEngine.Object.Destroy(text.gameObject);
+                    DestroyComponentObject(text);
                 }
 
                 _entries.Remove(uid);
@@ -512,6 +509,18 @@ namespace MDEN.UI.Displays
                 var rect = text.GetComponent<RectTransform>();
                 rect.anchoredPosition = new Vector2(24f, 30f + EntryHeight * (_entryOrder.Count - 1 - i));
             }
+        }
+
+        private static void DestroyObject(GameObject obj)
+        {
+            if (obj == null) return;
+            UnityEngine.Object.Destroy(obj);
+        }
+
+        private static void DestroyComponentObject(Component component)
+        {
+            if (component == null) return;
+            DestroyObject(component.gameObject);
         }
 
         private void EnsureOverlayOrder()

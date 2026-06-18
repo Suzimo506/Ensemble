@@ -70,7 +70,7 @@ namespace MDEN.UI.Core
                 var entry = pnlMessage.layout.GetChild(i);
                 if (entry != null)
                 {
-                    UnityEngine.Object.Destroy(entry.gameObject);
+                    DestroyTransformObject(entry);
                 }
             }
         }
@@ -140,8 +140,14 @@ namespace MDEN.UI.Core
             {
                 var child = pnlMessage.layout.GetChild(i);
                 if (child == null || child.name == ResultEntryName) continue;
-                UnityEngine.Object.Destroy(child.gameObject);
+                DestroyTransformObject(child);
             }
+        }
+
+        private static void DestroyTransformObject(Transform transform)
+        {
+            if (transform == null) return;
+            UnityEngine.Object.Destroy(transform.gameObject);
         }
 
         private static void Enable(bool clearVanillaMessages)

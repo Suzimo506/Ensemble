@@ -96,7 +96,8 @@ namespace MDEN.UI.Displays
         {
             if (_frame != null) return;
 
-            var parent = GameObject.Find("UI/Standerd/PnlNavigation")?.transform;
+            var parentObj = GameObject.Find("UI/Standerd/PnlNavigation");
+            var parent = parentObj == null ? null : parentObj.transform;
             if (parent == null) return;
 
             _textList.Clear();
@@ -165,7 +166,7 @@ namespace MDEN.UI.Displays
 
             if (!CreateNativeInputField(_scrollFrame.transform))
             {
-                UnityEngine.Object.Destroy(_frame);
+                DestroyObject(_frame);
                 _frame = null;
                 _scrollFrame = null;
                 _backgroundImage = null;
@@ -215,10 +216,7 @@ namespace MDEN.UI.Displays
 
             foreach (var txt in _textList.Values)
             {
-                if (txt != null && txt.gameObject != null)
-                {
-                    UnityEngine.Object.Destroy(txt.gameObject);
-                }
+                DestroyComponentObject(txt);
             }
 
             _textList.Clear();
@@ -232,7 +230,7 @@ namespace MDEN.UI.Displays
 
             if (_frame != null)
             {
-                UnityEngine.Object.Destroy(_frame);
+                DestroyObject(_frame);
                 _frame = null;
             }
 
@@ -268,7 +266,7 @@ namespace MDEN.UI.Displays
 
                 if (oldText != null)
                 {
-                    UnityEngine.Object.Destroy(oldText.gameObject);
+                    DestroyComponentObject(oldText);
                 }
 
                 _textList.Remove(oldest);
@@ -324,7 +322,7 @@ namespace MDEN.UI.Displays
             _inputField = inputObj.GetComponent<InputField>();
             if (_inputField == null)
             {
-                UnityEngine.Object.Destroy(inputObj);
+                DestroyObject(inputObj);
                 return false;
             }
 
@@ -1272,6 +1270,18 @@ namespace MDEN.UI.Displays
 
             _nativeFontTemplate = fallback;
             return _nativeFontTemplate;
+        }
+
+        private static void DestroyObject(GameObject obj)
+        {
+            if (obj == null) return;
+            UnityEngine.Object.Destroy(obj);
+        }
+
+        private static void DestroyComponentObject(Component component)
+        {
+            if (component == null) return;
+            DestroyObject(component.gameObject);
         }
 
         private void SetGameInputBlocked(bool blocked)

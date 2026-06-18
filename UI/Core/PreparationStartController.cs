@@ -29,7 +29,8 @@ namespace MDEN.UI.Core
                 _boundButton = button;
                 _boundKeyBinding = buttonObj.GetComponent<InputKeyBinding>();
                 _boundText = buttonObj.transform.Find("TxtStart")?.GetComponent<Text>();
-                _boundKeyIcon = buttonObj.transform.Find("TxtStart/ImgBtnA")?.gameObject;
+                var keyIcon = buttonObj.transform.Find("TxtStart/ImgBtnA");
+                _boundKeyIcon = keyIcon == null ? null : keyIcon.gameObject;
             }
 
             Refresh();

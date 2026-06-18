@@ -32,6 +32,7 @@ namespace MDEN.UI.Core
         // 绑定到原生 UI 生命周期中调用
         public static void Create()
         {
+            RecoverSceneObjects();
             if (_multiplayerBtn != null)
             {
                 RefreshRoomButton();
@@ -109,6 +110,7 @@ namespace MDEN.UI.Core
 
         public static void RefreshRoomButton()
         {
+            RecoverSceneObjects();
             if (_multiplayerBtn == null)
             {
                 _myRoomBtn = null;
@@ -157,7 +159,8 @@ namespace MDEN.UI.Core
                 return;
             }
 
-            var topPanel = GameObject.Find("UI/Standerd/PnlNavigation/Top")?.transform;
+            var topPanelObj = GameObject.Find("UI/Standerd/PnlNavigation/Top");
+            var topPanel = topPanelObj == null ? null : topPanelObj.transform;
             var source = GameObject.Find("UI/Standerd/PnlNavigation/Top/BtnOption");
             if (topPanel == null || source == null) return;
 
@@ -206,7 +209,7 @@ namespace MDEN.UI.Core
         {
             if (_serverLabelObj != null)
             {
-                GameObject.Destroy(_serverLabelObj);
+                DestroyObject(_serverLabelObj);
             }
 
             _serverLabelObj = null;
@@ -287,7 +290,7 @@ namespace MDEN.UI.Core
         private static void DestroyRoomButton()
         {
             if (_myRoomBtn == null) return;
-            GameObject.Destroy(_myRoomBtn);
+            DestroyObject(_myRoomBtn);
             _myRoomBtn = null;
         }
 
@@ -338,7 +341,8 @@ namespace MDEN.UI.Core
 
         private static GameObject CreateTopActionButton(string name, int position, string label, Action action)
         {
-            var topPanel = GameObject.Find("UI/Standerd/PnlNavigation/Top")?.transform;
+            var topPanelObj = GameObject.Find("UI/Standerd/PnlNavigation/Top");
+            var topPanel = topPanelObj == null ? null : topPanelObj.transform;
             var source = GameObject.Find("UI/Standerd/PnlNavigation/Top/BtnOption");
             if (topPanel == null || source == null)
             {
@@ -450,15 +454,50 @@ namespace MDEN.UI.Core
         {
             if (_playlistBtn != null)
             {
-                GameObject.Destroy(_playlistBtn);
+                DestroyObject(_playlistBtn);
                 _playlistBtn = null;
             }
 
             if (_startBtn != null)
             {
-                GameObject.Destroy(_startBtn);
+                DestroyObject(_startBtn);
                 _startBtn = null;
             }
+        }
+
+        private static void RecoverSceneObjects()
+        {
+            if (_multiplayerBtn == null)
+            {
+                _multiplayerBtn = GameObject.Find("UI/Standerd/PnlNavigation/Top/BtnMDENMultiplayer");
+            }
+
+            if (_myRoomBtn == null)
+            {
+                _myRoomBtn = GameObject.Find("UI/Standerd/PnlNavigation/Top/BtnMDENMyRoom");
+            }
+
+            if (_playlistBtn == null)
+            {
+                _playlistBtn = GameObject.Find("UI/Standerd/PnlNavigation/Top/BtnMDENPlaylist");
+            }
+
+            if (_startBtn == null)
+            {
+                _startBtn = GameObject.Find("UI/Standerd/PnlNavigation/Top/BtnMDENStartGame");
+            }
+
+            if (_serverLabelObj == null)
+            {
+                _serverLabelObj = GameObject.Find("UI/Standerd/PnlNavigation/Top/TxtMDENCurrentServerNode");
+                _serverLabel = _serverLabelObj == null ? null : _serverLabelObj.GetComponent<Text>();
+            }
+        }
+
+        private static void DestroyObject(GameObject obj)
+        {
+            if (obj == null) return;
+            GameObject.Destroy(obj);
         }
 
         public static void ResetSceneObjects()

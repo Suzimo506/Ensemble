@@ -427,7 +427,7 @@ namespace MDEN.UI.Core
             }
         }
 
-        private static void HideGeneratedObjects()
+        public static void HideGeneratedObjects()
         {
             _localLabels?.SetPlayer(null);
             HideOtherSlots();
@@ -479,8 +479,8 @@ namespace MDEN.UI.Core
                              _nextPageButton != null &&
                              _prevPageText != null &&
                              _nextPageText != null;
-            if (_prevPageButton != null) _prevPageButton.gameObject.SetActive(shouldShow);
-            if (_nextPageButton != null) _nextPageButton.gameObject.SetActive(shouldShow);
+            SetButtonGameObjectActive(_prevPageButton, shouldShow);
+            SetButtonGameObjectActive(_nextPageButton, shouldShow);
             if (!shouldShow) return;
 
             _prevPageText.text = "◀";
@@ -492,8 +492,8 @@ namespace MDEN.UI.Core
 
         private static void HidePageButtons()
         {
-            if (_prevPageButton != null) _prevPageButton.gameObject.SetActive(false);
-            if (_nextPageButton != null) _nextPageButton.gameObject.SetActive(false);
+            SetButtonGameObjectActive(_prevPageButton, false);
+            SetButtonGameObjectActive(_nextPageButton, false);
         }
 
         private static void ResetPageIfLobbyChanged(LobbySyncPush lobby)
@@ -576,10 +576,10 @@ namespace MDEN.UI.Core
 
         private static void PositionPageButtons()
         {
-            SetPageButtonPosition(_prevPageButton?.gameObject, true);
-            SetPageButtonPosition(_nextPageButton?.gameObject, false);
-            _prevPageButton?.transform.SetAsLastSibling();
-            _nextPageButton?.transform.SetAsLastSibling();
+            SetPageButtonPosition(GetButtonGameObject(_prevPageButton), true);
+            SetPageButtonPosition(GetButtonGameObject(_nextPageButton), false);
+            SetButtonAsLastSibling(_prevPageButton);
+            SetButtonAsLastSibling(_nextPageButton);
         }
 
         private static void SetPageButtonPosition(GameObject obj, bool leftSide)
@@ -602,12 +602,29 @@ namespace MDEN.UI.Core
 
         private static void DestroyPageButtons()
         {
-            DestroyObject(_prevPageButton?.gameObject);
-            DestroyObject(_nextPageButton?.gameObject);
+            DestroyObject(GetButtonGameObject(_prevPageButton));
+            DestroyObject(GetButtonGameObject(_nextPageButton));
             _prevPageButton = null;
             _nextPageButton = null;
             _prevPageText = null;
             _nextPageText = null;
+        }
+
+        private static GameObject GetButtonGameObject(Button button)
+        {
+            return button == null ? null : button.gameObject;
+        }
+
+        private static void SetButtonGameObjectActive(Button button, bool active)
+        {
+            var obj = GetButtonGameObject(button);
+            if (obj != null) obj.SetActive(active);
+        }
+
+        private static void SetButtonAsLastSibling(Button button)
+        {
+            if (button == null) return;
+            button.transform.SetAsLastSibling();
         }
 
         private static GameObject FindCharacterRoot(string uid)
@@ -624,19 +641,19 @@ namespace MDEN.UI.Core
 
         private static DefaultTalkBubble GetTalkBubble(GameObject museShow)
         {
-            var bubble = museShow?.transform.Find("FirstTwnTalkBubble");
+            var bubble = FindChild(museShow, "FirstTwnTalkBubble");
             return bubble == null ? null : bubble.gameObject.GetComponent<DefaultTalkBubble>();
         }
 
         private static void PlayChatExpression(GameObject museShow)
         {
-            var expression = museShow?.transform.Find("BtnInteraction")?.GetComponent<CharacterExpression>();
+            var expression = GetChildComponent<CharacterExpression>(museShow, "BtnInteraction");
             if (expression == null) return;
 
             try
             {
                 var expressionInfo = expression.expressionContainer?.RandomExpression();
-                var museComponent = museShow.transform.Find("ShowLocalization/SpinePerfab_other")?.gameObject.GetComponent<MuseShow>();
+                var museComponent = GetChildComponent<MuseShow>(museShow, "ShowLocalization/SpinePerfab_other");
                 var apply = museComponent?.apply;
                 if (expressionInfo == null || apply == null) return;
 
@@ -650,7 +667,7 @@ namespace MDEN.UI.Core
 
         private static void BindCharacterExpression(GameObject museShow, MuseShow museComponent)
         {
-            var expression = museShow?.transform.Find("BtnInteraction")?.GetComponent<CharacterExpression>();
+            var expression = GetChildComponent<CharacterExpression>(museShow, "BtnInteraction");
             if (expression == null || museComponent == null) return;
 
             try
@@ -677,7 +694,7 @@ namespace MDEN.UI.Core
                 // 原生气泡在场景切换时可能已经处于销毁边缘，隐藏失败可以忽略。
             }
 
-            bubble.gameObject.SetActive(false);
+            SetComponentGameObjectActive(bubble, false);
         }
 
         private static int NextTalkBubbleGeneration(string uid)
@@ -729,7 +746,7 @@ namespace MDEN.UI.Core
                     return;
                 }
 
-                bubble.gameObject.SetActive(false);
+                SetComponentGameObjectActive(bubble, false);
             });
         }
 
@@ -758,7 +775,7 @@ namespace MDEN.UI.Core
 
         private static void ClearCharacterPrefab(GameObject museShow)
         {
-            var prefabTransform = museShow?.transform.Find("ShowLocalization/SpinePerfab_other");
+            var prefabTransform = FindChild(museShow, "ShowLocalization/SpinePerfab_other");
             if (prefabTransform == null) return;
 
             for (var i = prefabTransform.childCount - 1; i >= 0; i--)
@@ -772,7 +789,7 @@ namespace MDEN.UI.Core
 
         private static void PruneDuplicateCharacterPrefabs(GameObject museShow)
         {
-            var prefabTransform = museShow?.transform.Find("ShowLocalization/SpinePerfab_other");
+            var prefabTransform = FindChild(museShow, "ShowLocalization/SpinePerfab_other");
             if (prefabTransform == null || prefabTransform.childCount <= 1) return;
 
             GameObject keptObject = null;
@@ -1364,6 +1381,30 @@ namespace MDEN.UI.Core
             UnityEngine.Object.Destroy(obj);
         }
 
+        private static void DestroyComponentObject(Component component)
+        {
+            if (component == null) return;
+            DestroyObject(component.gameObject);
+        }
+
+        private static Transform FindChild(GameObject obj, string path)
+        {
+            if (obj == null || string.IsNullOrEmpty(path)) return null;
+            return obj.transform.Find(path);
+        }
+
+        private static T GetChildComponent<T>(GameObject obj, string path) where T : Component
+        {
+            var child = FindChild(obj, path);
+            return child == null ? null : child.GetComponent<T>();
+        }
+
+        private static void SetComponentGameObjectActive(Component component, bool active)
+        {
+            if (component == null) return;
+            component.gameObject.SetActive(active);
+        }
+
         private static void DestroyOwnedObjectsByName()
         {
             foreach (var objectName in OwnedObjectNames)
@@ -1396,7 +1437,7 @@ namespace MDEN.UI.Core
             public int SortingOrder { get; private set; }
             public bool IsActive => Root != null && Root.activeSelf;
             public bool HasCharacterPrefab => _currentShow != null && _currentShow.activeSelf && HasVisibleCharacterContent(_currentShow);
-            public Transform PrefabTransform => Root?.transform.Find("ShowLocalization/SpinePerfab_other");
+            public Transform PrefabTransform => FindChild(Root, "ShowLocalization/SpinePerfab_other");
 
             public void Bind(GameObject root, SlotLabels labels)
             {
@@ -1561,8 +1602,8 @@ namespace MDEN.UI.Core
 
             public void Destroy()
             {
-                if (_title != null) UnityEngine.Object.Destroy(_title.gameObject);
-                if (_name != null) UnityEngine.Object.Destroy(_name.gameObject);
+                DestroyComponentObject(_title);
+                DestroyComponentObject(_name);
             }
 
             private static Text CreateText(
