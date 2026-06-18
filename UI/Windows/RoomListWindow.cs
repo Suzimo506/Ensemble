@@ -16,8 +16,8 @@ namespace MDEN.UI.Windows
     public class RoomListWindow : MDENWindowBase
     {
         private const int AutoRefreshIntervalMs = 3000;
-        public const string WaitingStatusColor = "66ff66ff";
-        private const string PlayingStatusColor = "ff5555ff";
+        public const string WaitingStatusColor = Constants.ColorSoftGreen;
+        private const string PlayingStatusColor = Constants.ColorRed;
         private const string LockedStatusColor = Constants.ColorYellow;
 
         private ForumWindow _window;
@@ -41,6 +41,16 @@ namespace MDEN.UI.Windows
 
         public override async void Show()
         {
+            await LoadInitialLobbiesAsync();
+            if (IsDisposed) return;
+
+            MainThreadDispatcher.Enqueue(ShowLoadedWindow);
+        }
+
+        private void ShowLoadedWindow()
+        {
+            if (IsDisposed) return;
+
             _window = new ForumWindow();
             _window.AutoReset = true;
             BuildList();
@@ -61,7 +71,6 @@ namespace MDEN.UI.Windows
                 StopAutoRefresh();
             });
 
-            await RefreshLobbiesAsync();
             if (!IsDisposed)
             {
                 StartAutoRefresh();
@@ -250,7 +259,7 @@ namespace MDEN.UI.Windows
             if (button == _btnBack)
             {
                 Close();
-                UIManager.OpenWindow(LobbyManager.IsInLobby
+                WindowStackController.OpenWindow(LobbyManager.IsInLobby
                     ? new MyRoomWindow()
                     : new ServerSelectionWindow());
             }
@@ -261,7 +270,7 @@ namespace MDEN.UI.Windows
             else if (!_readOnly && button == _btnCreateRoom)
             {
                 Close();
-                UIManager.OpenWindow(new CreateRoomWindow());
+                WindowStackController.OpenWindow(new CreateRoomWindow());
             }
             else if (_lobbies.Length == 0)
             {
@@ -281,7 +290,7 @@ namespace MDEN.UI.Windows
                     if (IsCurrentLobby(selectedLobby))
                     {
                         Close();
-                        UIManager.OpenWindow(new MyRoomWindow());
+                        WindowStackController.OpenWindow(new MyRoomWindow());
                         return;
                     }
 
@@ -378,6 +387,25 @@ namespace MDEN.UI.Windows
             await RefreshLobbiesAsync(true, true);
         }
 
+        private async Task LoadInitialLobbiesAsync()
+        {
+            IDisposable uiLock = null;
+            try
+            {
+                uiLock = WindowStackController.LockUI("Fetching lobby list...");
+                _lobbies = await LobbyManager.RefreshLobbiesAsync();
+            }
+            catch (Exception ex)
+            {
+                MelonLogger.Warning($"Fetch lobby list failed: {ex.Message}");
+                _lobbies = new LobbyListEntry[0];
+            }
+            finally
+            {
+                uiLock?.Dispose();
+            }
+        }
+
         private async Task RefreshLobbiesAsync(bool showLock, bool forceRebuild)
         {
             if (_refreshInProgress) return;
@@ -388,7 +416,7 @@ namespace MDEN.UI.Windows
             {
                 if (showLock)
                 {
-                    uiLock = UIManager.LockUI("Fetching lobby list...");
+                    uiLock = WindowStackController.LockUI("Fetching lobby list...");
                 }
 
                 var lobbies = await LobbyManager.RefreshLobbiesAsync();
@@ -488,7 +516,7 @@ namespace MDEN.UI.Windows
 
         private async Task JoinLobbyAsync(LobbyListEntry lobby, string password = null)
         {
-            using var _ = UIManager.LockUI("Joining lobby...");
+            using var _ = WindowStackController.LockUI("Joining lobby...");
 
             try
             {

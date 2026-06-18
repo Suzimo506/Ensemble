@@ -13,6 +13,7 @@ namespace MDEN.Protocol
         public const ushort Disconnect = 0x0003;
         public const ushort ServerInfoReq = 0x0004;
         public const ushort ServerInfoResp = 0x0005;
+        public const ushort PingReportNotify = 0x0006;
 
         // === 认证 (0x0100 ~ 0x01FF) ===
         public const ushort LoginReq = 0x0100;

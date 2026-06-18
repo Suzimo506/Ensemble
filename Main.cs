@@ -4,7 +4,7 @@ using MDEN.Network;
 using MDEN.UI.Core;
 using System;
 
-[assembly: MelonInfo(typeof(MDEN.Main), "MDEN", "0.3.2", "MDENTeam")]
+[assembly: MelonInfo(typeof(MDEN.Main), "Ensemble", "0.3.2", "MDENTeam")]
 [assembly: MelonGame("PeroPeroGames", "MuseDash")]
 
 namespace MDEN
@@ -33,7 +33,7 @@ namespace MDEN
         {
             if (sceneName == "UISystem_PC")
             {
-                UIManager.ForceUnlock();
+                WindowStackController.ForceUnlock();
                 NavigationButton.ResetSceneObjects();
                 RoomHudController.ResetSceneObjects();
 
@@ -49,8 +49,8 @@ namespace MDEN
             }
             else if (sceneName == "GameMain")
             {
-                UIManager.ForceUnlock();
-                Patches.BattlePatch.SceneLoaded();
+                WindowStackController.ForceUnlock();
+                Patches.BattleFlowPatch.SceneLoaded();
             }
         }
 

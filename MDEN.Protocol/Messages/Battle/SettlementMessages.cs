@@ -21,5 +21,6 @@ namespace MDEN.Protocol.Messages.Battle
         public string ChartKey { get; set; }
         public int Difficulty { get; set; }
         public string ChartName { get; set; }
+        public float DurationSeconds { get; set; }
     }
 }

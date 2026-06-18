@@ -11,6 +11,8 @@ namespace MDEN.UI.Windows
     // 左右分栏的大厅主菜单，遵守防错窗与生命周期管理规范
     public class MainMenuWindow : MDENWindowBase
     {
+        private const string SupportUsUrl = "https://afdian.com/a/szm520";
+
         private ForumWindow _window;
         private ForumObject _btnProfile;
         private ForumObject _btnFriends;
@@ -24,6 +26,10 @@ namespace MDEN.UI.Windows
             _window = new ForumWindow();
             _window.AutoReset = true;
             
+            _btnAbout = new ForumObject(new LocalString("关于"), new LocalString(Constants.CreditsText));
+            _btnAbout.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("HomePanel.png")?.texture;
+            _window.ForumObjects.Add(_btnAbout);
+
             _btnProfile = new ForumObject(new LocalString("个人信息"), new LocalString("更改自己的名字、个人简介、以及个性化修改"));
             _btnProfile.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("PlayerCard.png")?.texture;
             _window.ForumObjects.Add(_btnProfile);
@@ -40,14 +46,9 @@ namespace MDEN.UI.Windows
             _btnSettings.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("OptionsPanel.png")?.texture;
             _window.ForumObjects.Add(_btnSettings);
 
-            _btnSupportUs = new ForumObject(new LocalString("支持我们"), new LocalString("支持 MDEN 继续开发"));
+            _btnSupportUs = new ForumObject(new LocalString("支持我们"), new LocalString("前往爱发电支持我们，让服务器更长久！OVO"));
             _btnSupportUs.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("HomePanel.png")?.texture;
             _window.ForumObjects.Add(_btnSupportUs);
-
-            _btnAbout = new ForumObject(new LocalString("关于"), new LocalString(Constants.CreditsText));
-            
-            _btnAbout.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("HomePanel.png")?.texture;
-            _window.ForumObjects.Add(_btnAbout);
 
             _window.OnSelectionChanged += OnSelectionChanged;
 
@@ -144,23 +145,24 @@ namespace MDEN.UI.Windows
             if (button == _btnProfile)
             {
                 Close();
-                UIManager.OpenWindow(new ProfileWindow());
+                WindowStackController.OpenWindow(new ProfileWindow());
             }
             else if (button == _btnLobbies)
             {
                 Close();
-                UIManager.OpenWindow(LobbyManager.IsInLobby
+                WindowStackController.OpenWindow(LobbyManager.IsInLobby
                     ? new RoomListWindow()
                     : new ServerSelectionWindow());
             }
             else if (button == _btnSettings)
             {
                 Close();
-                UIManager.OpenWindow(new SettingsWindow());
+                WindowStackController.OpenWindow(new SettingsWindow());
             }
             else if (button == _btnSupportUs)
             {
                 MelonLoader.MelonLogger.Msg("Support us button selected.");
+                Application.OpenURL(SupportUsUrl);
             }
         }
 

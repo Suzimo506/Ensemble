@@ -23,6 +23,7 @@ namespace MDEN.Managers
         public string PlayerTitle { get; set; }
         public string PlayerAvatarName { get; set; }
         public bool EnableFavGirlDisplayForOthers { get; set; }
+        public bool HideBattleHealthBar { get; set; }
     }
 
     public static class ModConfigManager
@@ -39,6 +40,7 @@ namespace MDEN.Managers
         public static string PlayerTitle { get; private set; }
         public static string PlayerAvatarName { get; private set; }
         public static bool EnableFavGirlDisplayForOthers { get; private set; }
+        public static bool HideBattleHealthBar { get; private set; }
 
         public static void LoadConfig()
         {
@@ -73,7 +75,8 @@ namespace MDEN.Managers
                     PlayerEntranceMessage = PlayerEntranceMessage,
                     PlayerTitle = PlayerTitle,
                     PlayerAvatarName = PlayerAvatarName,
-                    EnableFavGirlDisplayForOthers = EnableFavGirlDisplayForOthers
+                    EnableFavGirlDisplayForOthers = EnableFavGirlDisplayForOthers,
+                    HideBattleHealthBar = HideBattleHealthBar
                 };
                 var json = JsonSerializer.Serialize(data, new JsonSerializerOptions { WriteIndented = true });
                 File.WriteAllText(ConfigPath, json);
@@ -151,6 +154,12 @@ namespace MDEN.Managers
             SaveConfig();
         }
 
+        public static void SetHideBattleHealthBar(bool enabled)
+        {
+            HideBattleHealthBar = enabled;
+            SaveConfig();
+        }
+
         private static void LoadConfigFromJson(string json)
         {
             if (string.IsNullOrWhiteSpace(json))
@@ -175,6 +184,7 @@ namespace MDEN.Managers
             PlayerTitle = data?.PlayerTitle;
             PlayerAvatarName = data?.PlayerAvatarName;
             EnableFavGirlDisplayForOthers = data?.EnableFavGirlDisplayForOthers ?? false;
+            HideBattleHealthBar = data?.HideBattleHealthBar ?? false;
         }
 
         private static void EnsureIdentity()

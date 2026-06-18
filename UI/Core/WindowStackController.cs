@@ -5,7 +5,7 @@ using MelonLoader;
 namespace MDEN.UI.Core
 {
     // 拦截开窗请求，保证单一活跃窗口；提供全局防抖锁
-    public static class UIManager
+    public static class WindowStackController
     {
         private static readonly Stack<MDENWindowBase> _windowStack = new Stack<MDENWindowBase>();
         private static int _lockCount = 0;

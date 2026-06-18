@@ -156,10 +156,20 @@ namespace MDEN.Managers
 
         public static async Task SetLobbySettingsAsync(bool joinLocked, bool updatePassword, string password)
         {
+            await SetLobbySettingsAsync(new LobbySettingsRequest
+            {
+                JoinLocked = joinLocked,
+                UpdatePassword = updatePassword,
+                Password = password
+            });
+        }
+
+        public static async Task SetLobbySettingsAsync(LobbySettingsRequest request)
+        {
             EnsureReady();
             await NetworkClient.Instance.SendRequestAsync<LobbySettingsRequest, LobbySettingsResponse>(
                 OpCodes.LobbySettingsReq,
-                new LobbySettingsRequest { JoinLocked = joinLocked, UpdatePassword = updatePassword, Password = password });
+                request ?? new LobbySettingsRequest());
         }
 
         public static void Init()
@@ -211,6 +221,7 @@ namespace MDEN.Managers
                         {
                             Uid = currentUid,
                             Name = string.IsNullOrEmpty(currentName) ? currentUid : currentName,
+                            Bio = PlayerManager.CurrentProfile?.Bio,
                             Title = PlayerManager.CurrentProfile?.Title,
                             ChatColor = PlayerManager.CurrentProfile?.ChatColor,
                             PingMS = 0,
@@ -257,7 +268,7 @@ namespace MDEN.Managers
                 Il2CppAssets.Scripts.UI.Controls.ShowText.ShowInfo(reason);
                 NavigationButton.RefreshRoomButton();
                 RoomHudController.Refresh();
-                UIManager.OpenWindow(new RoomListWindow());
+                WindowStackController.OpenWindow(new RoomListWindow());
             });
         }
 

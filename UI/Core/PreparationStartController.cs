@@ -70,7 +70,7 @@ namespace MDEN.UI.Core
 
             _busy = true;
             Refresh();
-            using var _ = UIManager.LockUI("Updating playlist...");
+            using var _ = WindowStackController.LockUI("Updating playlist...");
 
             try
             {

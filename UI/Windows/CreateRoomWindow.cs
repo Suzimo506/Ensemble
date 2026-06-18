@@ -106,7 +106,7 @@ namespace MDEN.UI.Windows
             if (button == _btnBack)
             {
                 Close();
-                UIManager.OpenWindow(new RoomListWindow());
+                WindowStackController.OpenWindow(new RoomListWindow());
             }
             else if (button == _btnName)
             {
@@ -198,11 +198,11 @@ namespace MDEN.UI.Windows
             {
                 MelonLogger.Warning("Create lobby skipped: not connected to server. Please choose a server again.");
                 Close();
-                UIManager.OpenWindow(new ServerSelectionWindow());
+                WindowStackController.OpenWindow(new ServerSelectionWindow());
                 return;
             }
 
-            using var _ = UIManager.LockUI("Creating lobby...");
+            using var _ = WindowStackController.LockUI("Creating lobby...");
 
             try
             {
@@ -229,7 +229,7 @@ namespace MDEN.UI.Windows
                     if (IsDisposed) return;
                     Close();
                     NavigationButton.RefreshRoomButton();
-                    UIManager.OpenWindow(new MyRoomWindow());
+                    WindowStackController.OpenWindow(new MyRoomWindow());
                 });
             }
             catch (Exception ex)

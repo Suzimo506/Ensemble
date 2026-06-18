@@ -4,10 +4,10 @@ using MDEN.UI.Core;
 
 namespace MDEN.Patches
 {
-    internal static class PnlPreparationPatch
+    internal static class PreparationPanelPatch
     {
         [HarmonyPatch(typeof(PnlPreparation), nameof(PnlPreparation.OnEnable))]
-        internal static class PnlPreparationOnEnablePatch
+        internal static class PreparationPanelEnabledPatch
         {
             private static void Postfix()
             {
@@ -16,7 +16,7 @@ namespace MDEN.Patches
         }
 
         [HarmonyPatch(typeof(PnlPreparation), nameof(PnlPreparation.OnDiffTglChanged))]
-        internal static class PnlPreparationDiffChangedPatch
+        internal static class PreparationDifficultyChangedPatch
         {
             private static void Postfix()
             {
@@ -25,7 +25,7 @@ namespace MDEN.Patches
         }
 
         [HarmonyPatch(typeof(PnlPreparation), nameof(PnlPreparation.OnBattleStart))]
-        internal static class PnlPreparationBattleStartPatch
+        internal static class PreparationNativeStartGuardPatch
         {
             private static bool Prefix()
             {

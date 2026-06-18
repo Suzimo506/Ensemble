@@ -7,6 +7,7 @@ namespace MDEN.Protocol.Models
     {
         public string Uid { get; set; }
         public string Name { get; set; }
+        public string Bio { get; set; }
         public string Title { get; set; }
         public string ChatColor { get; set; }
         public ushort PingMS { get; set; }

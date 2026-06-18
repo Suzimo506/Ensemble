@@ -25,6 +25,7 @@ namespace MDEN.Managers
         private static bool _finishReported;
         private static bool _forcedDead;
         private static bool _accuracyInitialized;
+        private static DateTime _battleStartedUtc;
 
         public static bool Synchronizing => _synchronizing;
         public static event Action<BattlePlayerEntry[]> BattleDataChanged;
@@ -46,6 +47,8 @@ namespace MDEN.Managers
 
         public static void PrepareForNewBattle()
         {
+            _battleStartedUtc = DateTime.UtcNow;
+
             lock (BattleDataLock)
             {
                 PlayerBattleData.Clear();
@@ -96,6 +99,7 @@ namespace MDEN.Managers
             _forcedDead = !alive;
             StopSyncLoop();
 
+            var playedSeconds = GetPlayedSeconds();
             await FlushFinalBattleDataAsync();
 
             if (!IsNetworkReady()) return;
@@ -104,12 +108,24 @@ namespace MDEN.Managers
             {
                 await NetworkClient.Instance.SendRequestAsync<BattleReturnedReq, BattleReturnedResp>(
                     OpCodes.BattleReturnedReq,
-                    new BattleReturnedReq());
+                    new BattleReturnedReq
+                    {
+                        PlayedSeconds = playedSeconds
+                    });
             }
             catch (Exception ex)
             {
                 MelonLogger.Warning($"Battle returned request failed: {ex.Message}");
             }
+        }
+
+        private static float GetPlayedSeconds()
+        {
+            if (_battleStartedUtc == default) return 0f;
+
+            var seconds = (float)(DateTime.UtcNow - _battleStartedUtc).TotalSeconds;
+            if (float.IsNaN(seconds) || float.IsInfinity(seconds) || seconds <= 0f) return 0f;
+            return seconds > 7200f ? 7200f : seconds;
         }
 
         public static void StopSyncLoop()
@@ -131,6 +147,7 @@ namespace MDEN.Managers
             _taskStageTarget = null;
             _battleRoleAttributeComponent = null;
             _accuracyInitialized = false;
+            _battleStartedUtc = default;
 
             lock (BattleDataLock)
             {

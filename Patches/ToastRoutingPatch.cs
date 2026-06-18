@@ -6,7 +6,7 @@ namespace MDEN.Patches
     // 拦截因使用原生兑换码输入框导致的错误提示
     [HarmonyPatch(typeof(ShowText), nameof(ShowText.ShowInfo))]
     [HarmonyPriority(Priority.First)]
-    internal static class ShowTextPatch
+    internal static class ToastRoutingPatch
     {
         private static bool Prefix(string info)
         {

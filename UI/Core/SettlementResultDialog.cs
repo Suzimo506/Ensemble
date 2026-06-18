@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Reflection;
 using System.Text;
 using MDEN.Managers;
@@ -346,7 +347,7 @@ namespace MDEN.UI.Core
 
             var lines = new List<string>();
             var totalSeconds = 0f;
-            var hasUnknownDuration = false;
+            var knownDurationCount = 0;
 
             for (var i = 0; i < charts.Length; i++)
             {
@@ -358,16 +359,13 @@ namespace MDEN.UI.Core
                 if (durationSeconds.HasValue)
                 {
                     totalSeconds += durationSeconds.Value;
-                }
-                else
-                {
-                    hasUnknownDuration = true;
+                    knownDurationCount++;
                 }
 
                 lines.Add($"{ColorLabel((i + 1).ToString(), Constants.ColorYellow)}. {ColorLabel(name, "ffffffff")} {FormatDifficulty(chart?.Difficulty ?? 0)}");
             }
 
-            var total = hasUnknownDuration ? "--:--" : FormatDuration(totalSeconds);
+            var total = knownDurationCount > 0 ? FormatDuration(totalSeconds) : "--:--";
             return $"{ColorLabel("本次游玩时长", Constants.ColorCyan)}：{ColorLabel(total, "ffffffff")}\n" +
                    $"{ColorLabel("游玩曲目", Constants.ColorBlue)}：\n" +
                    string.Join("\n", lines);
@@ -375,7 +373,9 @@ namespace MDEN.UI.Core
 
         private static float? GetDurationSeconds(SettlementChartEntry chart)
         {
-            if (chart == null || string.IsNullOrWhiteSpace(chart.ChartKey)) return null;
+            if (chart == null) return null;
+            if (chart.DurationSeconds > 0f) return chart.DurationSeconds;
+            if (string.IsNullOrWhiteSpace(chart.ChartKey)) return null;
 
             object musicInfo = null;
             try
@@ -392,15 +392,20 @@ namespace MDEN.UI.Core
             var value = TryReadDurationValue(musicInfo);
             if (!value.HasValue || value <= 0f) return null;
 
-            return value > 10000f ? value / 1000f : value;
+            return NormalizeDurationSeconds(value.Value);
         }
 
         private static float? TryReadDurationValue(object source)
         {
             var names = new[]
             {
-                "duration", "Duration", "musicDuration", "MusicDuration",
+                "duration", "Duration", "durationSec", "DurationSec",
+                "durationSeconds", "DurationSeconds", "musicDuration", "MusicDuration",
+                "musicDurationSec", "MusicDurationSec", "musicDurationSeconds", "MusicDurationSeconds",
                 "musicLength", "MusicLength", "musicTime", "MusicTime",
+                "musicTimeLength", "MusicTimeLength", "timeLength", "TimeLength",
+                "songDuration", "SongDuration", "songDurationSec", "SongDurationSec",
+                "songDurationSeconds", "SongDurationSeconds",
                 "songLength", "SongLength", "songTime", "SongTime",
                 "length", "Length", "time", "Time"
             };
@@ -411,7 +416,12 @@ namespace MDEN.UI.Core
                 try
                 {
                     var property = type.GetProperty(name, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
-                    if (TryConvertDuration(property?.GetValue(source), out var seconds)) return seconds;
+                    if (property != null &&
+                        property.GetIndexParameters().Length == 0 &&
+                        TryConvertDuration(property.GetValue(source), out var seconds))
+                    {
+                        return seconds;
+                    }
 
                     var field = type.GetField(name, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
                     if (TryConvertDuration(field?.GetValue(source), out seconds)) return seconds;
@@ -441,7 +451,63 @@ namespace MDEN.UI.Core
                 }
             }
 
+            var fallback = TryReadDurationLikeMember(source, type);
+            if (fallback.HasValue) return fallback;
+
             return null;
+        }
+
+        private static float? TryReadDurationLikeMember(object source, Type type)
+        {
+            foreach (var property in type.GetProperties(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance))
+            {
+                if (!IsDurationLikeName(property.Name) || property.GetIndexParameters().Length != 0) continue;
+
+                try
+                {
+                    if (TryConvertDuration(property.GetValue(source), out var seconds)) return seconds;
+                }
+                catch
+                {
+                    // Some Il2Cpp-backed members throw when reflected during scene transitions.
+                }
+            }
+
+            foreach (var field in type.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance))
+            {
+                if (!IsDurationLikeName(field.Name)) continue;
+
+                try
+                {
+                    if (TryConvertDuration(field.GetValue(source), out var seconds)) return seconds;
+                }
+                catch
+                {
+                    // Some Il2Cpp-backed members throw when reflected during scene transitions.
+                }
+            }
+
+            return null;
+        }
+
+        private static bool IsDurationLikeName(string name)
+        {
+            if (string.IsNullOrWhiteSpace(name)) return false;
+
+            var normalized = name.ToLowerInvariant();
+            if (normalized.Contains("preview") ||
+                normalized.Contains("offset") ||
+                normalized.Contains("start") ||
+                normalized.Contains("end"))
+            {
+                return false;
+            }
+
+            return normalized.Contains("duration") ||
+                   normalized.Contains("timelength") ||
+                   normalized.Contains("musiclength") ||
+                   normalized.Contains("songlength") ||
+                   normalized.Contains("audiolength");
         }
 
         private static bool TryConvertDuration(object value, out float seconds)
@@ -449,15 +515,63 @@ namespace MDEN.UI.Core
             seconds = 0f;
             if (value == null) return false;
 
+            if (value is TimeSpan span)
+            {
+                seconds = (float)span.TotalSeconds;
+                return seconds > 0f;
+            }
+
+            if (value is string text)
+            {
+                return TryParseDurationText(text, out seconds);
+            }
+
             try
             {
-                seconds = Convert.ToSingle(value);
+                seconds = Convert.ToSingle(value, CultureInfo.InvariantCulture);
                 return seconds > 0f;
             }
             catch
             {
                 return false;
             }
+        }
+
+        private static bool TryParseDurationText(string value, out float seconds)
+        {
+            seconds = 0f;
+            if (string.IsNullOrWhiteSpace(value)) return false;
+
+            var text = value.Trim();
+            if (float.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out seconds))
+            {
+                return seconds > 0f;
+            }
+
+            var parts = text.Split(':');
+            if (parts.Length < 2 || parts.Length > 3) return false;
+
+            var total = 0f;
+            foreach (var part in parts)
+            {
+                if (!float.TryParse(part, NumberStyles.Float, CultureInfo.InvariantCulture, out var segment) || segment < 0f)
+                {
+                    seconds = 0f;
+                    return false;
+                }
+
+                total = total * 60f + segment;
+            }
+
+            seconds = total;
+            return seconds > 0f;
+        }
+
+        private static float NormalizeDurationSeconds(float value)
+        {
+            if (value > 10000000f) return value / 10000000f;
+            if (value > 10000f) return value / 1000f;
+            return value;
         }
 
         private static string FormatDuration(float seconds)

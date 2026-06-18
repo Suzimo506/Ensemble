@@ -22,6 +22,7 @@ namespace MDEN.UI.Core
     public static class RoomCharacterDisplay
     {
         private const int MaxOtherSlots = 4;
+        private const int OtherSlotsPerPage = 2;
         private const int PirateRinGirlIndex = 32;
         private const float CenterX = 1.3f;
         private const float LocalCharacterXOffset = 0.25f;
@@ -37,8 +38,15 @@ namespace MDEN.UI.Core
         private const float OtherTitleYOffset = 3.20f;
         private const float OtherNameYOffset = 2.91f;
         private const float LabelZOffset = -0.5f;
+        private const float PageButtonScreenEdgeOffset = 88f;
+        private const float PageButtonScreenYRatio = 0.5f;
         private static readonly Vector2 LocalLabelSize = new Vector2(250f, 125f);
         private static readonly Vector2 OtherLabelSize = new Vector2(250f, 125f);
+        private static readonly Vector2 PageButtonSize = new Vector2(96f, 96f);
+        private static readonly Color PageButtonNormalColor = new Color(1f, 0.18f, 0.78f, 1f);
+        private static readonly Color PageButtonHighlightedColor = new Color(1f, 0.62f, 0.96f, 1f);
+        private static readonly Color PageButtonPressedColor = new Color(0.84f, 0.08f, 1f, 1f);
+        private static readonly Color PageButtonDisabledColor = new Color(0.62f, 0.42f, 0.58f, 0.72f);
         private static readonly float[] OtherOffsets = { 5.7f, 8.4f };
         private static readonly string[] OwnedObjectNames =
         {
@@ -67,6 +75,12 @@ namespace MDEN.UI.Core
         private static GameObject _nativeElfinShow;
         private static readonly OtherCharacterSlot[] OtherSlots = CreateSlots();
         private static SlotLabels _localLabels;
+        private static Button _prevPageButton;
+        private static Button _nextPageButton;
+        private static Text _prevPageText;
+        private static Text _nextPageText;
+        private static int _currentPage;
+        private static int _currentLobbyId = -1;
         private static Vector3 _nativePosition;
         private static Vector3 _nativeScale;
         private static bool _created;
@@ -96,15 +110,20 @@ namespace MDEN.UI.Core
             }
 
             var localPlayer = GetLocalPlayer(lobby);
-            var otherPlayers = GetOtherPlayers(lobby).Take(MaxOtherSlots).ToList();
+            ResetPageIfLobbyChanged(lobby);
+            var otherPlayers = GetOtherPlayers(lobby).ToList();
+            var pageCount = GetPageCount(otherPlayers.Count);
+            _currentPage = ClampPage(_currentPage, pageCount);
+            var visiblePlayers = GetVisibleOtherPlayers(otherPlayers);
             if (_nativeElfinShow != null) _nativeElfinShow.SetActive(false);
 
-            if (otherPlayers.Count == 0)
+            if (visiblePlayers.Count == 0)
             {
                 SetTransform(_nativeMuseShow, CenterX + LocalCharacterXOffset, LocalY, LocalScale);
                 PrepareMuseShow(_nativeMuseShow, true);
                 ApplyLabels(_localLabels, _nativeMuseShow, localPlayer, true);
                 HideOtherSlots();
+                RefreshPageButtons(pageCount);
                 return true;
             }
 
@@ -115,13 +134,14 @@ namespace MDEN.UI.Core
             var ready = true;
             for (var i = 0; i < OtherSlots.Length; i++)
             {
-                var player = i < otherPlayers.Count ? otherPlayers[i] : null;
+                var player = i < visiblePlayers.Count ? visiblePlayers[i] : null;
                 if (!ApplyOtherSlot(OtherSlots[i], player, i))
                 {
                     ready = false;
                 }
             }
 
+            RefreshPageButtons(pageCount);
             return ready;
         }
 
@@ -141,8 +161,11 @@ namespace MDEN.UI.Core
             if (lobby == null || !ShouldDisplay(lobby)) return true;
             if (!_created || _nativeMuseShow == null || _localLabels == null) return false;
 
-            var otherPlayers = GetOtherPlayers(lobby).Take(MaxOtherSlots).ToList();
-            if (otherPlayers.Count == 0)
+            var otherPlayers = GetOtherPlayers(lobby).ToList();
+            var pageCount = GetPageCount(otherPlayers.Count);
+            var currentPage = ClampPage(_currentPage, pageCount);
+            var visiblePlayers = GetVisibleOtherPlayers(otherPlayers, currentPage);
+            if (visiblePlayers.Count == 0)
             {
                 return _nativeMuseShow.activeSelf &&
                        _localLabels.HasPlayer &&
@@ -152,7 +175,7 @@ namespace MDEN.UI.Core
             if (!_nativeMuseShow.activeSelf || !_localLabels.HasPlayer) return false;
             for (var i = 0; i < OtherSlots.Length; i++)
             {
-                var player = i < otherPlayers.Count ? otherPlayers[i] : null;
+                var player = i < visiblePlayers.Count ? visiblePlayers[i] : null;
                 if (!OtherSlots[i].HasExpectedContent(player)) return false;
             }
 
@@ -203,6 +226,9 @@ namespace MDEN.UI.Core
 
             _localLabels?.Destroy();
             _localLabels = null;
+            DestroyPageButtons();
+            _currentPage = 0;
+            _currentLobbyId = -1;
             _created = false;
             DestroyOwnedObjectsByName();
         }
@@ -234,6 +260,7 @@ namespace MDEN.UI.Core
             _nativeScale = _nativeMuseShow.transform.localScale;
             PrepareMuseShow(_nativeMuseShow, true);
             _localLabels = SlotLabels.Create(_nativeMuseShow.transform.parent, "MDENRoomLocal", LocalLabelSize, 24, 36, ApplyGameFont);
+            CreatePageButtons(_nativeMuseShow.transform.parent);
 
             for (var i = 0; i < OtherSlots.Length; i++)
             {
@@ -404,6 +431,7 @@ namespace MDEN.UI.Core
         {
             _localLabels?.SetPlayer(null);
             HideOtherSlots();
+            HidePageButtons();
             RestoreNativeMuseShow();
         }
 
@@ -413,6 +441,173 @@ namespace MDEN.UI.Core
             {
                 slot.Hide();
             }
+        }
+
+        private static int GetPageCount(int otherPlayerCount)
+        {
+            return Math.Max(1, (otherPlayerCount + OtherSlotsPerPage - 1) / OtherSlotsPerPage);
+        }
+
+        private static int ClampPage(int page, int pageCount)
+        {
+            return Math.Max(0, Math.Min(page, pageCount - 1));
+        }
+
+        private static List<RoomCharacterPlayer> GetVisibleOtherPlayers(List<RoomCharacterPlayer> otherPlayers)
+        {
+            return GetVisibleOtherPlayers(otherPlayers, _currentPage);
+        }
+
+        private static List<RoomCharacterPlayer> GetVisibleOtherPlayers(List<RoomCharacterPlayer> otherPlayers, int page)
+        {
+            if (otherPlayers == null || otherPlayers.Count == 0)
+            {
+                return new List<RoomCharacterPlayer>();
+            }
+
+            var clampedPage = ClampPage(page, GetPageCount(otherPlayers.Count));
+            return otherPlayers
+                .Skip(clampedPage * OtherSlotsPerPage)
+                .Take(OtherSlotsPerPage)
+                .ToList();
+        }
+
+        private static void RefreshPageButtons(int pageCount)
+        {
+            var shouldShow = pageCount > 1 &&
+                             _prevPageButton != null &&
+                             _nextPageButton != null &&
+                             _prevPageText != null &&
+                             _nextPageText != null;
+            if (_prevPageButton != null) _prevPageButton.gameObject.SetActive(shouldShow);
+            if (_nextPageButton != null) _nextPageButton.gameObject.SetActive(shouldShow);
+            if (!shouldShow) return;
+
+            _prevPageText.text = "◀";
+            _nextPageText.text = "▶";
+            _prevPageButton.interactable = _currentPage > 0;
+            _nextPageButton.interactable = _currentPage < pageCount - 1;
+            PositionPageButtons();
+        }
+
+        private static void HidePageButtons()
+        {
+            if (_prevPageButton != null) _prevPageButton.gameObject.SetActive(false);
+            if (_nextPageButton != null) _nextPageButton.gameObject.SetActive(false);
+        }
+
+        private static void ResetPageIfLobbyChanged(LobbySyncPush lobby)
+        {
+            if (lobby == null) return;
+            if (_currentLobbyId == lobby.Id) return;
+
+            _currentLobbyId = lobby.Id;
+            _currentPage = 0;
+        }
+
+        private static void ChangePage(int delta)
+        {
+            var lobby = LobbyManager.CurrentLobby;
+            if (lobby == null) return;
+
+            var pageCount = GetPageCount(GetOtherPlayers(lobby).Count());
+            var nextPage = ClampPage(_currentPage + delta, pageCount);
+            if (nextPage == _currentPage) return;
+
+            _currentPage = nextPage;
+            RoomHudController.RequestRefresh();
+        }
+
+        private static void CreatePageButtons(Transform parent)
+        {
+            _prevPageButton = CreatePageButton(parent, "MDENRoomCharacterPrev", "◀", true, () => ChangePage(-1), out _prevPageText);
+            _nextPageButton = CreatePageButton(parent, "MDENRoomCharacterNext", "▶", false, () => ChangePage(1), out _nextPageText);
+            RefreshPageButtons(1);
+        }
+
+        private static Button CreatePageButton(
+            Transform parent,
+            string name,
+            string label,
+            bool leftSide,
+            Action action,
+            out Text text)
+        {
+            var obj = new GameObject(name);
+            var rect = obj.AddComponent<RectTransform>();
+            rect.SetParent(parent);
+            rect.localScale = Vector3.one;
+            rect.sizeDelta = PageButtonSize;
+
+            text = obj.AddComponent<Text>();
+            ApplyGameFont(text);
+            text.text = label;
+            text.fontSize = 58;
+            text.alignment = TextAnchor.MiddleCenter;
+            text.horizontalOverflow = HorizontalWrapMode.Overflow;
+            text.verticalOverflow = VerticalWrapMode.Overflow;
+            text.supportRichText = true;
+            text.raycastTarget = true;
+            text.color = PageButtonNormalColor;
+
+            var shadow = obj.AddComponent<Shadow>();
+            shadow.effectDistance = new Vector2(2f, -2f);
+            shadow.effectColor = new Color(0f, 0f, 0f, 0.45f);
+
+            var button = obj.AddComponent<Button>();
+            button.targetGraphic = text;
+            button.transition = Selectable.Transition.ColorTint;
+            button.colors = new ColorBlock
+            {
+                normalColor = PageButtonNormalColor,
+                highlightedColor = PageButtonHighlightedColor,
+                pressedColor = PageButtonPressedColor,
+                selectedColor = PageButtonHighlightedColor,
+                disabledColor = PageButtonDisabledColor,
+                colorMultiplier = 1f,
+                fadeDuration = 0.08f
+            };
+            button.onClick.AddListener((UnityAction)(() => action.Invoke()));
+            obj.SetActive(false);
+
+            SetPageButtonPosition(obj, leftSide);
+            return button;
+        }
+
+        private static void PositionPageButtons()
+        {
+            SetPageButtonPosition(_prevPageButton?.gameObject, true);
+            SetPageButtonPosition(_nextPageButton?.gameObject, false);
+            _prevPageButton?.transform.SetAsLastSibling();
+            _nextPageButton?.transform.SetAsLastSibling();
+        }
+
+        private static void SetPageButtonPosition(GameObject obj, bool leftSide)
+        {
+            if (obj == null) return;
+
+            var camera = Camera.main;
+            if (camera == null || _nativeMuseShow == null)
+            {
+                obj.transform.position = new Vector3(leftSide ? -8f : 10f, LocalY + 2f, Z + LabelZOffset);
+                return;
+            }
+
+            var screenX = leftSide ? PageButtonScreenEdgeOffset : Screen.width - PageButtonScreenEdgeOffset;
+            var screenY = Screen.height * PageButtonScreenYRatio;
+            var nativeDepth = camera.WorldToScreenPoint(_nativeMuseShow.transform.position).z;
+            var position = camera.ScreenToWorldPoint(new Vector3(screenX, screenY, nativeDepth));
+            obj.transform.position = new Vector3(position.x, position.y, Z + LabelZOffset);
+        }
+
+        private static void DestroyPageButtons()
+        {
+            DestroyObject(_prevPageButton?.gameObject);
+            DestroyObject(_nextPageButton?.gameObject);
+            _prevPageButton = null;
+            _nextPageButton = null;
+            _prevPageText = null;
+            _nextPageText = null;
         }
 
         private static GameObject FindCharacterRoot(string uid)
@@ -843,6 +1038,7 @@ namespace MDEN.UI.Core
                     {
                         Uid = uid,
                         Name = string.IsNullOrEmpty(player.Name) ? uid : player.Name,
+                        Bio = player.Bio,
                         Title = GetDisplayTitle(player),
                         ChatColor = GetDisplayColor(player),
                         PingMS = player.PingMS,
@@ -867,6 +1063,7 @@ namespace MDEN.UI.Core
                 {
                     Uid = uid,
                     Name = uid,
+                    Bio = IsSameUid(uid, PlayerManager.CurrentUid) ? PlayerManager.CurrentProfile?.Bio : null,
                     Title = IsSameUid(uid, PlayerManager.CurrentUid) ? PlayerManager.CurrentProfile?.Title : null,
                     ChatColor = IsSameUid(uid, PlayerManager.CurrentUid) ? PlayerManager.CurrentProfile?.ChatColor : null,
                     GirlIndex = GetGirlIndex(uid, character),
@@ -941,6 +1138,7 @@ namespace MDEN.UI.Core
             {
                 Uid = player.Uid,
                 Name = player.Name,
+                Bio = player.Bio,
                 Title = player.Title,
                 ChatColor = player.ChatColor,
                 PingMS = player.PingMS,
@@ -965,7 +1163,7 @@ namespace MDEN.UI.Core
             labels.UpdatePosition(slot, local);
             var entry = ToPlayerSyncEntry(player);
             labels.Button.onClick = new Button.ButtonClickedEvent();
-            labels.Button.onClick.AddListener((UnityAction)(() => UIManager.OpenWindow(new RoomPlayerWindow(entry))));
+            labels.Button.onClick.AddListener((UnityAction)(() => WindowStackController.OpenWindow(new RoomPlayerWindow(entry))));
         }
 
         private static string FormatTitle(string title)
@@ -1430,6 +1628,7 @@ namespace MDEN.UI.Core
         {
             public string Uid { get; set; }
             public string Name { get; set; }
+            public string Bio { get; set; }
             public string Title { get; set; }
             public string ChatColor { get; set; }
             public ushort PingMS { get; set; }

@@ -45,7 +45,7 @@ namespace MDEN.UI.Core
             _loggedWaitingForLobby = false;
             MarkAllPlayersFinishedFromSettlementResult();
             var generation = ++_pendingGeneration;
-            MelonLogger.Msg($"Settlement result received. finished={_finishedBroadcastCount}, players={LobbyManager.CurrentLobby?.Players?.Length ?? 0}, playing={LobbyManager.CurrentLobby?.IsPlaying}, resultFlow={BattlePatch.IsBattleResultFlowPending}");
+            MelonLogger.Msg($"Settlement result received. finished={_finishedBroadcastCount}, players={LobbyManager.CurrentLobby?.Players?.Length ?? 0}, playing={LobbyManager.CurrentLobby?.IsPlaying}, resultFlow={BattleFlowPatch.IsBattleResultFlowPending}");
             TryShowSettlement(generation);
         }
 
@@ -96,7 +96,7 @@ namespace MDEN.UI.Core
                 if (!_loggedWaitingForLobby)
                 {
                     _loggedWaitingForLobby = true;
-                    MelonLogger.Msg($"Settlement result pending until lobby is visible. playing={LobbyManager.CurrentLobby?.IsPlaying}, resultFlow={BattlePatch.IsBattleResultFlowPending}, homeVisible={RoomSceneOverlay.IsHomeVisible}, finished={_finishedBroadcastCount}/{LobbyManager.CurrentLobby?.Players?.Length ?? 0}");
+                    MelonLogger.Msg($"Settlement result pending until lobby is visible. playing={LobbyManager.CurrentLobby?.IsPlaying}, resultFlow={BattleFlowPatch.IsBattleResultFlowPending}, homeVisible={RoomSceneOverlay.IsHomeVisible}, finished={_finishedBroadcastCount}/{LobbyManager.CurrentLobby?.Players?.Length ?? 0}");
                 }
 
                 MainThreadDispatcher.Enqueue(() => TryShowSettlement(generation));
@@ -118,7 +118,7 @@ namespace MDEN.UI.Core
         {
             return LobbyManager.IsInLobby &&
                    LobbyManager.CurrentLobby?.IsPlaying != true &&
-                   !BattlePatch.IsBattleResultFlowPending &&
+                   !BattleFlowPatch.IsBattleResultFlowPending &&
                    RoomSceneOverlay.IsHomeVisible &&
                    HasEveryoneFinished();
         }

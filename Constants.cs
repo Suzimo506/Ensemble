@@ -6,6 +6,10 @@ namespace MDEN
         public const string ColorPink = "f542adff";
         public const string ColorYellow = "fff700ff";
         public const string ColorCyan = "00ffffff";
+        public const string ColorGreen = "00ff00ff";
+        public const string ColorSoftGreen = "66ff66ff";
+        public const string ColorRed = "ff5555ff";
+        public const string ColorProfilePink = "ff66ccff";
         public const string ColorLavender = "c58cffff";
 
         public const string ModName = "MDEN";
@@ -13,7 +17,10 @@ namespace MDEN
         public const string UIDirName = "UI";
         public const string BannersDirName = "Banners";
 
-        public const string CreditsText = "[ 开发者 ]\n" +
+        public const string CreditsText = "当前Ensemble版本：<color=" + ColorGreen + ">0.3.2</color>\n" +
+            "加入喵斯兔交流群，反馈问题，与其他人一起合奏！\n" +
+            "<color=" + ColorPink + ">331568783</color>\n\n" +
+            "[ 开发者 ]\n" +
             "<color=" + ColorPink + ">Suzimo506</color> — MDEN项目发起与维护人\n" +
             "<color=" + ColorPink + ">XMJjs</color> — Mod与服务器后端开发者\n" +
             "<color=" + ColorPink + ">Cookie</color> — Mod与服务器后端开发者\n" +

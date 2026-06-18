@@ -24,17 +24,30 @@ namespace MDEN.UI.Windows
         private ForumObject _btnMute;
         private ForumObject _btnInfo;
         private int _lastSelectedIndex = -1;
+        private double? _ratingLevel;
+        private bool _ratingLevelLoaded;
 
         public RoomPlayerWindow(PlayerSyncEntry player)
         {
             _player = player;
         }
 
-        public override void Show()
+        public override async void Show()
         {
+            await LoadRatingLevelForInitialShowAsync();
+            if (IsDisposed) return;
+
+            MainThreadDispatcher.Enqueue(ShowLoadedWindow);
+        }
+
+        private void ShowLoadedWindow()
+        {
+            if (IsDisposed) return;
+
             _window = new ForumWindow();
             _window.AutoReset = true;
             BuildList();
+            LobbyManager.CurrentLobbyChanged += HandleCurrentLobbyChanged;
             _window.OnSelectionChanged += OnSelectionChanged;
             _window.OnInternalShow += OnInternalShowInjectTitle;
             _window.Show();
@@ -42,13 +55,27 @@ namespace MDEN.UI.Windows
 
             RegisterEventCleanup(() =>
             {
-                if (_window != null)
-                {
-                    _window.OnSelectionChanged -= OnSelectionChanged;
-                    _window.OnInternalShow -= OnInternalShowInjectTitle;
-                }
-
+                LobbyManager.CurrentLobbyChanged -= HandleCurrentLobbyChanged;
+                UnbindWindowEvents();
                 RemoveInjectedTitle();
+            });
+        }
+
+        private void HandleCurrentLobbyChanged(MDEN.Protocol.Messages.Lobby.LobbySyncPush lobby)
+        {
+            MainThreadDispatcher.Enqueue(() =>
+            {
+                if (IsDisposed) return;
+
+                if (lobby == null || !IsPlayerStillInLobby(lobby))
+                {
+                    Close();
+                    WindowStackController.OpenWindow(lobby == null ? new RoomListWindow() : new MyRoomWindow());
+                }
+                else
+                {
+                    RebuildWindow();
+                }
             });
         }
 
@@ -57,6 +84,7 @@ namespace MDEN.UI.Windows
             _window.ForumObjects.Clear();
 
             _btnBack = CreateButton("- 返回 -", "回到我的房间");
+            _btnInfo = CreateButton(GetDisplayName(), PlayerInfoDescriptionFormatter.Build(_player, _ratingLevel, _ratingLevelLoaded));
             _btnAddFriend = CreateButton("添加好友", $"向 {GetDisplayName()} 发送好友请求");
             _btnKick = CreateButton("踢出", "将该玩家踢出房间");
             _btnTransferHost = CreateButton("移交房主", "将房主权限移交给该玩家");
@@ -66,10 +94,6 @@ namespace MDEN.UI.Windows
             _btnMute = CreateButton(
                 IsMuted() ? "解除禁言" : "禁言",
                 IsMuted() ? "允许该玩家发送聊天消息" : "禁止该玩家发送聊天消息");
-
-            _btnInfo = CreateButton(
-                GetDisplayName(),
-                $"UID: {_player?.Uid}\nPing: {_player?.PingMS ?? 0}ms\n状态: {_player?.Status ?? 0}");
         }
 
         private ForumObject CreateButton(string title, string description)
@@ -94,7 +118,7 @@ namespace MDEN.UI.Windows
             if (button == _btnBack)
             {
                 Close();
-                UIManager.OpenWindow(new MyRoomWindow());
+                WindowStackController.OpenWindow(new MyRoomWindow());
                 return;
             }
 
@@ -117,7 +141,7 @@ namespace MDEN.UI.Windows
             if (button == _btnInfo)
             {
                 Close();
-                UIManager.OpenWindow(new RoomPlayerProfileWindow(_player));
+                WindowStackController.OpenWindow(new RoomPlayerProfileWindow(_player));
                 return;
             }
 
@@ -195,7 +219,7 @@ namespace MDEN.UI.Windows
 
         private async System.Threading.Tasks.Task RunWindowActionAsync(Func<System.Threading.Tasks.Task> action, bool reopenRoom)
         {
-            using var _ = UIManager.LockUI("处理中...");
+            using var _ = WindowStackController.LockUI("处理中...");
             try
             {
                 await action();
@@ -205,7 +229,7 @@ namespace MDEN.UI.Windows
                     {
                         if (IsDisposed) return;
                         Close();
-                        UIManager.OpenWindow(new MyRoomWindow());
+                        WindowStackController.OpenWindow(new MyRoomWindow());
                     });
                 }
             }
@@ -234,6 +258,25 @@ namespace MDEN.UI.Windows
             };
         }
 
+        private async System.Threading.Tasks.Task LoadRatingLevelForInitialShowAsync()
+        {
+            var uid = _player?.Uid;
+            if (string.IsNullOrWhiteSpace(uid))
+            {
+                _ratingLevelLoaded = true;
+                return;
+            }
+
+            try
+            {
+                _ratingLevel = await MuseDashMoeProfileManager.GetRatingLevelAsync(uid);
+            }
+            finally
+            {
+                _ratingLevelLoaded = true;
+            }
+        }
+
         private string GetDisplayName()
         {
             return string.IsNullOrEmpty(_player?.Name) ? "玩家信息" : _player.Name;
@@ -254,6 +297,13 @@ namespace MDEN.UI.Windows
             return !string.IsNullOrWhiteSpace(uid) &&
                    uids != null &&
                    uids.Any(item => string.Equals(item, uid, StringComparison.Ordinal));
+        }
+
+        private bool IsPlayerStillInLobby(MDEN.Protocol.Messages.Lobby.LobbySyncPush lobby)
+        {
+            return !string.IsNullOrWhiteSpace(_player?.Uid) &&
+                   lobby?.Players != null &&
+                   lobby.Players.Any(uid => string.Equals(uid, _player.Uid, StringComparison.Ordinal));
         }
 
         private void OnInternalShowInjectTitle(PopupLib.UI.Windows.Abstract.BaseWindow w)
@@ -295,16 +345,44 @@ namespace MDEN.UI.Windows
         {
             var title = GameObject.Find("UI/Forward/Tips/PnlBulletinNew/ImgBase/MDENTitle");
             if (title != null) UnityEngine.Object.Destroy(title);
+
+            var titleInScroll = GameObject.Find("UI/Forward/Tips/PnlBulletinNew/ImgBase/ScrollView/MDENTitle");
+            if (titleInScroll != null) UnityEngine.Object.Destroy(titleInScroll);
+        }
+
+        private void UnbindWindowEvents()
+        {
+            if (_window == null) return;
+
+            _window.OnSelectionChanged -= OnSelectionChanged;
+            _window.OnInternalShow -= OnInternalShowInjectTitle;
         }
 
         public override void Close()
         {
             _lastSelectedIndex = -1;
+            UnbindWindowEvents();
+            RemoveInjectedTitle();
             if (_window != null)
             {
                 _window.ForceClose();
                 _window = null;
             }
+        }
+
+        private void RebuildWindow()
+        {
+            if (_window == null) return;
+
+            UnbindWindowEvents();
+            _window.ForceClose();
+            _window = new ForumWindow();
+            _window.AutoReset = true;
+            BuildList();
+            _window.OnSelectionChanged += OnSelectionChanged;
+            _window.OnInternalShow += OnInternalShowInjectTitle;
+            _window.Show();
+            _lastSelectedIndex = -1;
         }
     }
 }

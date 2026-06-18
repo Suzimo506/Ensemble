@@ -615,7 +615,7 @@ namespace MDEN.UI.Displays
 
             try
             {
-                using var _ = UIManager.LockUI("Sending message...");
+                using var _ = WindowStackController.LockUI("Sending message...");
                 await ChatManager.SendAsync(message);
                 MainThreadDispatcher.Enqueue(ClearSubmittedInput);
             }

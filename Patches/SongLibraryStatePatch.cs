@@ -9,11 +9,11 @@ using MDEN.Managers;
 
 namespace MDEN.Patches
 {
-    internal static class DBMusicTagPatch
+    internal static class SongLibraryStatePatch
     {
         [HarmonyPatch]
         [HarmonyPriority(Priority.First)]
-        internal static class UpdateHiddenPatch
+        internal static class ChartHiddenStateGuardPatch
         {
             private static IEnumerable<MethodBase> TargetMethods()
             {
@@ -41,7 +41,7 @@ namespace MDEN.Patches
         }
 
         [HarmonyPatch(typeof(DBMusicTag), nameof(DBMusicTag.CurMusicInfo))]
-        internal static class BattleStartMusicInfoPatch
+        internal static class PlaylistBattleMusicInfoPatch
         {
             private static bool Prefix(ref MusicInfo __result)
             {
@@ -56,7 +56,7 @@ namespace MDEN.Patches
         }
 
         [HarmonyPatch]
-        internal static class BattleStartMasterUnlockPatch
+        internal static class PlaylistMasterUnlockPatch
         {
             private static IEnumerable<MethodBase> TargetMethods()
             {

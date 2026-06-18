@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using LocalizeLib;
 using MDEN.Managers;
 using MDEN.Protocol.Enums;
+using MDEN.Protocol.Messages.Lobby;
 using MDEN.Protocol.Models;
 using MDEN.UI.Core;
 using PopupLib.UI.Components;
@@ -16,16 +17,31 @@ namespace MDEN.UI.Windows
     {
         private ForumWindow _window;
         private ForumObject _btnLeave;
+        private ForumObject _btnGoal;
+        private ForumObject _btnSettlement;
         private ForumObject _btnJoinLock;
         private ForumObject _btnPassword;
         private readonly Dictionary<ForumObject, PlayerSyncEntry> _playerItems = new Dictionary<ForumObject, PlayerSyncEntry>();
+        private readonly Dictionary<string, double?> _ratingLevels = new Dictionary<string, double?>();
+        private readonly HashSet<string> _loadingRatingLevels = new HashSet<string>();
         private int _lastSelectedIndex = -1;
 
-        public override void Show()
+        public override async void Show()
         {
+            await LoadRatingLevelsForInitialShowAsync();
+            if (IsDisposed) return;
+
+            MainThreadDispatcher.Enqueue(ShowLoadedWindow);
+        }
+
+        private void ShowLoadedWindow()
+        {
+            if (IsDisposed) return;
+
             _window = new ForumWindow();
             _window.AutoReset = true;
             BuildList();
+            LobbyManager.CurrentLobbyChanged += HandleCurrentLobbyChanged;
             _window.OnSelectionChanged += OnSelectionChanged;
             _window.OnInternalShow += OnInternalShowInjectTitle;
             _window.Show();
@@ -33,6 +49,8 @@ namespace MDEN.UI.Windows
 
             RegisterEventCleanup(() =>
             {
+                LobbyManager.CurrentLobbyChanged -= HandleCurrentLobbyChanged;
+
                 if (_window != null)
                 {
                     _window.OnSelectionChanged -= OnSelectionChanged;
@@ -41,6 +59,55 @@ namespace MDEN.UI.Windows
 
                 RemoveInjectedTitle();
             });
+        }
+
+        private void HandleCurrentLobbyChanged(LobbySyncPush lobby)
+        {
+            MainThreadDispatcher.Enqueue(() =>
+            {
+                if (IsDisposed) return;
+
+                if (lobby == null)
+                {
+                    Close();
+                    NavigationButton.RefreshRoomButton();
+                    WindowStackController.OpenWindow(new RoomListWindow());
+                    return;
+                }
+
+                RebuildWindow();
+            });
+        }
+
+        private async Task LoadRatingLevelsForInitialShowAsync()
+        {
+            var uids = GetCurrentLobbyPlayerUids();
+            if (uids.Length == 0) return;
+
+            var results = await Task.WhenAll(uids.Select(LoadRatingLevelValueAsync));
+            foreach (var result in results)
+            {
+                _ratingLevels[result.Uid] = result.Level;
+                _loadingRatingLevels.Remove(result.Uid);
+            }
+        }
+
+        private static string[] GetCurrentLobbyPlayerUids()
+        {
+            var lobby = LobbyManager.CurrentLobby;
+            if (lobby?.PlayerDetails != null && lobby.PlayerDetails.Length > 0)
+            {
+                return lobby.PlayerDetails
+                    .Where(player => !string.IsNullOrWhiteSpace(player?.Uid))
+                    .Select(player => player.Uid)
+                    .Distinct()
+                    .ToArray();
+            }
+
+            return lobby?.Players?
+                .Where(uid => !string.IsNullOrWhiteSpace(uid))
+                .Distinct()
+                .ToArray() ?? new string[0];
         }
 
         private void BuildList()
@@ -57,6 +124,26 @@ namespace MDEN.UI.Windows
             _btnLeave = new ForumObject(new LocalString("- 退出房间 -"), new LocalString("离开当前联机房间"));
             _btnLeave.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("HomePanel.png")?.texture;
             _window.ForumObjects.Add(_btnLeave);
+
+            if (lobby != null)
+            {
+                _btnGoal = new ForumObject(
+                    new LocalString("获胜方式"),
+                    new LocalString($"当前: {Highlight(GetGoalName(lobby.Goal), Constants.ColorYellow)}\n点击切换为{Highlight(GetGoalName(GetNextGoal(lobby.Goal)), Constants.ColorCyan)}"));
+                _btnGoal.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("SocialNetwork.png")?.texture;
+                _window.ForumObjects.Add(_btnGoal);
+
+                _btnSettlement = new ForumObject(
+                    new LocalString("结算功能"),
+                    new LocalString($"当前: {Highlight(lobby.SettlementEnabled ? "开启" : "关闭", Constants.ColorYellow)}\n点击{Highlight(lobby.SettlementEnabled ? "关闭" : "开启", Constants.ColorCyan)}五首一结算"));
+                _btnSettlement.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("OptionsPanel.png")?.texture;
+                _window.ForumObjects.Add(_btnSettlement);
+            }
+            else
+            {
+                _btnGoal = null;
+                _btnSettlement = null;
+            }
 
             if (lobby?.HostUid == PlayerManager.CurrentUid)
             {
@@ -90,18 +177,21 @@ namespace MDEN.UI.Windows
                     var name = player.Uid == lobby.HostUid
                         ? $"<color={Constants.ColorPink}>{displayName}</color>"
                         : displayName;
-                    var item = new ForumObject(new LocalString(name), new LocalString($"UID: {player.Uid}"));
-                    item.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("PlayerCard.png")?.texture;
-                    _window.ForumObjects.Add(item);
-                    _playerItems[item] = new PlayerSyncEntry
+                    var entry = new PlayerSyncEntry
                     {
                         Uid = player.Uid,
                         Name = displayName,
+                        Bio = player.Bio,
                         Title = player.Title,
                         ChatColor = player.ChatColor,
                         PingMS = player.PingMS,
                         Status = player.Status
                     };
+                    var item = new ForumObject(new LocalString(name), new LocalString(BuildPlayerDescription(entry)));
+                    item.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("PlayerCard.png")?.texture;
+                    _window.ForumObjects.Add(item);
+                    _playerItems[item] = entry;
+                    RequestRatingLevel(entry.Uid);
                 }
             }
             else if (lobby?.Players != null)
@@ -112,18 +202,70 @@ namespace MDEN.UI.Windows
                         ? PlayerManager.CurrentProfile.Name
                         : uid;
                     var name = uid == lobby.HostUid ? $"<color={Constants.ColorPink}>{displayName}</color>" : displayName;
-                    var item = new ForumObject(new LocalString(name), new LocalString($"UID: {uid}"));
-                    item.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("PlayerCard.png")?.texture;
-                    _window.ForumObjects.Add(item);
-                    _playerItems[item] = new PlayerSyncEntry
+                    var entry = new PlayerSyncEntry
                     {
                         Uid = uid,
                         Name = displayName,
+                        Bio = uid == PlayerManager.CurrentUid ? PlayerManager.CurrentProfile?.Bio : null,
                         Title = uid == PlayerManager.CurrentUid ? PlayerManager.CurrentProfile?.Title : null,
                         ChatColor = uid == PlayerManager.CurrentUid ? PlayerManager.CurrentProfile?.ChatColor : null
                     };
+                    var item = new ForumObject(new LocalString(name), new LocalString(BuildPlayerDescription(entry)));
+                    item.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("PlayerCard.png")?.texture;
+                    _window.ForumObjects.Add(item);
+                    _playerItems[item] = entry;
+                    RequestRatingLevel(entry.Uid);
                 }
             }
+        }
+
+        private string BuildPlayerDescription(PlayerSyncEntry player)
+        {
+            var uid = player?.Uid;
+            var loaded = !string.IsNullOrWhiteSpace(uid) && _ratingLevels.ContainsKey(uid);
+            var rl = loaded ? _ratingLevels[uid] : null;
+            return PlayerInfoDescriptionFormatter.Build(player, rl, loaded);
+        }
+
+        private void RequestRatingLevel(string uid)
+        {
+            if (string.IsNullOrWhiteSpace(uid) ||
+                _ratingLevels.ContainsKey(uid) ||
+                !_loadingRatingLevels.Add(uid))
+            {
+                return;
+            }
+
+            _ = LoadRatingLevelAsync(uid);
+        }
+
+        private async Task LoadRatingLevelAsync(string uid)
+        {
+            var result = await LoadRatingLevelValueAsync(uid);
+
+            MainThreadDispatcher.Enqueue(() =>
+            {
+                if (IsDisposed) return;
+                _ratingLevels[result.Uid] = result.Level;
+                _loadingRatingLevels.Remove(result.Uid);
+            });
+        }
+
+        private static async Task<RatingLevelLoadResult> LoadRatingLevelValueAsync(string uid)
+        {
+            return new RatingLevelLoadResult(uid, await MuseDashMoeProfileManager.GetRatingLevelAsync(uid));
+        }
+
+        private readonly struct RatingLevelLoadResult
+        {
+            public RatingLevelLoadResult(string uid, double? level)
+            {
+                Uid = uid;
+                Level = level;
+            }
+
+            public string Uid { get; }
+            public double? Level { get; }
         }
 
         private static string BuildRoomSummary(MDEN.Protocol.Messages.Lobby.LobbySyncPush lobby)
@@ -212,12 +354,43 @@ namespace MDEN.UI.Windows
                 return;
             }
 
+            if (button == _btnGoal)
+            {
+                var lobby = LobbyManager.CurrentLobby;
+                if (!CanChangeRoomRules(lobby)) return;
+
+                _ = UpdateLobbySettingsAsync(new LobbySettingsRequest
+                {
+                    JoinLocked = lobby.JoinLocked,
+                    UpdateGoal = true,
+                    Goal = GetNextGoal(lobby.Goal)
+                });
+                return;
+            }
+
+            if (button == _btnSettlement)
+            {
+                var lobby = LobbyManager.CurrentLobby;
+                if (!CanChangeRoomRules(lobby)) return;
+
+                _ = UpdateLobbySettingsAsync(new LobbySettingsRequest
+                {
+                    JoinLocked = lobby.JoinLocked,
+                    UpdateSettlementEnabled = true,
+                    SettlementEnabled = !lobby.SettlementEnabled
+                });
+                return;
+            }
+
             if (button == _btnJoinLock)
             {
                 var lobby = LobbyManager.CurrentLobby;
                 if (!CanChangeRoomSettings(lobby)) return;
 
-                _ = UpdateLobbySettingsAsync(!lobby.JoinLocked, false, null);
+                _ = UpdateLobbySettingsAsync(new LobbySettingsRequest
+                {
+                    JoinLocked = !lobby.JoinLocked
+                });
                 return;
             }
 
@@ -232,7 +405,7 @@ namespace MDEN.UI.Windows
             if (_playerItems.TryGetValue(button, out var player))
             {
                 Close();
-                UIManager.OpenWindow(new RoomPlayerWindow(player));
+                WindowStackController.OpenWindow(new RoomPlayerWindow(player));
             }
         }
 
@@ -241,7 +414,16 @@ namespace MDEN.UI.Windows
             if (lobby == null) return false;
             if (lobby.HostUid == PlayerManager.CurrentUid) return true;
 
-            Il2CppAssets.Scripts.UI.Controls.ShowText.ShowInfo("只有房主可以修改房间设置");
+            Il2CppAssets.Scripts.UI.Controls.ShowText.ShowInfo("只有房主能进行该操作");
+            return false;
+        }
+
+        private static bool CanChangeRoomRules(MDEN.Protocol.Messages.Lobby.LobbySyncPush lobby)
+        {
+            if (!CanChangeRoomSettings(lobby)) return false;
+            if (!lobby.Locked && !lobby.IsPlaying) return true;
+
+            Il2CppAssets.Scripts.UI.Controls.ShowText.ShowInfo("游戏准备或进行中，不能修改房间规则");
             return false;
         }
 
@@ -263,19 +445,24 @@ namespace MDEN.UI.Windows
                     return;
                 }
 
-                _ = UpdateLobbySettingsAsync(LobbyManager.CurrentLobby?.JoinLocked == true, true, value);
+                _ = UpdateLobbySettingsAsync(new LobbySettingsRequest
+                {
+                    JoinLocked = LobbyManager.CurrentLobby?.JoinLocked == true,
+                    UpdatePassword = true,
+                    Password = value
+                });
             };
             input.Show();
         }
 
-        private async Task UpdateLobbySettingsAsync(bool joinLocked, bool updatePassword, string password)
+        private async Task UpdateLobbySettingsAsync(LobbySettingsRequest request)
         {
-            using var _ = UIManager.LockUI("处理中...");
+            using var _ = WindowStackController.LockUI("处理中...");
 
             try
             {
-                await LobbyManager.SetLobbySettingsAsync(joinLocked, updatePassword, password);
-                ApplyLocalLobbySettings(joinLocked, updatePassword, password);
+                await LobbyManager.SetLobbySettingsAsync(request);
+                ApplyLocalLobbySettings(request);
                 if (IsDisposed) return;
 
                 MainThreadDispatcher.Enqueue(() =>
@@ -291,21 +478,36 @@ namespace MDEN.UI.Windows
             }
         }
 
-        private static void ApplyLocalLobbySettings(bool joinLocked, bool updatePassword, string password)
+        private static void ApplyLocalLobbySettings(LobbySettingsRequest request)
         {
             var lobby = LobbyManager.CurrentLobby;
-            if (lobby == null) return;
+            if (lobby == null || request == null) return;
 
-            lobby.JoinLocked = joinLocked;
-            if (updatePassword)
+            lobby.JoinLocked = request.JoinLocked;
+            if (request.UpdatePassword)
             {
-                lobby.IsPrivate = !string.IsNullOrWhiteSpace(password);
+                lobby.IsPrivate = !string.IsNullOrWhiteSpace(request.Password);
             }
+
+            if (request.UpdateGoal)
+            {
+                lobby.Goal = request.Goal;
+            }
+
+            if (request.UpdateSettlementEnabled)
+            {
+                lobby.SettlementEnabled = request.SettlementEnabled;
+            }
+        }
+
+        private static byte GetNextGoal(byte goal)
+        {
+            return (byte)((LobbyGoal)goal == LobbyGoal.Accuracy ? LobbyGoal.Score : LobbyGoal.Accuracy);
         }
 
         private async System.Threading.Tasks.Task LeaveLobbyAsync()
         {
-            using var _ = UIManager.LockUI("Leaving lobby...");
+            using var _ = WindowStackController.LockUI("Leaving lobby...");
 
             try
             {
@@ -317,7 +519,7 @@ namespace MDEN.UI.Windows
                     if (IsDisposed) return;
                     Close();
                     NavigationButton.RefreshRoomButton();
-                    UIManager.OpenWindow(new RoomListWindow());
+                    WindowStackController.OpenWindow(new RoomListWindow());
                 });
             }
             catch (System.Exception ex)

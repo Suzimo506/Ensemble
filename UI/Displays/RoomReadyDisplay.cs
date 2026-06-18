@@ -288,7 +288,7 @@ namespace MDEN.UI.Displays
 
             try
             {
-                using var _ = UIManager.LockUI("Setting ready...");
+                using var _ = WindowStackController.LockUI("Setting ready...");
                 await PlaylistManager.SetReadyAsync(!PlaylistManager.IsLocalPlayerReady());
             }
             catch (Exception ex)
@@ -313,7 +313,7 @@ namespace MDEN.UI.Displays
 
             try
             {
-                using var _ = UIManager.LockUI("Applying recommended config...");
+                using var _ = WindowStackController.LockUI("Applying recommended config...");
                 await RecommendedConfigManager.ApplyCurrentAsync();
             }
             catch (Exception ex)
@@ -336,7 +336,7 @@ namespace MDEN.UI.Displays
 
             try
             {
-                using var _ = UIManager.LockUI("Stopping lobby...");
+                using var _ = WindowStackController.LockUI("Stopping lobby...");
                 await PlaylistManager.StopLobbyAsync();
             }
             catch (Exception ex)

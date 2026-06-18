@@ -12,6 +12,7 @@ namespace MDEN.UI.Windows
         private ForumWindow _window;
         private ForumObject _btnBack;
         private ForumObject _btnFavGirlDisplayForOthers;
+        private ForumObject _btnHideBattleHealthBar;
         private int _lastSelectedIndex = -1;
 
         public override void Show()
@@ -43,7 +44,10 @@ namespace MDEN.UI.Windows
             _btnBack = CreateButton("- 返回 -", "回到主菜单");
             _btnFavGirlDisplayForOthers = CreateButton(
                 ModConfigManager.EnableFavGirlDisplayForOthers ? "已开启" : "已关闭",
-                $"是否启用favgirl显示给他人\n当前设置：{FormatSwitchState()}");
+                $"将我的 FavGirl 角色和精灵显示给其他玩家\n当前设置：{FormatSwitchState(ModConfigManager.EnableFavGirlDisplayForOthers)}");
+            _btnHideBattleHealthBar = CreateButton(
+                ModConfigManager.HideBattleHealthBar ? "已隐藏" : "已显示",
+                $"隐藏游戏内血量条和 Fever 条\n当前设置：{FormatSwitchState(ModConfigManager.HideBattleHealthBar)}");
         }
 
         private ForumObject CreateButton(string title, string description)
@@ -54,9 +58,9 @@ namespace MDEN.UI.Windows
             return button;
         }
 
-        private static string FormatSwitchState()
+        private static string FormatSwitchState(bool enabled)
         {
-            return ModConfigManager.EnableFavGirlDisplayForOthers
+            return enabled
                 ? "<color=00ff00ff>开启</color>"
                 : "<color=ff4444ff>关闭</color>";
         }
@@ -75,15 +79,23 @@ namespace MDEN.UI.Windows
             if (button == _btnBack)
             {
                 Close();
-                UIManager.OpenWindow(new MainMenuWindow());
+                WindowStackController.OpenWindow(new MainMenuWindow());
                 return;
             }
 
-            if (button != _btnFavGirlDisplayForOthers) return;
+            if (button == _btnFavGirlDisplayForOthers)
+            {
+                ModConfigManager.SetEnableFavGirlDisplayForOthers(!ModConfigManager.EnableFavGirlDisplayForOthers);
+                PlayerManager.SyncSelectionFireAndForget(GameAccountManager.RefreshSelectionSnapshot());
+                RoomHudController.RequestRefresh();
+                RebuildWindow();
+                return;
+            }
 
-            ModConfigManager.SetEnableFavGirlDisplayForOthers(!ModConfigManager.EnableFavGirlDisplayForOthers);
-            PlayerManager.SyncSelectionFireAndForget(GameAccountManager.RefreshSelectionSnapshot());
-            RoomHudController.RequestRefresh();
+            if (button != _btnHideBattleHealthBar) return;
+
+            ModConfigManager.SetHideBattleHealthBar(!ModConfigManager.HideBattleHealthBar);
+            Patches.BattleFlowPatch.ApplyBattleHealthBarVisibility();
             RebuildWindow();
         }
 

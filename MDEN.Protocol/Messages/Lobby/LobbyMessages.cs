@@ -87,6 +87,10 @@ namespace MDEN.Protocol.Messages.Lobby
     {
         public bool JoinLocked { get; set; }
         public bool UpdatePassword { get; set; }
+        public bool UpdateGoal { get; set; }
+        public byte Goal { get; set; }
+        public bool UpdateSettlementEnabled { get; set; }
+        public bool SettlementEnabled { get; set; }
 
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public string Password { get; set; }

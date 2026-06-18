@@ -130,7 +130,7 @@ namespace MDEN.UI.Windows
             }
 
             _isRefreshingNodes = true;
-            using var _ = UIManager.LockUI("Fetching server nodes...");
+            using var _ = WindowStackController.LockUI("Fetching server nodes...");
             CloudSyncIndicator.Start("正在获取节点...");
 
             try
@@ -354,7 +354,7 @@ namespace MDEN.UI.Windows
             if (button == _btnBack)
             {
                 Close();
-                UIManager.OpenWindow(new MainMenuWindow());
+                WindowStackController.OpenWindow(new MainMenuWindow());
             }
             else if (button == _btnRefresh)
             {
@@ -405,7 +405,7 @@ namespace MDEN.UI.Windows
                 if (customIndex >= 0)
                 {
                     Close();
-                    UIManager.OpenWindow(new CustomServerManagementWindow(customIndex));
+                    WindowStackController.OpenWindow(new CustomServerManagementWindow(customIndex));
                     return;
                 }
 
@@ -456,7 +456,7 @@ namespace MDEN.UI.Windows
 
         private async Task JoinServerAsync(string address, string serverDisplayName = null, bool isOfficialServer = false)
         {
-            using var _ = UIManager.LockUI("Connecting to server...");
+            using var _ = WindowStackController.LockUI("Connecting to server...");
 
             try
             {
@@ -469,7 +469,7 @@ namespace MDEN.UI.Windows
                 {
                     if (IsDisposed) return;
                     Close();
-                    UIManager.OpenWindow(new RoomListWindow());
+                    WindowStackController.OpenWindow(new RoomListWindow());
                 });
             }
             catch (Exception ex)

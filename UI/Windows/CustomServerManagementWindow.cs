@@ -19,6 +19,7 @@ namespace MDEN.UI.Windows
         private ForumObject _btnJoin;
         private ForumObject _btnRename;
         private ForumObject _btnDelete;
+        private int _lastSelectedIndex = -1;
 
         public CustomServerManagementWindow(int customServerIndex)
         {
@@ -33,6 +34,7 @@ namespace MDEN.UI.Windows
             _window.OnSelectionChanged += OnSelectionChanged;
             _window.OnInternalShow += OnInternalShowInjectTitle;
             _window.Show();
+            _lastSelectedIndex = -1;
 
             RegisterEventCleanup(() =>
             {
@@ -49,6 +51,7 @@ namespace MDEN.UI.Windows
         private void BuildList()
         {
             _window.ForumObjects.Clear();
+            _lastSelectedIndex = -1;
 
             var selectedServer = GetSelectedCustomServer();
             var serverName = selectedServer?.Name ?? "自定义节点";
@@ -75,18 +78,25 @@ namespace MDEN.UI.Windows
         {
             if (_window == null || objectIndex < 0 || objectIndex >= _window.ForumObjects.Count) return;
 
+            // 第一次点击只会选中并且展示右侧文本，第二次点击才生效
+            if (_lastSelectedIndex != objectIndex)
+            {
+                _lastSelectedIndex = objectIndex;
+                return;
+            }
+
             var button = _window.ForumObjects[objectIndex];
             var selectedServer = GetSelectedCustomServer();
 
             if (button == _btnBack)
             {
                 Close();
-                UIManager.OpenWindow(new ServerSelectionWindow());
+                WindowStackController.OpenWindow(new ServerSelectionWindow());
             }
             else if (selectedServer == null)
             {
                 Close();
-                UIManager.OpenWindow(new ServerSelectionWindow());
+                WindowStackController.OpenWindow(new ServerSelectionWindow());
             }
             else if (button == _btnJoin)
             {
@@ -100,7 +110,7 @@ namespace MDEN.UI.Windows
             {
                 ModConfigManager.DeleteCustomServer(_customServerIndex);
                 Close();
-                UIManager.OpenWindow(new ServerSelectionWindow());
+                WindowStackController.OpenWindow(new ServerSelectionWindow());
             }
         }
 
@@ -121,7 +131,7 @@ namespace MDEN.UI.Windows
                 }
 
                 Close();
-                UIManager.OpenWindow(new CustomServerManagementWindow(_customServerIndex));
+                WindowStackController.OpenWindow(new CustomServerManagementWindow(_customServerIndex));
             };
             input.Show();
         }
@@ -139,7 +149,7 @@ namespace MDEN.UI.Windows
 
         private async Task JoinServerAsync(string address, string serverDisplayName)
         {
-            using var _ = UIManager.LockUI("Connecting to server...");
+            using var _ = WindowStackController.LockUI("Connecting to server...");
 
             try
             {
@@ -152,7 +162,7 @@ namespace MDEN.UI.Windows
                 {
                     if (IsDisposed) return;
                     Close();
-                    UIManager.OpenWindow(new RoomListWindow());
+                    WindowStackController.OpenWindow(new RoomListWindow());
                 });
             }
             catch (Exception ex)

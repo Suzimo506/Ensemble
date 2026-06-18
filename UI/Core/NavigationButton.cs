@@ -23,11 +23,12 @@ namespace MDEN.UI.Core
         private const float ServerLabelOptionOffset = 420f;
         private const float ServerLabelWidth = 280f;
         private const float NavigationIconCenterOffset = 10f;
-        private const string NavigationButtonSpriteName = "PcSprButton_Img.png";
-        private const string MultiplayerIconSpriteName = "Multiplayer_Img.png";
-        private const string MyRoomIconSpriteName = "MyRoom_Img.png";
-        private const string PlaylistIconSpriteName = "RoomPlaylist_Img.png";
-        private const string StartIconSpriteName = "Play_Img.png";
+        private const float RoomActionIconCenterOffset = 8f;
+        private const string NavigationButtonSpriteName = "PcSprButton.png";
+        private const string MultiplayerIconSpriteName = "Multiplayer.png";
+        private const string MyRoomIconSpriteName = "MyRoom.png";
+        private const string PlaylistIconSpriteName = "RoomPlaylist.png";
+        private const string StartIconSpriteName = "Play.png";
         // 绑定到原生 UI 生命周期中调用
         public static void Create()
         {
@@ -95,7 +96,7 @@ namespace MDEN.UI.Core
                 button.onClick = new Button.ButtonClickedEvent();
                 button.onClick.AddListener((UnityAction)new Action(() => 
                 {
-                    UIManager.OpenWindow(LobbyManager.IsInLobby
+                    WindowStackController.OpenWindow(LobbyManager.IsInLobby
                         ? new RoomListWindow(true)
                         : new MainMenuWindow());
                 }));
@@ -278,7 +279,7 @@ namespace MDEN.UI.Core
                 button.onClick = new Button.ButtonClickedEvent();
                 button.onClick.AddListener((UnityAction)new Action(() =>
                 {
-                    UIManager.OpenWindow(new MyRoomWindow());
+                    WindowStackController.OpenWindow(new MyRoomWindow());
                 }));
             }
         }
@@ -296,7 +297,7 @@ namespace MDEN.UI.Core
             {
                 _playlistBtn = CreateTopActionButton("BtnMDENPlaylist", 1, "歌曲列表", () =>
                 {
-                    UIManager.OpenWindow(new RoomPlaylistWindow());
+                    WindowStackController.OpenWindow(new RoomPlaylistWindow());
                 });
             }
 
@@ -322,7 +323,7 @@ namespace MDEN.UI.Core
 
         private static async System.Threading.Tasks.Task StartPrepareAsync()
         {
-            using var _ = UIManager.LockUI("Starting lobby...");
+            using var _ = WindowStackController.LockUI("Starting lobby...");
 
             try
             {
@@ -437,7 +438,7 @@ namespace MDEN.UI.Core
             iconRect.anchorMin = new Vector2(0.5f, 0.5f);
             iconRect.anchorMax = new Vector2(0.5f, 0.5f);
             iconRect.pivot = new Vector2(0.5f, 0.5f);
-            iconRect.anchoredPosition = new Vector2(mirrorParent ? 0f : NavigationIconCenterOffset, 0f);
+            iconRect.anchoredPosition = new Vector2(mirrorParent ? RoomActionIconCenterOffset : NavigationIconCenterOffset, 0f);
             var scale = iconRect.localScale;
             iconRect.localScale = new Vector3(
                 mirrorParent ? -Mathf.Abs(scale.x) : Mathf.Abs(scale.x),

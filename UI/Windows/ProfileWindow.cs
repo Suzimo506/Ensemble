@@ -185,7 +185,7 @@ namespace MDEN.UI.Windows
             if (button == _btnBack)
             {
                 Close();
-                UIManager.OpenWindow(new MainMenuWindow());
+                WindowStackController.OpenWindow(new MainMenuWindow());
             }
             else if (button == _btnRefresh)
             {
@@ -236,7 +236,7 @@ namespace MDEN.UI.Windows
 
         private async Task SaveProfileFieldAsync(string fieldName, string value, Func<string, Task> saveAction)
         {
-            using var _ = UIManager.LockUI("Saving profile...");
+            using var _ = WindowStackController.LockUI("Saving profile...");
 
             try
             {

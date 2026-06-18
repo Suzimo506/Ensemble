@@ -43,7 +43,7 @@ namespace MDEN.UI.Displays
                 SetEntry(
                     key,
                     $"{hostPrefix}{localColorStart}{player.Name}{localColorEnd}",
-                    () => UIManager.OpenWindow(new RoomPlayerWindow(capturedPlayer)));
+                    () => WindowStackController.OpenWindow(new RoomPlayerWindow(capturedPlayer)));
             }
 
             RemoveMissingEntries(activeKeys);
@@ -77,6 +77,7 @@ namespace MDEN.UI.Displays
                     {
                         Uid = player.Uid,
                         Name = string.IsNullOrEmpty(player.Name) ? player.Uid : player.Name,
+                        Bio = player.Bio,
                         Title = GetDisplayTitle(player),
                         ChatColor = GetDisplayColor(player),
                         PingMS = player.PingMS,
@@ -98,6 +99,7 @@ namespace MDEN.UI.Displays
                     Name = uid == PlayerManager.CurrentUid && !string.IsNullOrEmpty(PlayerManager.CurrentProfile?.Name)
                         ? PlayerManager.CurrentProfile.Name
                         : uid,
+                    Bio = uid == PlayerManager.CurrentUid ? PlayerManager.CurrentProfile?.Bio : null,
                     Title = uid == PlayerManager.CurrentUid ? PlayerManager.CurrentProfile?.Title : null,
                     ChatColor = uid == PlayerManager.CurrentUid ? PlayerManager.CurrentProfile?.ChatColor : null
                 };

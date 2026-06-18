@@ -8,7 +8,7 @@
     <GenerateTargetFrameworkAttribute>false</GenerateTargetFrameworkAttribute>
     <LangVersion>preview</LangVersion>
     <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
-    <AssemblyName>MDEN</AssemblyName>
+    <AssemblyName>Ensemble</AssemblyName>
   </PropertyGroup>
 
   <Target Name="CopyDLLs" AfterTargets="Build">

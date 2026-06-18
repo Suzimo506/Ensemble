@@ -6,6 +6,18 @@ MDEN（Muse Dash Ensemble）是一个基于 MelonLoader 的 Muse Dash 联机模�
 
 ---
 
+## 安装教程
+
+请将 `Ensemble.dll` 放入 `Mods`，安装前置模组 `PopupLib.dll`（作者：`PBalint817`），并将 `MDEN.Protocol.dll` 放入 `UserLibs`。
+
+---
+
+## 模组使用教程
+
+详情请见 [mden.top](https://mden.top/)。
+
+---
+
 ## 功能概览
 
 - 多人房间：创建、加入、离开、锁房、踢人、准备与开始。
@@ -30,12 +42,6 @@ MDEN（Muse Dash Ensemble）是一个基于 MelonLoader 的 Muse Dash 联机模�
 | `Patches/` | Harmony Patch，负责把入口和游戏流程接入原版 Muse Dash。 |
 | `MDEN.Protocol/` | 客户端和服务端共享的 OpCode、Envelope、DTO 与协议模型。 |
 | `Assets/` | 模组内嵌或运行时加载的图片资源。 |
-
----
-
-## 模组使用教程
-
-详情请见 [mden.top](https://mden.top/)。
 
 ---
 

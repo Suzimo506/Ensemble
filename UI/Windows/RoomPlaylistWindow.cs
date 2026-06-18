@@ -1,6 +1,7 @@
 using LocalizeLib;
 using Il2CppAssets.Scripts.UI.Controls;
 using MDEN.Managers;
+using MDEN.Protocol.Messages.Lobby;
 using MDEN.UI.Core;
 using MelonLoader;
 using PopupLib.UI.Components;
@@ -14,23 +15,60 @@ namespace MDEN.UI.Windows
         private ForumWindow _window;
         private PlaylistEntryViewModel[] _items = new PlaylistEntryViewModel[0];
         private int _lastSelectedIndex = -1;
+        private readonly object _refreshLock = new object();
+        private bool _refreshQueued;
+        private int _lastLobbyId = -1;
+        private string _lastPlaylistSnapshot = string.Empty;
 
         public override void Show()
         {
             _window = new ForumWindow();
             _window.AutoReset = true;
             BuildList();
+            CapturePlaylistSnapshot(LobbyManager.CurrentLobby);
+            LobbyManager.CurrentLobbyChanged += HandleCurrentLobbyChanged;
             _window.OnSelectionChanged += OnSelectionChanged;
             _window.OnInternalShow += OnInternalShowInjectTitle;
             _window.Show();
 
             RegisterEventCleanup(() =>
             {
+                LobbyManager.CurrentLobbyChanged -= HandleCurrentLobbyChanged;
+
                 if (_window != null)
                 {
                     _window.OnSelectionChanged -= OnSelectionChanged;
                     _window.OnInternalShow -= OnInternalShowInjectTitle;
                 }
+            });
+        }
+
+        private void HandleCurrentLobbyChanged(LobbySyncPush lobby)
+        {
+            lock (_refreshLock)
+            {
+                if (!HasPlaylistStateChanged(lobby) || _refreshQueued) return;
+                _refreshQueued = true;
+            }
+
+            MainThreadDispatcher.Enqueue(() =>
+            {
+                lock (_refreshLock)
+                {
+                    _refreshQueued = false;
+                }
+
+                if (IsDisposed) return;
+
+                if (lobby == null)
+                {
+                    Close();
+                    WindowStackController.OpenWindow(new RoomListWindow());
+                    return;
+                }
+
+                CapturePlaylistSnapshot(lobby);
+                RebuildWindow();
             });
         }
 
@@ -53,6 +91,30 @@ namespace MDEN.UI.Windows
                 var desc = $"谱面: {EscapeRichText(item.DisplayName)}\n难度: {FormatDifficulty(item.Difficulty)}\n添加者: {EscapeRichText(item.OwnerName)}";
                 AddButton(title, desc);
             }
+        }
+
+        private bool HasPlaylistStateChanged(LobbySyncPush lobby)
+        {
+            var lobbyId = lobby?.Id ?? -1;
+            var snapshot = BuildPlaylistSnapshot(lobby);
+            return lobbyId != _lastLobbyId || snapshot != _lastPlaylistSnapshot;
+        }
+
+        private void CapturePlaylistSnapshot(LobbySyncPush lobby)
+        {
+            _lastLobbyId = lobby?.Id ?? -1;
+            _lastPlaylistSnapshot = BuildPlaylistSnapshot(lobby);
+        }
+
+        private static string BuildPlaylistSnapshot(LobbySyncPush lobby)
+        {
+            if (lobby == null) return string.Empty;
+
+            var playlist = lobby.Playlist == null || lobby.Playlist.Length == 0
+                ? string.Empty
+                : string.Join("\u001F", lobby.Playlist);
+
+            return $"{lobby.PlaylistSize}|{lobby.Locked}|{lobby.IsPlaying}|{playlist}";
         }
 
         private ForumObject AddButton(string title, string desc)
@@ -103,7 +165,7 @@ namespace MDEN.UI.Windows
         {
             if (item == null || IsDisposed) return;
 
-            using var _ = UIManager.LockUI("Removing playlist entry...");
+            using var _ = WindowStackController.LockUI("Removing playlist entry...");
             try
             {
                 await PlaylistManager.RemoveAsync(item.Entry);

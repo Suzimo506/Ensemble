@@ -6,6 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using MDEN.Protocol;
 using MDEN.Protocol.Envelopes;
+using MDEN.Protocol.Messages.System;
 using MelonLoader;
 
 namespace MDEN.Network
@@ -26,6 +27,7 @@ namespace MDEN.Network
         private uint _nextReqId;
         private CancellationTokenSource _heartbeatCts;
         private int _connectionId;
+        private DateTime _lastPingSentUtc;
 
         public bool IsConnected => _isConnected;
 
@@ -215,6 +217,12 @@ namespace MDEN.Network
 
                         if (envelope.ReqId == null)
                         {
+                            if (envelope.Op == OpCodes.Pong)
+                            {
+                                _ = ReportPingAsync();
+                                continue;
+                            }
+
                             if (envelope.Payload is JsonElement pushPayload)
                             {
                                 OnPushReceived?.Invoke(envelope.Op, pushPayload);
@@ -252,6 +260,7 @@ namespace MDEN.Network
         {
             unchecked { _connectionId++; }
             _isConnected = false;
+            _lastPingSentUtc = default;
             StopHeartbeat();
             try { _stream?.Close(); } catch { }
             try { _tcpClient?.Close(); } catch { }
@@ -282,6 +291,7 @@ namespace MDEN.Network
                     await Task.Delay(15000, cancellationToken);
                     if (!_isConnected || _stream == null) continue;
 
+                    _lastPingSentUtc = DateTime.UtcNow;
                     await SendAsync(new ClientEnvelope { Op = OpCodes.Ping });
                 }
                 catch (OperationCanceledException)
@@ -292,6 +302,23 @@ namespace MDEN.Network
                 {
                     MelonLogger.Warning($"Heartbeat failed: {ex.Message}");
                 }
+            }
+        }
+
+        private async Task ReportPingAsync()
+        {
+            if (_lastPingSentUtc == default || !_isConnected || _stream == null) return;
+
+            var elapsedMs = (DateTime.UtcNow - _lastPingSentUtc).TotalMilliseconds;
+            var ping = (ushort)Math.Max(0, Math.Min(ushort.MaxValue, (int)Math.Round(elapsedMs)));
+
+            try
+            {
+                await SendNotifyAsync(OpCodes.PingReportNotify, new PingReportNotify { PingMS = ping });
+            }
+            catch (Exception ex)
+            {
+                MelonLogger.Warning($"Report ping failed: {ex.Message}");
             }
         }
 

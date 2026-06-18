@@ -29,8 +29,18 @@ namespace MDEN.UI.Windows
             _player = player ?? new PlayerSyncEntry();
         }
 
-        public override void Show()
+        public override async void Show()
         {
+            await LoadProfileForInitialShowAsync();
+            if (IsDisposed) return;
+
+            MainThreadDispatcher.Enqueue(ShowLoadedWindow);
+        }
+
+        private void ShowLoadedWindow()
+        {
+            if (IsDisposed) return;
+
             _window = new ForumWindow();
             _window.AutoReset = true;
             BuildList();
@@ -43,11 +53,9 @@ namespace MDEN.UI.Windows
                 UnbindWindowEvents();
                 RemoveInjectedObjects();
             });
-
-            _ = LoadProfileAsync();
         }
 
-        private async Task LoadProfileAsync()
+        private async Task LoadProfileForInitialShowAsync()
         {
             if (string.IsNullOrWhiteSpace(_player.Uid)) return;
 
@@ -56,13 +64,6 @@ namespace MDEN.UI.Windows
                 _profile = _player.Uid == PlayerManager.CurrentUid
                     ? await PlayerManager.GetMyProfileAsync()
                     : await PlayerManager.GetProfileAsync(_player.Uid);
-
-                if (IsDisposed) return;
-                MainThreadDispatcher.Enqueue(() =>
-                {
-                    if (IsDisposed || _window == null) return;
-                    RebuildWindow();
-                });
             }
             catch (Exception ex)
             {
@@ -109,7 +110,7 @@ namespace MDEN.UI.Windows
 
         private async Task SendFriendRequestAsync()
         {
-            using var _ = UIManager.LockUI("处理中...");
+            using var _ = WindowStackController.LockUI("处理中...");
             try
             {
                 var response = await SocialManager.SendFriendRequestAsync(_player.Uid);

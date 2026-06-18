@@ -18,7 +18,7 @@ using UnityEngine.UI;
 
 namespace MDEN.Patches
 {
-    internal static class BattlePatch
+    internal static class BattleFlowPatch
     {
         private static bool _canExitBattleResult;
         private static bool _battleResultFlowPending;
@@ -30,6 +30,7 @@ namespace MDEN.Patches
         public static void SceneLoaded()
         {
             _canExitBattleResult = false;
+            ApplyBattleHealthBarVisibility();
             if (!LobbyManager.IsInLobby)
             {
                 _canExitBattleResult = true;
@@ -45,6 +46,7 @@ namespace MDEN.Patches
         {
             private static void Postfix()
             {
+                ApplyBattleHealthBarVisibility();
                 if (!LobbyManager.IsInLobby) return;
 
                 _canExitBattleResult = false;
@@ -149,6 +151,20 @@ namespace MDEN.Patches
             if (pauseButton != null)
             {
                 pauseButton.SetActive(false);
+            }
+        }
+
+        public static void ApplyBattleHealthBarVisibility()
+        {
+            var healthBar = GameObject.Find("UI_2D/Standard/PnlBattle/PnlBattleUI/PnlBattleOthers/Below");
+            if (healthBar == null)
+            {
+                healthBar = GameObject.Find("PnlBattleOthers")?.transform.Find("Below")?.gameObject;
+            }
+
+            if (healthBar != null)
+            {
+                healthBar.SetActive(!ModConfigManager.HideBattleHealthBar);
             }
         }
 
