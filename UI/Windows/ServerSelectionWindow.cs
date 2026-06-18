@@ -159,6 +159,7 @@ namespace MDEN.UI.Windows
                     {
                         if (info.NodeId == "shanghai") displayName = "上海";
                         else if (info.NodeId == "shandong") displayName = "山东";
+                        else if (info.NodeId == "hubei") displayName = "湖北";
                         else if (info.NodeId == "hongkong") displayName = "香港";
                         else if (info.NodeId == "us") displayName = "美国";
                         else if (info.NodeId == "test") displayName = "内测节点";
