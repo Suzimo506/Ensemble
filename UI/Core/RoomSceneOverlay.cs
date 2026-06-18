@@ -155,7 +155,7 @@ namespace MDEN.UI.Core
             rect.anchorMax = new Vector2(1f, 1f);
             rect.pivot = new Vector2(1f, 1f);
             rect.anchoredPosition = new Vector2(x, y);
-            rect.sizeDelta = new Vector2(520f, fontSize * 4f);
+            rect.sizeDelta = new Vector2(620f, fontSize * 12f);
 
             var text = obj.AddComponent<Text>();
             ApplyGameFont(text);
@@ -243,8 +243,49 @@ namespace MDEN.UI.Core
             var roomName = EscapeRichText(lobby.Name);
             var hostName = EscapeRichText(GetHostName(lobby));
             var hostColor = GetPlayerColor(lobby.HostUid);
-            return $"<color=#{Constants.ColorYellow}>【{roomName}】</color> {GetPlayerCount(lobby)}/{lobby.MaxPlayers}\n" +
-                   $"房主：<color=#{hostColor}>【{hostName}】</color>";
+            var otherPlayers = FormatOtherPlayers(lobby);
+            var text = $"<color=#{Constants.ColorYellow}>【{roomName}】</color> {GetPlayerCount(lobby)}/{lobby.MaxPlayers}\n" +
+                       $"房主：<color=#{hostColor}>【{hostName}】</color>";
+
+            return string.IsNullOrEmpty(otherPlayers)
+                ? text
+                : $"{text}\n成员：{otherPlayers}";
+        }
+
+        private static string FormatOtherPlayers(LobbySyncPush lobby)
+        {
+            var names = GetOtherPlayerNames(lobby)
+                .Select(name => $"<color=#ffffffff>【{EscapeRichText(name)}】</color>")
+                .ToArray();
+            return names.Length == 0 ? string.Empty : string.Join(" ", names);
+        }
+
+        private static IEnumerable<string> GetOtherPlayerNames(LobbySyncPush lobby)
+        {
+            var seenUids = new HashSet<string>();
+            if (lobby.PlayerDetails != null && lobby.PlayerDetails.Length > 0)
+            {
+                foreach (var player in lobby.PlayerDetails)
+                {
+                    if (string.IsNullOrEmpty(player?.Uid)) continue;
+                    if (player.Uid == lobby.HostUid) continue;
+                    if (!seenUids.Add(player.Uid)) continue;
+                    yield return string.IsNullOrEmpty(player.Name) ? player.Uid : player.Name;
+                }
+
+                yield break;
+            }
+
+            if (lobby.Players == null) yield break;
+            foreach (var uid in lobby.Players)
+            {
+                if (string.IsNullOrEmpty(uid)) continue;
+                if (uid == lobby.HostUid) continue;
+                if (!seenUids.Add(uid)) continue;
+                yield return uid == PlayerManager.CurrentUid && !string.IsNullOrEmpty(PlayerManager.CurrentProfile?.Name)
+                    ? PlayerManager.CurrentProfile.Name
+                    : uid;
+            }
         }
 
         private static string GetHostName(LobbySyncPush lobby)
