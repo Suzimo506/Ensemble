@@ -8,7 +8,7 @@ MDEN（Muse Dash Ensemble）是一个基于 MelonLoader 的 Muse Dash 联机模�
 
 ## 安装教程
 
-请将 `Ensemble.dll` 放入 `Mods`，安装前置模组 `PopupLib.dll`（作者：`PBalint817`），并将 `MDEN.Protocol.dll` 放入 `UserLibs`。
+请将 `Ensemble.dll` 放入 `Mods`，安装前置模组 `PopupLib.dll`（作者：`PBalint817`）和 `LocalizeLib.dll`，并将 `MDEN.Protocol.dll` 放入 `UserLibs`。
 
 ---
 

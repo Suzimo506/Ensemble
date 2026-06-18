@@ -1,6 +1,9 @@
 *.md
-Assets/
-assets/
+Assets/**
+!Assets/
+!Assets/UI/
+!Assets/UI/**/
+!Assets/UI/**/*.png
 bin/
 obj/
 .vs/
