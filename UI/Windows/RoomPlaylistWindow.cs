@@ -68,7 +68,7 @@ namespace MDEN.UI.Windows
                 }
 
                 CapturePlaylistSnapshot(lobby);
-                RebuildWindow();
+                RefreshWindowContent();
             });
         }
 
@@ -240,6 +240,15 @@ namespace MDEN.UI.Windows
             _window.OnSelectionChanged += OnSelectionChanged;
             _window.OnInternalShow += OnInternalShowInjectTitle;
             _window.Show();
+            _lastSelectedIndex = -1;
+        }
+
+        private void RefreshWindowContent()
+        {
+            if (_window == null) return;
+
+            BuildList();
+            OnInternalShowInjectTitle(null);
             _lastSelectedIndex = -1;
         }
     }
