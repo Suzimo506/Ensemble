@@ -24,7 +24,7 @@ namespace MDEN.UI.Core
         private const float ServerLabelWidth = 280f;
         private const float NavigationIconCenterOffset = 10f;
         private const float RoomActionIconCenterOffset = 8f;
-        private const string NavigationButtonSpriteName = "PcSprButton.png";
+        private const string NavigationButtonSpriteName = "PcSprButton_Img.png";
         private const string MultiplayerIconSpriteName = "Multiplayer_Img.png";
         private const string MyRoomIconSpriteName = "MyRoom_Img.png";
         private const string PlaylistIconSpriteName = "RoomPlaylist_Img.png";
