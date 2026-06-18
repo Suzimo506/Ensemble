@@ -71,3 +71,9 @@ dotnet build .\MDEN.csproj
 ## 许可
 
 本项目使用 GNU General Public License v3.0。详见 `LICENSE`。
+
+---
+
+## 赞助官方服务器
+
+如果你愿意支持 MDEN 官方服务器，可以通过 [爱发电](https://afdian.com/a/szm520) 赞助。
