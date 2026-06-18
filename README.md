@@ -77,3 +77,5 @@ dotnet build .\MDEN.csproj
 ## 赞助官方服务器
 
 如果你愿意支持 MDEN 官方服务器，可以通过 [爱发电](https://afdian.com/a/szm520) 赞助。
+
+如果你需要私人开服工具，请进入喵斯兔交流群联系群主或者管理员。
