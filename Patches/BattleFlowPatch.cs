@@ -22,22 +22,50 @@ namespace MDEN.Patches
     {
         private static bool _canExitBattleResult;
         private static bool _battleResultFlowPending;
+        private static bool _multiplayerBattleActive;
+        private static int _nextPauseButtonHideFrame;
         private static BattlePlayerEntry[] _lastBattleResultSnapshot = System.Array.Empty<BattlePlayerEntry>();
 
         internal static bool IsHoldingBattleResult => !_canExitBattleResult && _lastBattleResultSnapshot.Length > 0;
         internal static bool IsBattleResultFlowPending => LobbyManager.IsInLobby && _battleResultFlowPending;
+        private static bool IsMultiplayerBattleContext => _multiplayerBattleActive || LobbyManager.CurrentLobby?.IsPlaying == true;
+
+        internal static void MarkMultiplayerBattleStarting()
+        {
+            _multiplayerBattleActive = true;
+            _nextPauseButtonHideFrame = 0;
+        }
+
+        internal static void ResetBattleSceneState()
+        {
+            _multiplayerBattleActive = false;
+            _battleResultFlowPending = false;
+            _lastBattleResultSnapshot = System.Array.Empty<BattlePlayerEntry>();
+            _canExitBattleResult = true;
+            _nextPauseButtonHideFrame = 0;
+        }
+
+        internal static void UpdateBattleUiState()
+        {
+            if (!IsMultiplayerBattleContext) return;
+            if (Time.frameCount < _nextPauseButtonHideFrame) return;
+
+            HidePauseButton();
+            _nextPauseButtonHideFrame = Time.frameCount + 30;
+        }
 
         public static void SceneLoaded()
         {
             _canExitBattleResult = false;
             ApplyBattleHealthBarVisibility();
-            if (!LobbyManager.IsInLobby)
+            if (!LobbyManager.IsInLobby && !_multiplayerBattleActive)
             {
                 _canExitBattleResult = true;
                 return;
             }
 
-            HidePauseButton();
+            _multiplayerBattleActive = true;
+            HideBattleControls();
         }
 
         [HarmonyPatch(typeof(PnlBattle), nameof(PnlBattle.GameStart))]
@@ -47,13 +75,13 @@ namespace MDEN.Patches
             private static void Postfix()
             {
                 ApplyBattleHealthBarVisibility();
-                if (!LobbyManager.IsInLobby) return;
+                if (!LobbyManager.IsInLobby && !_multiplayerBattleActive) return;
 
+                _multiplayerBattleActive = true;
                 _canExitBattleResult = false;
                 _battleResultFlowPending = false;
                 _lastBattleResultSnapshot = System.Array.Empty<BattlePlayerEntry>();
-                HidePauseButton();
-                HideFailRestartButton();
+                HideBattleControls();
                 BattleManager.PrepareForNewBattle();
                 BattleHudController.OnBattleStarted();
                 _ = BattleManager.SyncStartAsync();
@@ -112,7 +140,21 @@ namespace MDEN.Patches
 
             private static bool Prefix()
             {
-                return !LobbyManager.IsInLobby;
+                HidePauseButton();
+                return !IsMultiplayerBattleContext;
+            }
+        }
+
+        [HarmonyPatch(typeof(Input), nameof(Input.GetKeyDown), typeof(KeyCode))]
+        [HarmonyPriority(Priority.First)]
+        internal static class BattleEscapeKeyPatch
+        {
+            private static bool Prefix(KeyCode key, ref bool __result)
+            {
+                if (key != KeyCode.Escape || !IsMultiplayerBattleContext) return true;
+
+                __result = false;
+                return false;
             }
         }
 
@@ -122,7 +164,7 @@ namespace MDEN.Patches
         {
             private static bool Prefix()
             {
-                return !LobbyManager.IsInLobby;
+                return !IsMultiplayerBattleContext;
             }
         }
 
@@ -132,13 +174,14 @@ namespace MDEN.Patches
         {
             private static bool Prefix()
             {
-                return !LobbyManager.IsInLobby || _canExitBattleResult;
+                return !IsMultiplayerBattleContext || _canExitBattleResult;
             }
 
             private static void Postfix()
             {
                 if (!LobbyManager.IsInLobby)
                 {
+                    _multiplayerBattleActive = false;
                     BattleManager.Reset();
                     BattleHudController.Destroy();
                 }
@@ -152,6 +195,13 @@ namespace MDEN.Patches
             {
                 pauseButton.SetActive(false);
             }
+        }
+
+        private static void HideBattleControls()
+        {
+            HidePauseButton();
+            HideFailRestartButton();
+            _nextPauseButtonHideFrame = 0;
         }
 
         public static void ApplyBattleHealthBarVisibility()

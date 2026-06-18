@@ -34,6 +34,7 @@ namespace MDEN
             if (sceneName == "UISystem_PC")
             {
                 WindowStackController.ForceUnlock();
+                Patches.BattleFlowPatch.ResetBattleSceneState();
                 NavigationButton.ResetSceneObjects();
                 RoomHudController.ResetSceneObjects();
 
@@ -58,6 +59,7 @@ namespace MDEN
         {
             MainThreadDispatcher.ProcessQueue();
             PlayerManager.SyncCurrentSelectionIfChanged();
+            Patches.BattleFlowPatch.UpdateBattleUiState();
             RoomHudController.Update();
         }
 

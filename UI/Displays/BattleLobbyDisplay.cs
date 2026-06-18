@@ -213,7 +213,7 @@ namespace MDEN.UI.Displays
         {
             var playerName = EscapeRichText(GetPlayerName(player.Uid));
             var nameColor = GetPlayerColor(player.Uid);
-            return $"{FormatRank(player, rank)} {ColorText(playerName, nameColor)} — {FormatResultAccuracy(player)}";
+            return $"{FormatRank(player, rank)} {ColorText(playerName, nameColor)} — {FormatBattleInfo(player, false)}";
         }
 
         internal static BattlePlayerEntry[] WithLobbyDefaults(BattlePlayerEntry[] players)
@@ -248,29 +248,6 @@ namespace MDEN.UI.Displays
             if (!forceAccuracy && goal == LobbyGoal.Score)
             {
                 return ColorText(player.Score.ToString(), Constants.ColorYellow);
-            }
-
-            if (IsTp(player))
-            {
-                return ColorText("TP", ColorRed);
-            }
-
-            if (IsAp(player))
-            {
-                return $"{ColorText("AP", ColorGold)}{FormatJudgementSuffix(player)}";
-            }
-
-            var accuracy = player.Accuracy.ToString("0.00", CultureInfo.InvariantCulture);
-            var accuracyText = ColorText($"{accuracy}%", GetAccuracyColor(player.Accuracy));
-            var result = player.FC ? $"{ColorText("FC", Constants.ColorBlue)} {accuracyText}" : accuracyText;
-            return result + FormatJudgementSuffix(player);
-        }
-
-        private static string FormatResultAccuracy(BattlePlayerEntry player)
-        {
-            if (!player.Alive)
-            {
-                return ColorText("Down", ColorRed);
             }
 
             if (IsTp(player))

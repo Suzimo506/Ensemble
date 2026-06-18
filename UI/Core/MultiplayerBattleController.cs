@@ -118,6 +118,7 @@ namespace MDEN.UI.Core
                 return false;
             }
 
+            BattleFlowPatch.MarkMultiplayerBattleStarting();
             BattleHelper.GameBattleStart(new Il2CppSystem.Object());
             return true;
         }
