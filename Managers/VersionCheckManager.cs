@@ -70,7 +70,7 @@ namespace MDEN.Managers
 
         private static Version GetCurrentVersion()
         {
-            var versionText = MelonBase.FindMelon("MDEN", "MDEN Team")?.Info?.Version;
+            var versionText = MelonBase.FindMelon("MDEN", "MDENTeam")?.Info?.Version;
             return Version.TryParse(versionText, out var version)
                 ? version
                 : new Version(0, 0, 0);

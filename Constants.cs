@@ -6,6 +6,7 @@ namespace MDEN
         public const string ColorPink = "f542adff";
         public const string ColorYellow = "fff700ff";
         public const string ColorCyan = "00ffffff";
+        public const string ColorLavender = "c58cffff";
 
         public const string ModName = "MDEN";
         public const string AssetsDirName = "Assets";
@@ -17,6 +18,10 @@ namespace MDEN
             "<color=" + ColorPink + ">XMJjs</color> — Mod与服务器后端开发者\n" +
             "<color=" + ColorPink + ">Cookie</color> — Mod与服务器后端开发者\n" +
             "[ 测试团队 ]\n" +
-            "MSC☆言叶. AP的是给 莼畹ChunWan_ 冬瓜糖 飞翔冥王星 GreenHub 纯鹿人 苏达 nuxwalker 萧千岁 fish 浅夏\n\n";
+            "MSC☆言叶. AP的是给 莼畹ChunWan_ 冬瓜糖 飞翔冥王星 GreenHub 纯鹿人 苏达 nuxwalker 萧千岁 fish 浅夏\n" +
+            "[ 特别感谢 ]\n" +
+            "<color=" + ColorLavender + ">浅夏ぬ浅离</color> — 横幅选择与剪辑\n" +
+            "<color=" + ColorLavender + ">XMJjs</color> — mden.top网站维护人\n" +
+            "<color=" + ColorLavender + ">Cookie</color> — mden.top网站维护人\n\n";
     }
 }

@@ -4,7 +4,7 @@ using MDEN.Network;
 using MDEN.UI.Core;
 using System;
 
-[assembly: MelonInfo(typeof(MDEN.Main), "MDEN", "0.3.2", "MDEN Team")]
+[assembly: MelonInfo(typeof(MDEN.Main), "MDEN", "0.3.2", "MDENTeam")]
 [assembly: MelonGame("PeroPeroGames", "MuseDash")]
 
 namespace MDEN
