@@ -25,10 +25,10 @@ namespace MDEN.UI.Core
         private const float NavigationIconCenterOffset = 10f;
         private const float RoomActionIconCenterOffset = 8f;
         private const string NavigationButtonSpriteName = "PcSprButton.png";
-        private const string MultiplayerIconSpriteName = "Multiplayer.png";
-        private const string MyRoomIconSpriteName = "MyRoom.png";
-        private const string PlaylistIconSpriteName = "RoomPlaylist.png";
-        private const string StartIconSpriteName = "Play.png";
+        private const string MultiplayerIconSpriteName = "Multiplayer_Img.png";
+        private const string MyRoomIconSpriteName = "MyRoom_Img.png";
+        private const string PlaylistIconSpriteName = "RoomPlaylist_Img.png";
+        private const string StartIconSpriteName = "Play_Img.png";
         // 绑定到原生 UI 生命周期中调用
         public static void Create()
         {
