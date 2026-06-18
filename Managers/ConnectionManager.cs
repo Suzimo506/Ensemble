@@ -170,6 +170,11 @@ namespace MDEN.Managers
             }
             catch (Exception ex)
             {
+                if (!NetworkClient.Instance.IsConnected || !IsLoggedIn)
+                {
+                    return;
+                }
+
                 MelonLogger.Warning($"Failed to sync local player profile: {ex.Message}");
             }
         }

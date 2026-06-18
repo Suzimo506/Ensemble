@@ -117,7 +117,7 @@ namespace MDEN.Managers
                 _selectionSyncInProgress = false;
                 if (task.IsFaulted)
                 {
-                    MelonLogger.Warning($"Sync selection failed: {task.Exception?.GetBaseException().Message}");
+                    LogSyncFailure("Sync selection failed", task.Exception?.GetBaseException());
                 }
             });
         }
@@ -130,7 +130,7 @@ namespace MDEN.Managers
             {
                 if (task.IsFaulted)
                 {
-                    MelonLogger.Warning($"Sync selection failed: {task.Exception?.GetBaseException().Message}");
+                    LogSyncFailure("Sync selection failed", task.Exception?.GetBaseException());
                 }
             });
         }
@@ -183,7 +183,7 @@ namespace MDEN.Managers
             {
                 if (task.IsFaulted)
                 {
-                    MelonLogger.Warning($"Sync chart state failed: {task.Exception?.GetBaseException().Message}");
+                    LogSyncFailure("Sync chart state failed", task.Exception?.GetBaseException());
                 }
             });
         }
@@ -328,6 +328,16 @@ namespace MDEN.Managers
             {
                 throw new System.InvalidOperationException("Not logged in.");
             }
+        }
+
+        private static void LogSyncFailure(string prefix, Exception ex)
+        {
+            if (!NetworkClient.Instance.IsConnected || !ConnectionManager.IsLoggedIn)
+            {
+                return;
+            }
+
+            MelonLogger.Warning($"{prefix}: {ex?.Message}");
         }
 
         private static void ApplyLocalUpdate(GetPlayerResponse profile, UpdatePlayerRequest request)
