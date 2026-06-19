@@ -185,7 +185,7 @@ namespace MDEN.UI.Core
             {
                 if (!_characterNotReadyLogged)
                 {
-                    MelonLoader.MelonLogger.Warning("Room character display is not ready.");
+                    MDEN.Managers.ClientLogManager.Warning("Room character display is not ready.");
                     _characterNotReadyLogged = true;
                 }
             }

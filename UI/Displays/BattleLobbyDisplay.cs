@@ -186,6 +186,7 @@ namespace MDEN.UI.Displays
             return validPlayers
                 .OrderByDescending(player => player.Alive)
                 .ThenByDescending(player => player.Accuracy)
+                .ThenBy(player => IsAp(player) ? GetEarlyLateCount(player) : int.MaxValue)
                 .ThenByDescending(player => player.Score)
                 .ThenBy(player => GetPlayerSortIndex(player.Uid, playerOrder))
                 .ToArray();
@@ -335,6 +336,11 @@ namespace MDEN.UI.Displays
         private static bool IsTp(BattlePlayerEntry player)
         {
             return IsAp(player) && player.FC && player.Earlies == 0 && player.Lates == 0;
+        }
+
+        private static int GetEarlyLateCount(BattlePlayerEntry player)
+        {
+            return player.Earlies + player.Lates;
         }
 
         private static BattlePlayerEntry CreateDefaultBattleEntry(string uid)

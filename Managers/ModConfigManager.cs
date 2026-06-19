@@ -24,6 +24,7 @@ namespace MDEN.Managers
         public string PlayerAvatarName { get; set; }
         public bool EnableFavGirlDisplayForOthers { get; set; }
         public bool HideBattleHealthBar { get; set; }
+        public bool EnableVerboseLogs { get; set; }
     }
 
     public static class ModConfigManager
@@ -41,6 +42,7 @@ namespace MDEN.Managers
         public static string PlayerAvatarName { get; private set; }
         public static bool EnableFavGirlDisplayForOthers { get; private set; }
         public static bool HideBattleHealthBar { get; private set; }
+        public static bool EnableVerboseLogs { get; private set; }
 
         public static void LoadConfig()
         {
@@ -76,7 +78,8 @@ namespace MDEN.Managers
                     PlayerTitle = PlayerTitle,
                     PlayerAvatarName = PlayerAvatarName,
                     EnableFavGirlDisplayForOthers = EnableFavGirlDisplayForOthers,
-                    HideBattleHealthBar = HideBattleHealthBar
+                    HideBattleHealthBar = HideBattleHealthBar,
+                    EnableVerboseLogs = EnableVerboseLogs
                 };
                 var json = JsonSerializer.Serialize(data, new JsonSerializerOptions { WriteIndented = true });
                 File.WriteAllText(ConfigPath, json);
@@ -160,6 +163,12 @@ namespace MDEN.Managers
             SaveConfig();
         }
 
+        public static void SetEnableVerboseLogs(bool enabled)
+        {
+            EnableVerboseLogs = enabled;
+            SaveConfig();
+        }
+
         private static void LoadConfigFromJson(string json)
         {
             if (string.IsNullOrWhiteSpace(json))
@@ -185,6 +194,7 @@ namespace MDEN.Managers
             PlayerAvatarName = data?.PlayerAvatarName;
             EnableFavGirlDisplayForOthers = data?.EnableFavGirlDisplayForOthers ?? false;
             HideBattleHealthBar = data?.HideBattleHealthBar ?? false;
+            EnableVerboseLogs = data?.EnableVerboseLogs ?? false;
         }
 
         private static void EnsureIdentity()

@@ -51,18 +51,18 @@ namespace MDEN.Managers
 
                 if (!ForceShowUpdateDialogForTest && remoteVersion <= currentVersion)
                 {
-                    MelonLogger.Msg($"Version check: up to date ({currentVersion})");
+                    MDEN.Managers.ClientLogManager.Msg($"Version check: up to date ({currentVersion})");
                     return;
                 }
 
                 var downloadUrl = GetDownloadUrl(document.RootElement);
-                MelonLogger.Warning($"New Ensemble version available: {remoteVersion} (current: {currentVersion})");
+                MDEN.Managers.ClientLogManager.Warning($"New Ensemble version available: {remoteVersion} (current: {currentVersion})");
                 MainThreadDispatcher.Enqueue(() => ShowOutdatedWarning(downloadUrl));
             }
             catch (Exception ex)
             {
                 _checkStarted = false;
-                MelonLogger.Warning($"Version check failed: {ex.Message}");
+                MDEN.Managers.ClientLogManager.Warning($"Version check failed: {ex.Message}");
             }
         }
 

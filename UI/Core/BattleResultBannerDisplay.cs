@@ -30,13 +30,13 @@ namespace MDEN.UI.Core
                 .ToArray();
             if (orderedPlayers.Length == 0)
             {
-                MelonLogger.Warning("Battle result skipped: no player snapshot.");
+                MDEN.Managers.ClientLogManager.Warning("Battle result skipped: no player snapshot.");
                 return;
             }
 
             if (!await WaitForPnlMessageAsync())
             {
-                MelonLogger.Warning("Battle result skipped: PnlMessage is not ready.");
+                MDEN.Managers.ClientLogManager.Warning("Battle result skipped: PnlMessage is not ready.");
                 return;
             }
 

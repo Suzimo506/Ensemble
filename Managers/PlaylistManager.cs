@@ -218,15 +218,7 @@ namespace MDEN.Managers
 
         private static void EnsureReady()
         {
-            if (!NetworkClient.Instance.IsConnected)
-            {
-                throw new System.InvalidOperationException("Not connected to server.");
-            }
-
-            if (!ConnectionManager.IsLoggedIn)
-            {
-                throw new System.InvalidOperationException("Not logged in to server.");
-            }
+            ConnectionManager.EnsureCanSendRequest();
 
             if (!LobbyManager.IsInLobby)
             {

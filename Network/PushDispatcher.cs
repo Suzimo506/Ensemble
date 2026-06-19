@@ -38,7 +38,7 @@ namespace MDEN.Network
             }
             else
             {
-                MelonLogger.Warning($"Received unregistered push message, OpCode: {opCode}");
+                MDEN.Managers.ClientLogManager.Warning($"Received unregistered push message, OpCode: {opCode}");
             }
         }
 

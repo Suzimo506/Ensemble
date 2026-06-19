@@ -173,7 +173,7 @@ namespace MDEN.UI.Core
             var musicInfo = ChartManager.GetMusicInfo(entry.ChartKey);
             if (musicInfo == null)
             {
-                MelonLogger.Warning($"Cannot preview multiplayer chart: chart {entry.ChartKey} not found locally.");
+                MDEN.Managers.ClientLogManager.Warning($"Cannot preview multiplayer chart: chart {entry.ChartKey} not found locally.");
                 return;
             }
 

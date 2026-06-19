@@ -16,6 +16,7 @@ namespace MDEN.Managers
 
         public static Task<FriendRequestResp> SendFriendRequestAsync(string friendUid)
         {
+            ConnectionManager.EnsureCanSendRequest();
             return NetworkClient.Instance.SendRequestAsync<FriendRequestReq, FriendRequestResp>(
                 OpCodes.FriendRequestReq,
                 new FriendRequestReq { FriendUid = friendUid });
@@ -23,6 +24,7 @@ namespace MDEN.Managers
 
         public static Task<FriendRequestResp> RespondFriendRequestAsync(string friendUid, bool accept)
         {
+            ConnectionManager.EnsureCanSendRequest();
             return NetworkClient.Instance.SendRequestAsync<FriendRequestReq, FriendRequestResp>(
                 OpCodes.FriendRequestReq,
                 new FriendRequestReq { FriendUid = friendUid, Accept = accept });
@@ -65,7 +67,7 @@ namespace MDEN.Managers
             }
             catch (System.Exception ex)
             {
-                MelonLogger.Warning($"Respond friend request failed: {ex.Message}");
+                MDEN.Managers.ClientLogManager.Warning($"Respond friend request failed: {ex.Message}");
                 MainThreadDispatcher.Enqueue(() => Il2CppAssets.Scripts.UI.Controls.ShowText.ShowInfo(ex.Message));
             }
         }

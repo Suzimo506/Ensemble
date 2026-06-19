@@ -9,6 +9,15 @@ using MelonLoader;
 
 namespace MDEN.Managers
 {
+    public enum ConnectionLifecycleState
+    {
+        Disconnected,
+        Connecting,
+        Connected,
+        Reconnecting,
+        ReconnectFailed
+    }
+
     public static class ConnectionManager
     {
         public static string CurrentServerAddress { get; private set; }
@@ -16,6 +25,13 @@ namespace MDEN.Managers
         public static bool CurrentServerIsOfficial { get; private set; }
         public static string SessionToken { get; private set; }
         public static bool IsLoggedIn { get; private set; }
+        public static ConnectionLifecycleState State { get; private set; } = ConnectionLifecycleState.Disconnected;
+        public static bool IsReconnecting => State == ConnectionLifecycleState.Reconnecting;
+        public static bool CanSendRequests =>
+            State == ConnectionLifecycleState.Connected &&
+            IsLoggedIn &&
+            NetworkClient.Instance.IsConnected;
+        public static event Action<ConnectionLifecycleState> StateChanged;
         private static readonly SemaphoreSlim ConnectionSemaphore = new SemaphoreSlim(1, 1);
 
         public static async Task<LoginResponse> ConnectAndLoginAsync(string address, string serverDisplayName = null, bool isOfficialServer = false)
@@ -36,9 +52,15 @@ namespace MDEN.Managers
                 await LobbyManager.RefreshLobbiesAfterReconnectAsync();
                 return true;
             }
+            catch (ProtocolException ex)
+            {
+                MDEN.Managers.ClientLogManager.Warning($"Reconnect failed: {ex.Message}");
+                MarkReconnectFailed();
+                return false;
+            }
             catch (Exception ex)
             {
-                MelonLogger.Warning($"Reconnect failed: {ex.Message}");
+                MDEN.Managers.ClientLogManager.Warning($"Reconnect failed: {ex.Message}");
                 return false;
             }
         }
@@ -56,14 +78,16 @@ namespace MDEN.Managers
             await ConnectionSemaphore.WaitAsync();
             try
             {
+                SetState(isReconnect ? ConnectionLifecycleState.Reconnecting : ConnectionLifecycleState.Connecting);
+
                 if (NetworkClient.Instance.IsConnected)
                 {
                     NetworkClient.Instance.Disconnect();
                 }
 
-                ClearRuntimeSessionState();
                 if (!isReconnect)
                 {
+                    ClearRuntimeSessionState();
                     CurrentServerAddress = null;
                     CurrentServerDisplayName = null;
                     CurrentServerIsOfficial = false;
@@ -72,6 +96,11 @@ namespace MDEN.Managers
                 var connected = await NetworkClient.Instance.ConnectAsync(endpoint.Host, endpoint.Port);
                 if (!connected)
                 {
+                    if (!isReconnect)
+                    {
+                        ClearRuntimeSessionState();
+                        SetState(ConnectionLifecycleState.Disconnected);
+                    }
                     throw new InvalidOperationException("Failed to connect to server.");
                 }
 
@@ -84,14 +113,48 @@ namespace MDEN.Managers
                         {
                             Uid = account.Uid,
                             Name = displayName,
-                            IsReconnect = isReconnect
+                            IsReconnect = isReconnect,
+                            ClientVersion = GetClientVersion(),
+                            ProtocolVersion = ProtocolVersions.Current
                         });
                 }
-                catch
+                catch (Exception ex)
                 {
-                    NetworkClient.Instance.Disconnect();
-                    ClearRuntimeSessionState();
+                    NetworkClient.Instance.Disconnect(false);
+                    if (!isReconnect)
+                    {
+                        ClearRuntimeSessionState();
+                        SetState(ConnectionLifecycleState.Disconnected);
+                    }
+                    else
+                    {
+                        IsLoggedIn = false;
+                        SessionToken = null;
+                        if (ex is ProtocolException)
+                        {
+                            MarkReconnectFailed();
+                        }
+                        else
+                        {
+                            SetState(ConnectionLifecycleState.Reconnecting);
+                        }
+                    }
                     throw;
+                }
+
+                if (response?.ProtocolVersion != ProtocolVersions.Current)
+                {
+                    NetworkClient.Instance.Disconnect(false);
+                    if (!isReconnect)
+                    {
+                        ClearRuntimeSessionState();
+                        SetState(ConnectionLifecycleState.Disconnected);
+                    }
+                    else
+                    {
+                        MarkReconnectFailed();
+                    }
+                    throw new ProtocolException("服务器版本过旧，请更换节点或等待服务器更新。");
                 }
 
                 PlayerManager.SetCurrentIdentity(account.Uid, displayName);
@@ -105,6 +168,7 @@ namespace MDEN.Managers
                 _ = SyncLocalProfileAsync();
                 PlayerManager.SyncSelectionFireAndForget(selection);
                 PlayerManager.SyncChartStateFireAndForget();
+                SetState(ConnectionLifecycleState.Connected);
                 MainThreadDispatcher.Enqueue(NavigationButton.RefreshServerLabel);
                 return response;
             }
@@ -120,14 +184,44 @@ namespace MDEN.Managers
             CurrentServerDisplayName = null;
             CurrentServerIsOfficial = false;
             ClearRuntimeSessionState();
+            SetState(ConnectionLifecycleState.Disconnected);
             NetworkClient.Instance.Disconnect();
             MainThreadDispatcher.Enqueue(NavigationButton.RefreshServerLabel);
         }
 
         public static void MarkDisconnectedByRemote()
         {
-            ClearRuntimeSessionState();
+            IsLoggedIn = false;
+            SessionToken = null;
+            SetState(string.IsNullOrWhiteSpace(CurrentServerAddress)
+                ? ConnectionLifecycleState.Disconnected
+                : ConnectionLifecycleState.Reconnecting);
             MainThreadDispatcher.Enqueue(NavigationButton.RefreshServerLabel);
+        }
+
+        public static void MarkReconnectFailed()
+        {
+            ClearRuntimeSessionState();
+            SetState(ConnectionLifecycleState.ReconnectFailed);
+            MainThreadDispatcher.Enqueue(NavigationButton.RefreshServerLabel);
+        }
+
+        public static void EnsureCanSendRequest()
+        {
+            if (IsReconnecting)
+            {
+                throw new InvalidOperationException("正在重连服务器，请稍候。");
+            }
+
+            if (!NetworkClient.Instance.IsConnected)
+            {
+                throw new InvalidOperationException("未连接服务器。");
+            }
+
+            if (!IsLoggedIn)
+            {
+                throw new InvalidOperationException("尚未登录服务器。");
+            }
         }
 
         private static void ClearRuntimeSessionState()
@@ -136,6 +230,21 @@ namespace MDEN.Managers
             SessionToken = null;
             PlayerManager.ClearSession();
             LobbyManager.ClearSession();
+        }
+
+        private static void SetState(ConnectionLifecycleState state)
+        {
+            if (State == state) return;
+
+            State = state;
+            try
+            {
+                StateChanged?.Invoke(state);
+            }
+            catch (Exception ex)
+            {
+                MDEN.Managers.ClientLogManager.Warning($"Connection state listener failed: {ex.Message}");
+            }
         }
 
         private static ServerEndpoint ParseAddress(string address)
@@ -170,13 +279,18 @@ namespace MDEN.Managers
             }
             catch (Exception ex)
             {
-                if (!NetworkClient.Instance.IsConnected || !IsLoggedIn)
+                if (!CanSendRequests)
                 {
                     return;
                 }
 
-                MelonLogger.Warning($"Failed to sync local player profile: {ex.Message}");
+                MDEN.Managers.ClientLogManager.Warning($"Failed to sync local player profile: {ex.Message}");
             }
+        }
+
+        private static string GetClientVersion()
+        {
+            return MelonBase.FindMelon("Ensemble", "MDENTeam")?.Info?.Version ?? "unknown";
         }
 
         private readonly struct ServerEndpoint

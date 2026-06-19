@@ -165,7 +165,8 @@ namespace MDEN.UI.Windows
                 _btnPassword = null;
             }
 
-            var info = new ForumObject(new LocalString(lobby?.Name ?? "我的房间"), new LocalString(summary));
+            var roomName = Highlight(EscapeRichText(lobby?.Name ?? "我的房间"), Constants.ColorYellow);
+            var info = new ForumObject(new LocalString(roomName), new LocalString(summary));
             info.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("RoomList.png")?.texture;
             _window.ForumObjects.Add(info);
 
@@ -341,6 +342,8 @@ namespace MDEN.UI.Windows
             var button = _window.ForumObjects[objectIndex];
             if (button == _btnLeave)
             {
+                if (!CanLeaveLobby(LobbyManager.CurrentLobby)) return;
+
                 NativeConfirmDialog.Show(
                     string.Empty,
                     "是否退出房间？",
@@ -427,6 +430,15 @@ namespace MDEN.UI.Windows
             return false;
         }
 
+        private static bool CanLeaveLobby(MDEN.Protocol.Messages.Lobby.LobbySyncPush lobby)
+        {
+            if (lobby == null) return false;
+            if (!lobby.Locked && !lobby.IsPlaying) return true;
+
+            Il2CppAssets.Scripts.UI.Controls.ShowText.ShowInfo("请先停止游戏");
+            return false;
+        }
+
         private void ShowPasswordInput()
         {
             if (_window != null)
@@ -440,7 +452,7 @@ namespace MDEN.UI.Windows
                 var value = input.Result?.Trim();
                 if (value != null && value.Length > 16)
                 {
-                    MelonLoader.MelonLogger.Warning("Lobby password is too long. Max length is 16.");
+                    MDEN.Managers.ClientLogManager.Warning("Lobby password is too long. Max length is 16.");
                     MainThreadDispatcher.Enqueue(RebuildWindow);
                     return;
                 }
@@ -473,7 +485,7 @@ namespace MDEN.UI.Windows
             }
             catch (System.Exception ex)
             {
-                MelonLoader.MelonLogger.Warning($"Update lobby settings failed: {ex.Message}");
+                MDEN.Managers.ClientLogManager.Warning($"Update lobby settings failed: {ex.Message}");
                 MainThreadDispatcher.Enqueue(RebuildWindow);
             }
         }
@@ -524,7 +536,8 @@ namespace MDEN.UI.Windows
             }
             catch (System.Exception ex)
             {
-                MelonLoader.MelonLogger.Warning($"Leave lobby failed: {ex.Message}");
+                MDEN.Managers.ClientLogManager.Warning($"Leave lobby failed: {ex.Message}");
+                MainThreadDispatcher.Enqueue(() => Il2CppAssets.Scripts.UI.Controls.ShowText.ShowInfo(ex.Message));
             }
         }
 

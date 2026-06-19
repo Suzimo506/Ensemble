@@ -160,7 +160,7 @@ namespace MDEN.UI.Core
             }
             catch (System.Exception ex)
             {
-                MelonLogger.Warning($"Failed to remove {typeName}: {ex.Message}");
+                MDEN.Managers.ClientLogManager.Warning($"Failed to remove {typeName}: {ex.Message}");
             }
         }
     }

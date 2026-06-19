@@ -46,7 +46,7 @@ namespace MDEN.UI.Core
             }
             catch (System.Exception ex)
             {
-                MelonLogger.Warning($"Jump to multiplayer chart failed: {ex.Message}");
+                MDEN.Managers.ClientLogManager.Warning($"Jump to multiplayer chart failed: {ex.Message}");
             }
         }
     }

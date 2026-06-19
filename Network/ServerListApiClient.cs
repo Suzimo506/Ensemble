@@ -54,7 +54,7 @@ namespace MDEN.Network
             }
             catch (Exception ex)
             {
-                MelonLogger.Warning($"Fetch official server list failed or timed out: {ex.Message}");
+                MDEN.Managers.ClientLogManager.Warning($"Fetch official server list failed or timed out: {ex.Message}");
                 return new List<ApiServerEntry>();
             }
         }

@@ -50,6 +50,8 @@ namespace MDEN.Protocol
         public const ushort LobbyBanChartSelectResp = 0x0315;
         public const ushort LobbySettingsReq = 0x0316;
         public const ushort LobbySettingsResp = 0x0317;
+        public const ushort GetCurrentLobbyReq = 0x0318;
+        public const ushort GetCurrentLobbyResp = 0x0319;
 
         // === 播放列表 (0x0400 ~ 0x04FF) ===
         public const ushort PlaylistAddReq = 0x0400;
@@ -65,6 +67,7 @@ namespace MDEN.Protocol
         public const ushort BattleReturnedReq = 0x0502;
         public const ushort BattleReturnedResp = 0x0503;
         public const ushort SettlementResultPush = 0x0504;
+        public const ushort BattleStartFailedNotify = 0x0505;
 
         // === 聊天 (0x0600 ~ 0x06FF) ===
         public const ushort ChatNotify = 0x0600;

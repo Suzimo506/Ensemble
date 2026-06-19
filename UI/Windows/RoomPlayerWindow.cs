@@ -235,7 +235,7 @@ namespace MDEN.UI.Windows
             }
             catch (Exception ex)
             {
-                MelonLogger.Warning($"Room player operation failed: {ex.Message}");
+                MDEN.Managers.ClientLogManager.Warning($"Room player operation failed: {ex.Message}");
                 MainThreadDispatcher.Enqueue(() => ShowText.ShowInfo(ex.Message));
             }
         }

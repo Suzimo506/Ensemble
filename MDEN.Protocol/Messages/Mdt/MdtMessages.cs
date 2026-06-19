@@ -56,6 +56,7 @@ namespace MDEN.Protocol.Messages.Mdt
         public bool IsPlaying { get; set; }
         public int WatcherCount { get; set; }
         public ushort CurrentPlaylistEntry { get; set; }
+        public string CurrentBattleId { get; set; }
         public string CurrentBattleEntry { get; set; }
         public string[] Playlist { get; set; }
         public MdtLobbyPlayerEntry[] Players { get; set; }

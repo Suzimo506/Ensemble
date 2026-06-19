@@ -125,7 +125,7 @@ namespace MDEN.UI.Windows
         {
             if (_isRefreshingNodes)
             {
-                MelonLogger.Msg("Server refresh already in progress.");
+                MDEN.Managers.ClientLogManager.Msg("Server refresh already in progress.");
                 return;
             }
 
@@ -189,7 +189,7 @@ namespace MDEN.UI.Windows
             }
             catch (Exception e)
             {
-                MelonLogger.Warning($"Fetch official nodes failed: {e.Message}");
+                MDEN.Managers.ClientLogManager.Warning($"Fetch official nodes failed: {e.Message}");
                 _officialServerData = new List<ApiServerEntry>();
                 _officialNodeDisplayData = new List<Tuple<string, string>>();
                 _officialNodePlainNames = new List<string>();
@@ -373,7 +373,7 @@ namespace MDEN.UI.Windows
                     if (!string.IsNullOrEmpty(res))
                     {
                         ModConfigManager.AddCustomServer(res);
-                        MelonLogger.Msg($"Added custom server: {res}");
+                        MDEN.Managers.ClientLogManager.Msg($"Added custom server: {res}");
                         await RefreshNodesAsync(true);
                     }
                     
@@ -417,7 +417,7 @@ namespace MDEN.UI.Windows
                     return;
                 }
 
-                MelonLogger.Msg($"Selected node index: {objectIndex}");
+                MDEN.Managers.ClientLogManager.Msg($"Selected node index: {objectIndex}");
             }
         }
 
@@ -465,7 +465,7 @@ namespace MDEN.UI.Windows
                 var response = await ConnectionManager.ConnectAndLoginAsync(address, serverDisplayName, isOfficialServer);
                 if (IsDisposed) return;
 
-                MelonLogger.Msg($"Connected to {address}, server version: {response.Version}");
+                MDEN.Managers.ClientLogManager.Msg($"Connected to {address}, server version: {response.Version}");
                 MainThreadDispatcher.Enqueue(() =>
                 {
                     if (IsDisposed) return;
@@ -475,7 +475,7 @@ namespace MDEN.UI.Windows
             }
             catch (Exception ex)
             {
-                MelonLogger.Warning($"Join server failed: {ex.Message}");
+                MDEN.Managers.ClientLogManager.Warning($"Join server failed: {ex.Message}");
             }
         }
 

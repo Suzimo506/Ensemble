@@ -4,7 +4,7 @@ using MDEN.Network;
 using MDEN.UI.Core;
 using System;
 
-[assembly: MelonInfo(typeof(MDEN.Main), "Ensemble", "0.3.2", "MDENTeam")]
+[assembly: MelonInfo(typeof(MDEN.Main), "Ensemble", "0.3.3", "MDENTeam")]
 [assembly: MelonGame("PeroPeroGames", "MuseDash")]
 
 namespace MDEN
@@ -13,7 +13,7 @@ namespace MDEN
     {
         public override void OnInitializeMelon()
         {
-            MelonLogger.Msg("Mod is initializing...");
+            MDEN.Managers.ClientLogManager.Msg("Mod is initializing...");
             ModConfigManager.LoadConfig();
             PushDispatcher.Instance.Init();
             ReconnectionManager.Instance.Init();
@@ -26,7 +26,7 @@ namespace MDEN
             BattleHudController.Initialize();
             SettlementHudController.Initialize();
             RoomHudController.Initialize();
-            MelonLogger.Msg("Initialization complete.");
+            MDEN.Managers.ClientLogManager.Msg("Initialization complete.");
         }
 
         public override void OnSceneWasLoaded(int buildIndex, string sceneName)

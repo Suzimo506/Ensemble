@@ -157,7 +157,7 @@ namespace MDEN.UI.Windows
                 var response = await ConnectionManager.ConnectAndLoginAsync(address, serverDisplayName, false);
                 if (IsDisposed) return;
 
-                MelonLogger.Msg($"Connected to {address}, server version: {response.Version}");
+                MDEN.Managers.ClientLogManager.Msg($"Connected to {address}, server version: {response.Version}");
                 MainThreadDispatcher.Enqueue(() =>
                 {
                     if (IsDisposed) return;
@@ -167,7 +167,7 @@ namespace MDEN.UI.Windows
             }
             catch (Exception ex)
             {
-                MelonLogger.Warning($"Join server failed: {ex.Message}");
+                MDEN.Managers.ClientLogManager.Warning($"Join server failed: {ex.Message}");
             }
         }
 

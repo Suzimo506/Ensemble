@@ -17,7 +17,7 @@ namespace MDEN
         public const string UIDirName = "UI";
         public const string BannersDirName = "Banners";
 
-        public const string CreditsText = "当前Ensemble版本：<color=" + ColorGreen + ">0.3.2</color>\n" +
+        public const string CreditsText = "当前Ensemble版本：<color=" + ColorGreen + ">0.3.3</color>\n" +
             "加入喵斯兔交流群，反馈问题，与其他人一起合奏！\n" +
             "<color=" + ColorPink + ">331568783</color>\n\n" +
             "[ 开发者 ]\n" +

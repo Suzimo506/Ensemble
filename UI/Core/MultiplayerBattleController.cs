@@ -1,5 +1,6 @@
 using Il2Cpp;
 using Il2CppAssets.Scripts.Database;
+using Il2CppAssets.Scripts.UI.Controls;
 using MDEN.Patches;
 using MelonLoader;
 using UnityEngine;
@@ -11,6 +12,7 @@ namespace MDEN.UI.Core
         private const int StartRetryCount = 20;
         private const int StartRetryDelayFrames = 3;
         private static int _startedLobbyId;
+        private static string _startedBattleId;
         private static string _startedBattleEntry;
         private static int _startGeneration;
 
@@ -36,38 +38,43 @@ namespace MDEN.UI.Core
             var battleEntry = !string.IsNullOrWhiteSpace(lobby.CurrentBattleEntry)
                 ? lobby.CurrentBattleEntry
                 : (lobby.Playlist != null && lobby.Playlist.Length > 0 ? lobby.Playlist[0] : null);
-            if (string.IsNullOrWhiteSpace(battleEntry)) return;
-            if (_startedLobbyId == lobby.Id && _startedBattleEntry == battleEntry) return;
+            if (string.IsNullOrWhiteSpace(battleEntry) || string.IsNullOrWhiteSpace(lobby.CurrentBattleId)) return;
+            if (_startedLobbyId == lobby.Id && _startedBattleId == lobby.CurrentBattleId) return;
 
             _startedLobbyId = lobby.Id;
+            _startedBattleId = lobby.CurrentBattleId;
             _startedBattleEntry = battleEntry;
-            ScheduleStartCurrentPlaylistEntry(lobby.Id, battleEntry);
+            ScheduleStartCurrentPlaylistEntry(lobby.Id, lobby.CurrentBattleId, battleEntry);
         }
 
         public static void Reset()
         {
             _startGeneration++;
             _startedLobbyId = 0;
+            _startedBattleId = null;
             _startedBattleEntry = null;
         }
 
-        private static void ScheduleStartCurrentPlaylistEntry(int lobbyId, string entryText)
+        private static void ScheduleStartCurrentPlaylistEntry(int lobbyId, string battleId, string entryText)
         {
             var generation = ++_startGeneration;
-            MainThreadDispatcher.Enqueue(() => RunStartRetry(generation, lobbyId, entryText, StartRetryCount, 0));
+            MainThreadDispatcher.Enqueue(() => RunStartRetry(generation, lobbyId, battleId, entryText, StartRetryCount, 0));
         }
 
-        private static void RunStartRetry(int generation, int lobbyId, string entryText, int retriesRemaining, int delayFrames)
+        private static void RunStartRetry(int generation, int lobbyId, string battleId, string entryText, int retriesRemaining, int delayFrames)
         {
             if (generation != _startGeneration) return;
 
             var lobby = Managers.LobbyManager.CurrentLobby;
             if (lobby == null || lobby.Id != lobbyId || !lobby.IsPlaying) return;
-            if (_startedLobbyId != lobbyId || _startedBattleEntry != entryText) return;
+            if (lobby.CurrentBattleId != battleId ||
+                _startedLobbyId != lobbyId ||
+                _startedBattleId != battleId ||
+                _startedBattleEntry != entryText) return;
 
             if (delayFrames > 0)
             {
-                MainThreadDispatcher.Enqueue(() => RunStartRetry(generation, lobbyId, entryText, retriesRemaining, delayFrames - 1));
+                MainThreadDispatcher.Enqueue(() => RunStartRetry(generation, lobbyId, battleId, entryText, retriesRemaining, delayFrames - 1));
                 return;
             }
 
@@ -78,17 +85,23 @@ namespace MDEN.UI.Core
 
             if (retriesRemaining <= 1)
             {
-                MelonLogger.Warning("Cannot start multiplayer battle: chart selection was not ready after retries.");
-                if (_startedLobbyId == lobbyId && _startedBattleEntry == entryText)
+                ReportStartFailure(
+                    lobbyId,
+                    battleId,
+                    entryText,
+                    "SelectionNotReady",
+                    "本地选歌界面未准备好，未能进入联机游戏。");
+                if (_startedLobbyId == lobbyId && _startedBattleId == battleId && _startedBattleEntry == entryText)
                 {
                     _startedLobbyId = 0;
+                    _startedBattleId = null;
                     _startedBattleEntry = null;
                 }
 
                 return;
             }
 
-            MainThreadDispatcher.Enqueue(() => RunStartRetry(generation, lobbyId, entryText, retriesRemaining - 1, StartRetryDelayFrames));
+            MainThreadDispatcher.Enqueue(() => RunStartRetry(generation, lobbyId, battleId, entryText, retriesRemaining - 1, StartRetryDelayFrames));
         }
 
         private static bool TryStartCurrentPlaylistEntry(string entryText)
@@ -96,14 +109,24 @@ namespace MDEN.UI.Core
             var entry = Managers.ChartManager.ParseEntry(entryText);
             if (entry == null)
             {
-                MelonLogger.Warning("Cannot start multiplayer battle: playlist entry is missing.");
+                ReportStartFailure(
+                    Managers.LobbyManager.CurrentLobby?.Id ?? 0,
+                    Managers.LobbyManager.CurrentLobby?.CurrentBattleId,
+                    entryText,
+                    "InvalidPlaylistEntry",
+                    "联机歌曲信息无效，未能进入游戏。");
                 return true;
             }
 
             var musicInfo = Managers.ChartManager.GetMusicInfo(entry.ChartKey);
             if (musicInfo == null)
             {
-                MelonLogger.Warning($"Cannot start multiplayer battle: chart {entry.ChartKey} not found locally.");
+                ReportStartFailure(
+                    Managers.LobbyManager.CurrentLobby?.Id ?? 0,
+                    Managers.LobbyManager.CurrentLobby?.CurrentBattleId,
+                    entryText,
+                    "ChartMissing",
+                    $"本地缺少谱面 {entry.ChartKey}，未能进入联机游戏。");
                 return true;
             }
 
@@ -136,6 +159,18 @@ namespace MDEN.UI.Core
 
             var stage = GameObject.Find("UI/Standerd/PnlStage");
             return stage != null && stage.activeInHierarchy;
+        }
+
+        private static void ReportStartFailure(
+            int lobbyId,
+            string battleId,
+            string entryText,
+            string reasonCode,
+            string reason)
+        {
+            MDEN.Managers.ClientLogManager.Warning($"Cannot start multiplayer battle: {reasonCode}, {reason}");
+            ShowText.ShowInfo(reason);
+            Managers.BattleManager.ReportBattleStartFailed(lobbyId, battleId, entryText, reasonCode, reason);
         }
     }
 }

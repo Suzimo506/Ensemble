@@ -16,7 +16,7 @@ namespace MDEN.UI.Core
             _lockCount++;
             if (_lockCount == 1)
             {
-                MelonLogger.Msg($"Global UI locked: {message}");
+                MDEN.Managers.ClientLogManager.Msg($"Global UI locked: {message}");
             }
 
             return new UIToken(() =>
@@ -25,7 +25,7 @@ namespace MDEN.UI.Core
                 if (_lockCount <= 0)
                 {
                     _lockCount = 0;
-                    MelonLogger.Msg("Global UI unlocked.");
+                    MDEN.Managers.ClientLogManager.Msg("Global UI unlocked.");
                 }
             });
         }
@@ -35,7 +35,7 @@ namespace MDEN.UI.Core
             if (_lockCount <= 0) return;
 
             _lockCount = 0;
-            MelonLogger.Warning("Global UI lock force released.");
+            MDEN.Managers.ClientLogManager.Warning("Global UI lock force released.");
         }
 
         // 关闭顶部窗口并开新窗，确保栈中只有一个活跃业务窗口

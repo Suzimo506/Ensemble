@@ -45,7 +45,7 @@ namespace MDEN.UI.Core
             _loggedWaitingForLobby = false;
             MarkAllPlayersFinishedFromSettlementResult();
             var generation = ++_pendingGeneration;
-            MelonLogger.Msg($"Settlement result received. finished={_finishedBroadcastCount}, players={LobbyManager.CurrentLobby?.Players?.Length ?? 0}, playing={LobbyManager.CurrentLobby?.IsPlaying}, resultFlow={BattleFlowPatch.IsBattleResultFlowPending}");
+            MDEN.Managers.ClientLogManager.Msg($"Settlement result received. finished={_finishedBroadcastCount}, players={LobbyManager.CurrentLobby?.Players?.Length ?? 0}, playing={LobbyManager.CurrentLobby?.IsPlaying}, resultFlow={BattleFlowPatch.IsBattleResultFlowPending}");
             TryShowSettlement(generation);
         }
 
@@ -72,7 +72,7 @@ namespace MDEN.UI.Core
             if (TryParseFinishedPlayerName(message.Message, out var playerName))
             {
                 _finishedBroadcastCount++;
-                MelonLogger.Msg($"Settlement finish broadcast counted: {_finishedBroadcastCount}/{LobbyManager.CurrentLobby?.Players?.Length ?? 0}");
+                MDEN.Managers.ClientLogManager.Msg($"Settlement finish broadcast counted: {_finishedBroadcastCount}/{LobbyManager.CurrentLobby?.Players?.Length ?? 0}");
                 if (_pendingResult != null)
                 {
                     var generation = _pendingGeneration;
@@ -96,7 +96,7 @@ namespace MDEN.UI.Core
                 if (!_loggedWaitingForLobby)
                 {
                     _loggedWaitingForLobby = true;
-                    MelonLogger.Msg($"Settlement result pending until lobby is visible. playing={LobbyManager.CurrentLobby?.IsPlaying}, resultFlow={BattleFlowPatch.IsBattleResultFlowPending}, homeVisible={RoomSceneOverlay.IsHomeVisible}, finished={_finishedBroadcastCount}/{LobbyManager.CurrentLobby?.Players?.Length ?? 0}");
+                    MDEN.Managers.ClientLogManager.Msg($"Settlement result pending until lobby is visible. playing={LobbyManager.CurrentLobby?.IsPlaying}, resultFlow={BattleFlowPatch.IsBattleResultFlowPending}, homeVisible={RoomSceneOverlay.IsHomeVisible}, finished={_finishedBroadcastCount}/{LobbyManager.CurrentLobby?.Players?.Length ?? 0}");
                 }
 
                 MainThreadDispatcher.Enqueue(() => TryShowSettlement(generation));
@@ -109,7 +109,7 @@ namespace MDEN.UI.Core
             _loggedWaitingForLobby = false;
             if (result != null)
             {
-                MelonLogger.Msg("Showing settlement result dialog.");
+                MDEN.Managers.ClientLogManager.Msg("Showing settlement result dialog.");
                 SettlementResultDialog.Show(result);
             }
         }

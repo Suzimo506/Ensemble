@@ -173,7 +173,7 @@ namespace MDEN.UI.Windows
                 }
                 else if (!string.IsNullOrEmpty(value))
                 {
-                    MelonLogger.Warning("Room name is too long. Max length is 24.");
+                    MDEN.Managers.ClientLogManager.Warning("Room name is too long. Max length is 24.");
                 }
 
                 RebuildWindow();
@@ -198,7 +198,7 @@ namespace MDEN.UI.Windows
                 }
                 else if (!string.IsNullOrEmpty(value))
                 {
-                    MelonLogger.Warning("Room password is too long. Max length is 16.");
+                    MDEN.Managers.ClientLogManager.Warning("Room password is too long. Max length is 16.");
                 }
 
                 RebuildWindow();
@@ -214,11 +214,18 @@ namespace MDEN.UI.Windows
                 return;
             }
 
-            if (!ConnectionManager.IsLoggedIn)
+            if (!ConnectionManager.CanSendRequests)
             {
-                MelonLogger.Warning("Create lobby skipped: not connected to server. Please choose a server again.");
-                Close();
-                WindowStackController.OpenWindow(new ServerSelectionWindow());
+                var message = ConnectionManager.IsReconnecting
+                    ? "正在重连服务器，请稍候"
+                    : "未连接服务器，请重新选择节点";
+                MDEN.Managers.ClientLogManager.Warning($"Create lobby skipped: {message}");
+                ShowText.ShowInfo(message);
+                if (!ConnectionManager.IsReconnecting)
+                {
+                    Close();
+                    WindowStackController.OpenWindow(new ServerSelectionWindow());
+                }
                 return;
             }
 
@@ -249,7 +256,7 @@ namespace MDEN.UI.Windows
                 LobbyManager.MarkLobbyEntered(lobbyId, request);
                 keepPending = true;
 
-                MelonLogger.Msg($"Created lobby: {lobbyId}");
+                MDEN.Managers.ClientLogManager.Msg($"Created lobby: {lobbyId}");
                 MainThreadDispatcher.Enqueue(() =>
                 {
                     if (IsDisposed) return;
@@ -260,7 +267,7 @@ namespace MDEN.UI.Windows
             }
             catch (Exception ex)
             {
-                MelonLogger.Warning($"Create lobby failed: {ex.Message}");
+                MDEN.Managers.ClientLogManager.Warning($"Create lobby failed: {ex.Message}");
                 MainThreadDispatcher.Enqueue(() => ShowText.ShowInfo($"创建失败：{ex.Message}"));
             }
             finally

@@ -30,9 +30,12 @@ namespace MDEN.UI.Displays
             Create();
 
             var activeKeys = new List<string> { "title" };
+            var watcherInfo = lobby.WatcherCount > 0
+                ? $"观众：<color=#{Constants.ColorCyan}>{lobby.WatcherCount}</color> "
+                : string.Empty;
             SetEntry(
                 "title",
-                $"{lobby.Name} 观众：<color=#{Constants.ColorCyan}>{lobby.WatcherCount}</color> <color=#{Constants.ColorYellow}>({GetPlayerCount(lobby)}/{lobby.MaxPlayers})</color>");
+                $"{watcherInfo}{lobby.Name} <color=#{Constants.ColorYellow}>({GetPlayerCount(lobby)}/{lobby.MaxPlayers})</color>");
 
             foreach (var player in GetPlayers(lobby))
             {

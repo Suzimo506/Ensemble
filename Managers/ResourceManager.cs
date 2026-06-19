@@ -23,7 +23,7 @@ namespace MDEN.Managers
                 try
                 {
                     _uiBundle = AssetBundle.LoadFromFile(bundlePath);
-                    MelonLogger.Msg("UI AssetBundle loaded successfully!");
+                    MDEN.Managers.ClientLogManager.Msg("UI AssetBundle loaded successfully!");
                 }
                 catch (Exception ex)
                 {
@@ -35,7 +35,7 @@ namespace MDEN.Managers
                 if (!_bundleMissingWarningShown)
                 {
                     _bundleMissingWarningShown = true;
-                    MelonLogger.Warning($"AssetBundle not found at: {bundlePath}, will attempt to load loose Assets.");
+                    MDEN.Managers.ClientLogManager.Warning($"AssetBundle not found at: {bundlePath}, will attempt to load loose Assets.");
                 }
             }
         }
@@ -65,14 +65,14 @@ namespace MDEN.Managers
                         {
                             var sprite = Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), new Vector2(0.5f, 0.5f));
                             _spriteCache[name] = sprite;
-                            MelonLogger.Msg($"Successfully loaded texture from bundle: {name}");
+                            MDEN.Managers.ClientLogManager.Msg($"Successfully loaded texture from bundle: {name}");
                             return sprite;
                         }
                     }
                 }
                 catch (Exception ex)
                 {
-                    MelonLogger.Warning($"Failed to load bundle texture {name}: {ex.Message}");
+                    MDEN.Managers.ClientLogManager.Warning($"Failed to load bundle texture {name}: {ex.Message}");
                 }
             }
 
@@ -104,7 +104,7 @@ namespace MDEN.Managers
                             {
                                 var sprite = Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), new Vector2(0.5f, 0.5f));
                                 _spriteCache[name] = sprite;
-                                MelonLogger.Msg($"Successfully loaded embedded texture: {name}");
+                                MDEN.Managers.ClientLogManager.Msg($"Successfully loaded embedded texture: {name}");
                                 return sprite;
                             }
                         }
@@ -133,7 +133,7 @@ namespace MDEN.Managers
                         {
                             var sprite = Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), new Vector2(0.5f, 0.5f));
                             _spriteCache[name] = sprite;
-                            MelonLogger.Msg($"Successfully loaded loose texture: {name}");
+                            MDEN.Managers.ClientLogManager.Msg($"Successfully loaded loose texture: {name}");
                             return sprite;
                         }
                     }
@@ -144,7 +144,7 @@ namespace MDEN.Managers
                 }
             }
 
-            MelonLogger.Warning($"Missing texture: {name}, returning fallback.");
+            MDEN.Managers.ClientLogManager.Warning($"Missing texture: {name}, returning fallback.");
             var fallback = CreateFallbackSprite();
             _spriteCache[name] = fallback;
             return fallback;
@@ -190,9 +190,9 @@ namespace MDEN.Managers
                 }
 
                 if (_randomBannerResourceNames.Count > 0)
-                    MelonLogger.Msg($"Successfully loaded {_randomBannerResourceNames.Count} embedded random banners.");
+                    MDEN.Managers.ClientLogManager.Msg($"Successfully loaded {_randomBannerResourceNames.Count} embedded random banners.");
                 else
-                    MelonLogger.Warning("No embedded banners found.");
+                    MDEN.Managers.ClientLogManager.Warning("No embedded banners found.");
             }
 
             if (_randomBannerResourceNames != null && _randomBannerResourceNames.Count > 0)
@@ -215,7 +215,7 @@ namespace MDEN.Managers
             }
             catch (Exception ex)
             {
-                MelonLogger.Warning($"Invalid sprite texture skipped: {ex.Message}");
+                MDEN.Managers.ClientLogManager.Warning($"Invalid sprite texture skipped: {ex.Message}");
                 return false;
             }
         }

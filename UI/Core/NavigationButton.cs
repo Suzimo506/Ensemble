@@ -20,6 +20,8 @@ namespace MDEN.UI.Core
         private static GameObject _serverLabelObj;
         private static Text _serverLabel;
         private static Sprite _serverLabelBackgroundSprite;
+        private static bool _connectionStateSubscribed;
+        private static ConnectionLifecycleState _lastConnectionState = ConnectionLifecycleState.Disconnected;
         private const float NavigationButtonOffset = 132f;
         private const float LeftNavigationOffset = 192f;
         private const float ServerLabelOptionOffset = 500f;
@@ -38,6 +40,7 @@ namespace MDEN.UI.Core
         // 绑定到原生 UI 生命周期中调用
         public static void Create()
         {
+            EnsureConnectionStateSubscription();
             RecoverSceneObjects();
             if (_multiplayerBtn != null)
             {
@@ -109,9 +112,46 @@ namespace MDEN.UI.Core
                 }));
             }
             
-            MelonLogger.Msg("Lobby entrance button injected successfully.");
+            MDEN.Managers.ClientLogManager.Msg("Lobby entrance button injected successfully.");
             RefreshRoomButton();
             RefreshServerLabel();
+        }
+
+        private static void EnsureConnectionStateSubscription()
+        {
+            if (_connectionStateSubscribed) return;
+
+            ConnectionManager.StateChanged -= OnConnectionStateChanged;
+            ConnectionManager.StateChanged += OnConnectionStateChanged;
+            _connectionStateSubscribed = true;
+        }
+
+        private static void OnConnectionStateChanged(ConnectionLifecycleState state)
+        {
+            MainThreadDispatcher.Enqueue(() =>
+            {
+                RefreshRoomButton();
+                RefreshServerLabel();
+                ShowConnectionStateToast(_lastConnectionState, state);
+                _lastConnectionState = state;
+            });
+        }
+
+        private static void ShowConnectionStateToast(ConnectionLifecycleState previousState, ConnectionLifecycleState currentState)
+        {
+            if (currentState == ConnectionLifecycleState.Reconnecting)
+            {
+                ShowText.ShowInfo("连接中断，正在重连...");
+            }
+            else if (currentState == ConnectionLifecycleState.Connected &&
+                     previousState == ConnectionLifecycleState.Reconnecting)
+            {
+                ShowText.ShowInfo("已重新连接服务器");
+            }
+            else if (currentState == ConnectionLifecycleState.ReconnectFailed)
+            {
+                ShowText.ShowInfo("重连失败，请重新选择节点");
+            }
         }
 
         public static void RefreshRoomButton()
@@ -143,7 +183,8 @@ namespace MDEN.UI.Core
 
         public static void RefreshServerLabel()
         {
-            if (!ConnectionManager.IsLoggedIn || string.IsNullOrWhiteSpace(ConnectionManager.CurrentServerDisplayName))
+            if ((!ConnectionManager.IsLoggedIn && !ConnectionManager.IsReconnecting) ||
+                string.IsNullOrWhiteSpace(ConnectionManager.CurrentServerDisplayName))
             {
                 DestroyServerLabel();
                 return;
@@ -155,10 +196,17 @@ namespace MDEN.UI.Core
             _serverLabelObj.SetActive(true);
             ApplyGameFont(_serverLabel);
             var serverName = EscapeRichText(ConnectionManager.CurrentServerDisplayName);
-            var serverColor = ConnectionManager.CurrentServerIsOfficial
-                ? Constants.ColorYellow
-                : Constants.ColorBlue;
-            _serverLabel.text = $"<color=#{serverColor}>{serverName}</color>";
+            if (ConnectionManager.IsReconnecting)
+            {
+                _serverLabel.text = $"<color=#{Constants.ColorYellow}>{serverName} 重连中...</color>";
+            }
+            else
+            {
+                var serverColor = ConnectionManager.CurrentServerIsOfficial
+                    ? Constants.ColorYellow
+                    : Constants.ColorBlue;
+                _serverLabel.text = $"<color=#{serverColor}>{serverName}</color>";
+            }
             PositionServerLabel();
         }
 
@@ -390,7 +438,7 @@ namespace MDEN.UI.Core
                     if (LobbyManager.CurrentLobby?.HostUid != PlayerManager.CurrentUid)
                     {
                         ShowText.ShowInfo("只有房主可以开始游戏哦");
-                        MelonLogger.Warning("No permission to start lobby.");
+                        MDEN.Managers.ClientLogManager.Warning("No permission to start lobby.");
                         return;
                     }
 
@@ -413,7 +461,7 @@ namespace MDEN.UI.Core
             }
             catch (Exception ex)
             {
-                MelonLogger.Warning($"Start lobby prepare failed: {ex.Message}");
+                MDEN.Managers.ClientLogManager.Warning($"Start lobby prepare failed: {ex.Message}");
                 MainThreadDispatcher.Enqueue(() => ShowText.ShowInfo($"开始失败：{ex.Message}"));
             }
         }
@@ -425,7 +473,7 @@ namespace MDEN.UI.Core
             var source = GameObject.Find("UI/Standerd/PnlNavigation/Top/BtnOption");
             if (topPanel == null || source == null)
             {
-                MelonLogger.Warning($"Cannot create {name}: native navigation button source not found.");
+                MDEN.Managers.ClientLogManager.Warning($"Cannot create {name}: native navigation button source not found.");
                 return null;
             }
 

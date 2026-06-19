@@ -45,7 +45,7 @@ namespace MDEN.Network
                 }
                 else
                 {
-                    MelonLogger.Warning($"[MDMC API] Failed to fetch user info. Uid: {mdmcUid}, status: {response.StatusCode}");
+                    MDEN.Managers.ClientLogManager.Warning($"[MDMC API] Failed to fetch user info. Uid: {mdmcUid}, status: {response.StatusCode}");
                 }
             }
             catch (Exception ex)

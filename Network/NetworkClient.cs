@@ -202,7 +202,7 @@ namespace MDEN.Network
 
                     if (bytesRead == 0)
                     {
-                        MelonLogger.Msg("Server disconnected.");
+                        MDEN.Managers.ClientLogManager.Msg("Server disconnected.");
                         DisconnectIfCurrent(connectionId, true);
                         break;
                     }
@@ -312,7 +312,7 @@ namespace MDEN.Network
                 }
                 catch (Exception ex)
                 {
-                    MelonLogger.Warning($"Heartbeat failed: {ex.Message}");
+                    MDEN.Managers.ClientLogManager.Warning($"Heartbeat failed: {ex.Message}");
                 }
             }
         }
@@ -330,7 +330,7 @@ namespace MDEN.Network
             }
             catch (Exception ex)
             {
-                MelonLogger.Warning($"Report ping failed: {ex.Message}");
+                MDEN.Managers.ClientLogManager.Warning($"Report ping failed: {ex.Message}");
             }
         }
 

@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Reflection;
-using System.Text;
 using MDEN.Managers;
 using MDEN.Protocol.Messages.Battle;
 using MelonLoader;
@@ -17,10 +16,12 @@ namespace MDEN.UI.Core
     {
         private const string RootName = "MDENSettlementResultDialog";
         private const int SortingOrder = 32760;
-        private const float PanelWidth = 980f;
-        private const float PanelHeight = 700f;
-        private const float ContentWidth = 800f;
-        private const float ContentViewportHeight = 450f;
+        private const float PanelWidth = 1120f;
+        private const float PanelHeight = 760f;
+        private const float SidePadding = 54f;
+        private const float AwardCardWidth = 242f;
+        private const float AwardCardHeight = 154f;
+        private const float ChartViewportHeight = 290f;
 
         private static GameObject _root;
         private static Font _cachedFont;
@@ -40,8 +41,9 @@ namespace MDEN.UI.Core
                     return;
                 }
 
-                CreateTitle(panel);
-                CreateContent(panel, result);
+                CreateHeader(panel);
+                CreateAwardCards(panel, result);
+                CreatePlayedCharts(panel, result);
                 CreateCloseButton(panel);
             }
             catch (Exception ex)
@@ -92,7 +94,7 @@ namespace MDEN.UI.Core
             shadeRect.offsetMax = Vector2.zero;
 
             var shadeImage = shade.AddComponent<Image>();
-            shadeImage.color = new Color(0.02f, 0f, 0.05f, 0.62f);
+            shadeImage.color = new Color(0.05f, 0.02f, 0.08f, 0.66f);
             shadeImage.raycastTarget = true;
 
             var shadeButton = shade.AddComponent<Button>();
@@ -105,23 +107,15 @@ namespace MDEN.UI.Core
 
         private static RectTransform CreatePanel(Transform root)
         {
-            var border = new GameObject("PanelBorder");
-            border.transform.SetParent(root, false);
-            var borderRect = border.AddComponent<RectTransform>();
-            borderRect.anchorMin = new Vector2(0.5f, 0.5f);
-            borderRect.anchorMax = new Vector2(0.5f, 0.5f);
-            borderRect.pivot = new Vector2(0.5f, 0.5f);
-            borderRect.sizeDelta = new Vector2(PanelWidth + 12f, PanelHeight + 12f);
-            borderRect.anchoredPosition = Vector2.zero;
-
-            var borderImage = border.AddComponent<Image>();
-            borderImage.sprite = GetRoundedSprite();
-            borderImage.type = borderImage.sprite != null ? Image.Type.Sliced : Image.Type.Simple;
-            borderImage.color = new Color(0.98f, 0.82f, 0.22f, 0.98f);
-            borderImage.raycastTarget = true;
+            var shadow = CreateImage(root, "PanelShadow", new Color(0.05f, 0f, 0.10f, 0.40f));
+            shadow.anchorMin = new Vector2(0.5f, 0.5f);
+            shadow.anchorMax = new Vector2(0.5f, 0.5f);
+            shadow.pivot = new Vector2(0.5f, 0.5f);
+            shadow.sizeDelta = new Vector2(PanelWidth + 36f, PanelHeight + 36f);
+            shadow.anchoredPosition = new Vector2(0f, -10f);
 
             var panel = new GameObject("Panel");
-            panel.transform.SetParent(border.transform, false);
+            panel.transform.SetParent(root, false);
             var panelRect = panel.AddComponent<RectTransform>();
             panelRect.anchorMin = new Vector2(0.5f, 0.5f);
             panelRect.anchorMax = new Vector2(0.5f, 0.5f);
@@ -132,72 +126,189 @@ namespace MDEN.UI.Core
             var panelImage = panel.AddComponent<Image>();
             panelImage.sprite = GetRoundedSprite();
             panelImage.type = panelImage.sprite != null ? Image.Type.Sliced : Image.Type.Simple;
-            panelImage.color = new Color(0.28f, 0.15f, 0.52f, 0.98f);
+            panelImage.color = new Color(0.58f, 0.22f, 0.70f, 0.42f);
             panelImage.raycastTarget = true;
 
-            var header = CreateImage(panelRect, "HeaderGlow", new Color(0.45f, 0.27f, 0.74f, 0.92f));
-            header.anchorMin = new Vector2(0f, 1f);
-            header.anchorMax = new Vector2(1f, 1f);
-            header.pivot = new Vector2(0.5f, 1f);
-            header.offsetMin = new Vector2(34f, -92f);
-            header.offsetMax = new Vector2(-34f, -18f);
+            var border = CreateImage(panelRect, "InnerBorder", new Color(1f, 0.76f, 0.98f, 0.23f));
+            border.anchorMin = Vector2.zero;
+            border.anchorMax = Vector2.one;
+            border.offsetMin = Vector2.zero;
+            border.offsetMax = Vector2.zero;
+
+            var glass = CreateImage(panelRect, "GlassLayer", new Color(1f, 0.88f, 1f, 0.08f));
+            glass.anchorMin = Vector2.zero;
+            glass.anchorMax = Vector2.one;
+            glass.offsetMin = new Vector2(10f, 10f);
+            glass.offsetMax = new Vector2(-10f, -10f);
+
+            var highlight = CreateImage(panelRect, "HeaderSheen", new Color(1f, 0.74f, 0.98f, 0.18f));
+            highlight.anchorMin = new Vector2(0f, 1f);
+            highlight.anchorMax = new Vector2(1f, 1f);
+            highlight.pivot = new Vector2(0.5f, 1f);
+            highlight.offsetMin = new Vector2(20f, -150f);
+            highlight.offsetMax = new Vector2(-20f, -18f);
 
             return panelRect;
         }
 
-        private static void CreateTitle(RectTransform parent)
+        private static void CreateHeader(RectTransform parent)
         {
-            var title = CreateText(parent, "Title", ColorLabel("结算", "5f7bffff"), 46, TextAnchor.MiddleCenter);
-            title.color = Color.white;
+            var title = CreateText(parent, "Title", "结算", 50, TextAnchor.MiddleCenter);
+            title.color = new Color(1f, 0.86f, 1f, 1f);
             title.fontStyle = FontStyle.Bold;
-            title.lineSpacing = 1f;
+
+            var titleRect = title.rectTransform;
+            titleRect.anchorMin = new Vector2(0.5f, 1f);
+            titleRect.anchorMax = new Vector2(0.5f, 1f);
+            titleRect.pivot = new Vector2(0.5f, 1f);
+            titleRect.sizeDelta = new Vector2(420f, 62f);
+            titleRect.anchoredPosition = new Vector2(0f, -30f);
 
             var outline = title.gameObject.AddComponent<Outline>();
-            outline.effectColor = new Color(0.08f, 0.03f, 0.24f, 0.72f);
+            outline.effectColor = new Color(0.27f, 0.05f, 0.36f, 0.82f);
             outline.effectDistance = new Vector2(2f, -2f);
 
-            var rect = title.rectTransform;
-            rect.anchorMin = new Vector2(0.5f, 1f);
-            rect.anchorMax = new Vector2(0.5f, 1f);
-            rect.pivot = new Vector2(0.5f, 1f);
-            rect.sizeDelta = new Vector2(ContentWidth, 70f);
-            rect.anchoredPosition = new Vector2(0f, -26f);
+            var subtitle = CreateText(parent, "Subtitle", "SETTLEMENT RESULT", 18, TextAnchor.MiddleCenter);
+            subtitle.color = new Color(1f, 0.70f, 0.96f, 0.88f);
+            subtitle.fontStyle = FontStyle.Bold;
+            var subtitleRect = subtitle.rectTransform;
+            subtitleRect.anchorMin = new Vector2(0.5f, 1f);
+            subtitleRect.anchorMax = new Vector2(0.5f, 1f);
+            subtitleRect.pivot = new Vector2(0.5f, 1f);
+            subtitleRect.sizeDelta = new Vector2(420f, 30f);
+            subtitleRect.anchoredPosition = new Vector2(0f, -88f);
         }
 
-        private static void CreateContent(RectTransform parent, SettlementResultPush result)
+        private static void CreateAwardCards(RectTransform parent, SettlementResultPush result)
         {
-            var viewport = new GameObject("ContentViewport");
+            var area = new GameObject("Awards");
+            area.transform.SetParent(parent, false);
+            var areaRect = area.AddComponent<RectTransform>();
+            areaRect.anchorMin = new Vector2(0.5f, 1f);
+            areaRect.anchorMax = new Vector2(0.5f, 1f);
+            areaRect.pivot = new Vector2(0.5f, 1f);
+            areaRect.sizeDelta = new Vector2(PanelWidth - SidePadding * 2f, AwardCardHeight);
+            areaRect.anchoredPosition = new Vector2(0f, -138f);
+
+            var gap = 14f;
+            var x = 0f;
+            CreateAwardCard(areaRect, x, "龙币", FormatNames(result?.DragonCoinUids, result), "ffd700ff");
+            x += AwardCardWidth + gap;
+            CreateAwardCard(areaRect, x, "最能连之人", FormatNames(result?.ComboUids, result), Constants.ColorBlue);
+            x += AwardCardWidth + gap;
+            CreateAwardCard(areaRect, x, "P佬", FormatNames(result?.PerfectUids, result), Constants.ColorPink);
+            x += AwardCardWidth + gap;
+            CreateAwardCard(areaRect, x, "真·梦游少女", FormatNames(result?.SleepwalkUids, result), "ff9f1aff");
+        }
+
+        private static void CreateAwardCard(RectTransform parent, float x, string titleText, string namesText, string accentColor)
+        {
+            var card = CreateImage(parent, titleText, new Color(0.68f, 0.25f, 0.78f, 0.24f), true);
+            card.anchorMin = new Vector2(0f, 1f);
+            card.anchorMax = new Vector2(0f, 1f);
+            card.pivot = new Vector2(0f, 1f);
+            card.sizeDelta = new Vector2(AwardCardWidth, AwardCardHeight);
+            card.anchoredPosition = new Vector2(x, 0f);
+
+            var topLine = CreateImage(card, "Accent", RichTextColorToUnityColor(accentColor, 0.74f));
+            topLine.anchorMin = new Vector2(0f, 1f);
+            topLine.anchorMax = new Vector2(1f, 1f);
+            topLine.pivot = new Vector2(0.5f, 1f);
+            topLine.offsetMin = new Vector2(18f, -5f);
+            topLine.offsetMax = new Vector2(-18f, 0f);
+
+            var title = CreateText(card, "Title", ColorLabel(titleText, accentColor), 23, TextAnchor.UpperLeft);
+            title.fontStyle = FontStyle.Bold;
+            var titleRect = title.rectTransform;
+            titleRect.anchorMin = new Vector2(0f, 1f);
+            titleRect.anchorMax = new Vector2(1f, 1f);
+            titleRect.pivot = new Vector2(0.5f, 1f);
+            titleRect.offsetMin = new Vector2(20f, -52f);
+            titleRect.offsetMax = new Vector2(-20f, -18f);
+
+            var names = CreateText(card, "Names", namesText, 21, TextAnchor.UpperLeft);
+            names.color = new Color(1f, 0.96f, 1f, 0.96f);
+            names.lineSpacing = 1.08f;
+            var namesRect = names.rectTransform;
+            namesRect.anchorMin = new Vector2(0f, 0f);
+            namesRect.anchorMax = new Vector2(1f, 1f);
+            namesRect.offsetMin = new Vector2(20f, 18f);
+            namesRect.offsetMax = new Vector2(-20f, -66f);
+        }
+
+        private static void CreatePlayedCharts(RectTransform parent, SettlementResultPush result)
+        {
+            var section = CreateImage(parent, "PlayedCharts", new Color(0.24f, 0.08f, 0.30f, 0.34f), true);
+            section.anchorMin = new Vector2(0.5f, 1f);
+            section.anchorMax = new Vector2(0.5f, 1f);
+            section.pivot = new Vector2(0.5f, 1f);
+            section.sizeDelta = new Vector2(PanelWidth - SidePadding * 2f, 382f);
+            section.anchoredPosition = new Vector2(0f, -322f);
+
+            var title = CreateText(section, "ChartsTitle", ColorLabel("游玩曲目", Constants.ColorBlue), 28, TextAnchor.MiddleLeft);
+            title.fontStyle = FontStyle.Bold;
+            var titleRect = title.rectTransform;
+            titleRect.anchorMin = new Vector2(0f, 1f);
+            titleRect.anchorMax = new Vector2(1f, 1f);
+            titleRect.pivot = new Vector2(0.5f, 1f);
+            titleRect.offsetMin = new Vector2(30f, -62f);
+            titleRect.offsetMax = new Vector2(-30f, -18f);
+
+            var total = CreateText(
+                section,
+                "Duration",
+                $"{ColorLabel("本次游玩时长", Constants.ColorCyan)}：{ColorLabel(GetTotalDurationText(result?.PlayedCharts), "ffffffff")}",
+                23,
+                TextAnchor.MiddleRight);
+            var totalRect = total.rectTransform;
+            totalRect.anchorMin = new Vector2(0f, 1f);
+            totalRect.anchorMax = new Vector2(1f, 1f);
+            totalRect.pivot = new Vector2(0.5f, 1f);
+            totalRect.offsetMin = new Vector2(30f, -62f);
+            totalRect.offsetMax = new Vector2(-30f, -18f);
+
+            var divider = CreateImage(section, "Divider", new Color(1f, 0.78f, 1f, 0.18f));
+            divider.anchorMin = new Vector2(0f, 1f);
+            divider.anchorMax = new Vector2(1f, 1f);
+            divider.pivot = new Vector2(0.5f, 1f);
+            divider.offsetMin = new Vector2(30f, -72f);
+            divider.offsetMax = new Vector2(-30f, -69f);
+
+            CreateChartScroll(section, result?.PlayedCharts);
+        }
+
+        private static void CreateChartScroll(RectTransform parent, SettlementChartEntry[] charts)
+        {
+            var viewport = new GameObject("ChartViewport");
             viewport.transform.SetParent(parent, false);
             var viewportRect = viewport.AddComponent<RectTransform>();
-            viewportRect.anchorMin = new Vector2(0.5f, 1f);
-            viewportRect.anchorMax = new Vector2(0.5f, 1f);
+            viewportRect.anchorMin = new Vector2(0f, 1f);
+            viewportRect.anchorMax = new Vector2(1f, 1f);
             viewportRect.pivot = new Vector2(0.5f, 1f);
-            viewportRect.sizeDelta = new Vector2(ContentWidth, ContentViewportHeight);
-            viewportRect.anchoredPosition = new Vector2(0f, -120f);
+            viewportRect.offsetMin = new Vector2(30f, -72f - ChartViewportHeight);
+            viewportRect.offsetMax = new Vector2(-30f, -86f);
 
             var viewportImage = viewport.AddComponent<Image>();
             viewportImage.sprite = GetRoundedSprite();
             viewportImage.type = viewportImage.sprite != null ? Image.Type.Sliced : Image.Type.Simple;
-            viewportImage.color = new Color(0.17f, 0.08f, 0.34f, 0.38f);
+            viewportImage.color = new Color(1f, 0.86f, 1f, 0.06f);
             viewportImage.raycastTarget = true;
 
             var mask = viewport.AddComponent<Mask>();
             mask.showMaskGraphic = true;
 
-            var contentRoot = new GameObject("ContentRoot");
+            var contentRoot = new GameObject("ChartContent");
             contentRoot.transform.SetParent(viewportRect, false);
             var contentRect = contentRoot.AddComponent<RectTransform>();
             contentRect.anchorMin = new Vector2(0f, 1f);
             contentRect.anchorMax = new Vector2(1f, 1f);
             contentRect.pivot = new Vector2(0.5f, 1f);
-            contentRect.offsetMin = new Vector2(26f, 0f);
-            contentRect.offsetMax = new Vector2(-26f, 0f);
+            contentRect.offsetMin = new Vector2(24f, 0f);
+            contentRect.offsetMax = new Vector2(-24f, 0f);
 
-            var content = CreateText(contentRect, "Content", BuildContent(result), 24, TextAnchor.UpperLeft);
+            var content = CreateText(contentRect, "ChartText", BuildChartList(charts), 23, TextAnchor.UpperLeft);
             content.color = Color.white;
-            content.lineSpacing = 1.18f;
-            content.horizontalOverflow = HorizontalWrapMode.Wrap;
-            content.verticalOverflow = VerticalWrapMode.Overflow;
+            content.lineSpacing = 1.22f;
 
             var textRect = content.rectTransform;
             textRect.anchorMin = new Vector2(0f, 1f);
@@ -207,7 +318,7 @@ namespace MDEN.UI.Core
             textRect.offsetMax = Vector2.zero;
 
             Canvas.ForceUpdateCanvases();
-            var contentHeight = Mathf.Max(ContentViewportHeight, content.preferredHeight + 28f);
+            var contentHeight = Mathf.Max(ChartViewportHeight, content.preferredHeight + 28f);
             contentRect.sizeDelta = new Vector2(0f, contentHeight);
             textRect.sizeDelta = new Vector2(0f, contentHeight);
 
@@ -217,7 +328,7 @@ namespace MDEN.UI.Core
             scroll.horizontal = false;
             scroll.vertical = true;
             scroll.movementType = ScrollRect.MovementType.Clamped;
-            scroll.scrollSensitivity = 28f;
+            scroll.scrollSensitivity = 26f;
         }
 
         private static void CreateCloseButton(RectTransform parent)
@@ -229,30 +340,30 @@ namespace MDEN.UI.Core
             rect.anchorMin = new Vector2(0.5f, 0f);
             rect.anchorMax = new Vector2(0.5f, 0f);
             rect.pivot = new Vector2(0.5f, 0f);
-            rect.sizeDelta = new Vector2(280f, 62f);
-            rect.anchoredPosition = new Vector2(0f, 34f);
+            rect.sizeDelta = new Vector2(220f, 56f);
+            rect.anchoredPosition = new Vector2(0f, 30f);
 
             var image = buttonObj.AddComponent<Image>();
             image.sprite = GetRoundedSprite();
             image.type = image.sprite != null ? Image.Type.Sliced : Image.Type.Simple;
-            image.color = new Color(1f, 0.69f, 0.15f, 1f);
+            image.color = new Color(1f, 0.46f, 0.86f, 0.92f);
 
             var button = buttonObj.AddComponent<Button>();
             button.targetGraphic = image;
             button.colors = new ColorBlock
             {
-                normalColor = new Color(1f, 0.69f, 0.15f, 1f),
-                highlightedColor = new Color(1f, 0.79f, 0.25f, 1f),
-                pressedColor = new Color(0.91f, 0.49f, 0.08f, 1f),
-                selectedColor = new Color(1f, 0.73f, 0.18f, 1f),
-                disabledColor = new Color(0.55f, 0.45f, 0.38f, 0.8f),
+                normalColor = new Color(1f, 0.46f, 0.86f, 0.92f),
+                highlightedColor = new Color(1f, 0.62f, 0.94f, 1f),
+                pressedColor = new Color(0.78f, 0.26f, 0.74f, 1f),
+                selectedColor = new Color(1f, 0.54f, 0.90f, 0.96f),
+                disabledColor = new Color(0.45f, 0.30f, 0.48f, 0.72f),
                 colorMultiplier = 1f,
                 fadeDuration = 0.08f
             };
             button.onClick.AddListener((UnityAction)new Action(Destroy));
 
-            var label = CreateText(rect, "Label", "确认", 30, TextAnchor.MiddleCenter);
-            label.color = new Color(0.20f, 0.04f, 0.31f, 1f);
+            var label = CreateText(rect, "Label", "确认", 27, TextAnchor.MiddleCenter);
+            label.color = Color.white;
             label.fontStyle = FontStyle.Bold;
             var labelRect = label.rectTransform;
             labelRect.anchorMin = Vector2.zero;
@@ -278,7 +389,7 @@ namespace MDEN.UI.Core
             return text;
         }
 
-        private static RectTransform CreateImage(Transform parent, string name, Color color)
+        private static RectTransform CreateImage(Transform parent, string name, Color color, bool raycastTarget = false)
         {
             var obj = new GameObject(name);
             obj.transform.SetParent(parent, false);
@@ -287,7 +398,7 @@ namespace MDEN.UI.Core
             image.sprite = GetRoundedSprite();
             image.type = image.sprite != null ? Image.Type.Sliced : Image.Type.Simple;
             image.color = color;
-            image.raycastTarget = false;
+            image.raycastTarget = raycastTarget;
             return rect;
         }
 
@@ -325,50 +436,47 @@ namespace MDEN.UI.Core
             return _roundedSprite;
         }
 
-        private static string BuildContent(SettlementResultPush result)
-        {
-            var builder = new StringBuilder();
-            builder.AppendLine($"{ColorLabel("龙币", "ffd700ff")}：{FormatNames(result?.DragonCoinUids, result)}");
-            builder.AppendLine($"{ColorLabel("最能连之人", Constants.ColorBlue)}：{FormatNames(result?.ComboUids, result)}");
-            builder.AppendLine($"{ColorLabel("P佬", Constants.ColorPink)}：{FormatNames(result?.PerfectUids, result)}");
-            builder.AppendLine($"{ColorLabel("真·梦游少女", "ff9f1aff")}：{FormatNames(result?.SleepwalkUids, result)}");
-            builder.AppendLine();
-            builder.Append(BuildPlayedCharts(result?.PlayedCharts));
-            return builder.ToString();
-        }
-
-        private static string BuildPlayedCharts(SettlementChartEntry[] charts)
+        private static string GetTotalDurationText(SettlementChartEntry[] charts)
         {
             if (charts == null || charts.Length == 0)
             {
-                return $"{ColorLabel("本次游玩时长", Constants.ColorCyan)}：--:--\n" +
-                       $"{ColorLabel("游玩曲目", Constants.ColorBlue)}：暂无";
+                return "--:--";
             }
 
-            var lines = new List<string>();
             var totalSeconds = 0f;
             var knownDurationCount = 0;
 
-            for (var i = 0; i < charts.Length; i++)
+            foreach (var chart in charts)
             {
-                var chart = charts[i];
-                var name = EscapeRichText(string.IsNullOrWhiteSpace(chart?.ChartName)
-                    ? $"Unknown Chart {chart?.Difficulty ?? 0}"
-                    : chart.ChartName);
                 var durationSeconds = GetDurationSeconds(chart);
                 if (durationSeconds.HasValue)
                 {
                     totalSeconds += durationSeconds.Value;
                     knownDurationCount++;
                 }
-
-                lines.Add($"{ColorLabel((i + 1).ToString(), Constants.ColorYellow)}. {ColorLabel(name, "ffffffff")} {FormatDifficulty(chart?.Difficulty ?? 0)}");
             }
 
-            var total = knownDurationCount > 0 ? FormatDuration(totalSeconds) : "--:--";
-            return $"{ColorLabel("本次游玩时长", Constants.ColorCyan)}：{ColorLabel(total, "ffffffff")}\n" +
-                   $"{ColorLabel("游玩曲目", Constants.ColorBlue)}：\n" +
-                   string.Join("\n", lines);
+            return knownDurationCount > 0 ? FormatDuration(totalSeconds) : "--:--";
+        }
+
+        private static string BuildChartList(SettlementChartEntry[] charts)
+        {
+            if (charts == null || charts.Length == 0)
+            {
+                return "暂无";
+            }
+
+            var lines = new List<string>();
+            for (var i = 0; i < charts.Length; i++)
+            {
+                var chart = charts[i];
+                var name = EscapeRichText(string.IsNullOrWhiteSpace(chart?.ChartName)
+                    ? $"Unknown Chart {chart?.Difficulty ?? 0}"
+                    : chart.ChartName);
+                lines.Add($"{ColorLabel((i + 1).ToString("00"), Constants.ColorYellow)}  {ColorLabel(name, "ffffffff")}  {FormatDifficulty(chart?.Difficulty ?? 0)}");
+            }
+
+            return string.Join("\n", lines);
         }
 
         private static float? GetDurationSeconds(SettlementChartEntry chart)
@@ -597,6 +705,20 @@ namespace MDEN.UI.Core
         private static string ColorLabel(string value, string color)
         {
             return $"<color=#{NormalizeRichTextColor(color)}>{value}</color>";
+        }
+
+        private static Color RichTextColorToUnityColor(string color, float alpha)
+        {
+            var normalized = NormalizeRichTextColor(color);
+            if (normalized.Length >= 6 &&
+                byte.TryParse(normalized.Substring(0, 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var r) &&
+                byte.TryParse(normalized.Substring(2, 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var g) &&
+                byte.TryParse(normalized.Substring(4, 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var b))
+            {
+                return new Color(r / 255f, g / 255f, b / 255f, alpha);
+            }
+
+            return new Color(1f, 0.55f, 0.90f, alpha);
         }
 
         private static string FormatNames(string[] uids, SettlementResultPush result)

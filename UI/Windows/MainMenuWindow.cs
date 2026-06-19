@@ -161,7 +161,7 @@ namespace MDEN.UI.Windows
             }
             else if (button == _btnSupportUs)
             {
-                MelonLoader.MelonLogger.Msg("Support us button selected.");
+                MDEN.Managers.ClientLogManager.Msg("Support us button selected.");
                 Application.OpenURL(SupportUsUrl);
             }
         }

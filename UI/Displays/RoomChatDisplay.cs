@@ -297,7 +297,7 @@ namespace MDEN.UI.Displays
             var templateInput = UnityEngine.Resources.FindObjectsOfTypeAll<Il2CppAssets.Scripts.UI.PeroInputField>();
             if (templateInput == null || templateInput.Length == 0)
             {
-                MelonLogger.Warning("Cannot create native room chat input: no PeroInputField template found.");
+                MDEN.Managers.ClientLogManager.Warning("Cannot create native room chat input: no PeroInputField template found.");
                 return false;
             }
 
@@ -634,7 +634,7 @@ namespace MDEN.UI.Displays
             }
             catch (Exception ex)
             {
-                MelonLogger.Warning($"Send chat failed: {ex.Message}");
+                MDEN.Managers.ClientLogManager.Warning($"Send chat failed: {ex.Message}");
                 MainThreadDispatcher.Enqueue(FinishFailedSubmit);
             }
         }
@@ -1338,7 +1338,7 @@ namespace MDEN.UI.Displays
             }
             catch (Exception ex)
             {
-                MelonLogger.Warning($"Set game input block failed: {ex.Message}");
+                MDEN.Managers.ClientLogManager.Warning($"Set game input block failed: {ex.Message}");
             }
         }
     }

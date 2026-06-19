@@ -288,7 +288,7 @@ namespace MDEN.UI.Windows
             }
             else if (_lobbies.Length == 0)
             {
-                MelonLogger.Msg("No lobby selected because lobby list is empty.");
+                MDEN.Managers.ClientLogManager.Msg("No lobby selected because lobby list is empty.");
             }
             else
             {
@@ -417,7 +417,7 @@ namespace MDEN.UI.Windows
             }
             catch (Exception ex)
             {
-                MelonLogger.Warning($"Fetch lobby list failed: {ex.Message}");
+                MDEN.Managers.ClientLogManager.Warning($"Fetch lobby list failed: {ex.Message}");
                 _lobbies = new LobbyListEntry[0];
             }
             finally
@@ -453,7 +453,7 @@ namespace MDEN.UI.Windows
             }
             catch (Exception ex)
             {
-                MelonLogger.Warning($"Fetch lobby list failed: {ex.Message}");
+                MDEN.Managers.ClientLogManager.Warning($"Fetch lobby list failed: {ex.Message}");
             }
             finally
             {
@@ -493,7 +493,7 @@ namespace MDEN.UI.Windows
                 }
                 catch (Exception ex)
                 {
-                    MelonLogger.Warning($"Auto refresh lobby list failed: {ex.Message}");
+                    MDEN.Managers.ClientLogManager.Warning($"Auto refresh lobby list failed: {ex.Message}");
                 }
             }
         }
@@ -559,7 +559,7 @@ namespace MDEN.UI.Windows
                 LobbyManager.MarkLobbyEntered(lobby);
                 joined = true;
 
-                MelonLogger.Msg($"Joined lobby: {lobby.Id}");
+                MDEN.Managers.ClientLogManager.Msg($"Joined lobby: {lobby.Id}");
                 MainThreadDispatcher.Enqueue(() =>
                 {
                     if (IsDisposed) return;
@@ -570,7 +570,7 @@ namespace MDEN.UI.Windows
             }
             catch (Exception ex)
             {
-                MelonLogger.Warning($"Join lobby failed: {ex.Message}");
+                MDEN.Managers.ClientLogManager.Warning($"Join lobby failed: {ex.Message}");
                 if (IsDisposed) return;
                 MainThreadDispatcher.Enqueue(() =>
                 {

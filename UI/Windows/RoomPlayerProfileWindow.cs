@@ -67,7 +67,7 @@ namespace MDEN.UI.Windows
             }
             catch (Exception ex)
             {
-                MelonLogger.Warning($"Load player profile failed: {_player.Uid}, {ex.Message}");
+                MDEN.Managers.ClientLogManager.Warning($"Load player profile failed: {_player.Uid}, {ex.Message}");
             }
         }
 
@@ -119,7 +119,7 @@ namespace MDEN.UI.Windows
             }
             catch (Exception ex)
             {
-                MelonLogger.Warning($"Friend action failed: {_player.Uid}, {ex.Message}");
+                MDEN.Managers.ClientLogManager.Warning($"Friend action failed: {_player.Uid}, {ex.Message}");
                 MainThreadDispatcher.Enqueue(() => Il2CppAssets.Scripts.UI.Controls.ShowText.ShowInfo(ex.Message));
             }
         }

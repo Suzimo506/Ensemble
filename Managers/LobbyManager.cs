@@ -151,6 +151,7 @@ namespace MDEN.Managers
 
             _pendingJoinLobbyId = null;
             CurrentLobby = null;
+            BattleManager.Reset();
             NotifyCurrentLobbyChanged();
         }
 
@@ -163,12 +164,33 @@ namespace MDEN.Managers
 
             try
             {
+                await RefreshCurrentLobbyAfterReconnectAsync();
                 await RefreshLobbiesAsync();
             }
             catch (Exception ex)
             {
-                MelonLogger.Warning($"Refresh lobbies after reconnect failed: {ex.Message}");
+                MDEN.Managers.ClientLogManager.Warning($"Refresh lobbies after reconnect failed: {ex.Message}");
             }
+        }
+
+        private static async Task RefreshCurrentLobbyAfterReconnectAsync()
+        {
+            var response = await NetworkClient.Instance.SendRequestAsync<GetCurrentLobbyRequest, GetCurrentLobbyResponse>(
+                OpCodes.GetCurrentLobbyReq,
+                new GetCurrentLobbyRequest());
+
+            if (response?.Lobby == null)
+            {
+                CurrentLobby = null;
+                _pendingJoinLobbyId = null;
+                IgnoredLobbySyncIds.Clear();
+                LobbySyncRevisions.Clear();
+                BattleManager.Reset();
+                NotifyCurrentLobbyChanged();
+                return;
+            }
+
+            ApplyCurrentLobbySnapshot(response?.Lobby, true);
         }
 
         public static async Task StartLobbyAsync()
@@ -247,6 +269,7 @@ namespace MDEN.Managers
             _pendingJoinLobbyId = null;
             IgnoredLobbySyncIds.Clear();
             LobbySyncRevisions.Clear();
+            BattleManager.Reset();
             NotifyCurrentLobbyChanged();
         }
 
@@ -309,25 +332,33 @@ namespace MDEN.Managers
 
         private static void OnLobbySync(LobbySyncPush push)
         {
+            ApplyCurrentLobbySnapshot(push, false);
+        }
+
+        private static void ApplyCurrentLobbySnapshot(LobbySyncPush push, bool force)
+        {
             if (push == null) return;
 
-            if (IgnoredLobbySyncIds.Contains(push.Id) &&
+            if (!force &&
+                IgnoredLobbySyncIds.Contains(push.Id) &&
                 CurrentLobby?.Id != push.Id &&
                 _pendingJoinLobbyId != push.Id)
             {
-                MelonLogger.Msg($"Ignored stale lobby sync: {push.Id}");
+                MDEN.Managers.ClientLogManager.Msg($"Ignored stale lobby sync: {push.Id}");
                 return;
             }
 
-            if (_pendingJoinLobbyId.HasValue && _pendingJoinLobbyId.Value != push.Id)
+            if (!force &&
+                _pendingJoinLobbyId.HasValue &&
+                _pendingJoinLobbyId.Value != push.Id)
             {
-                MelonLogger.Msg($"Ignored lobby sync while joining {_pendingJoinLobbyId.Value}: {push.Id}");
+                MDEN.Managers.ClientLogManager.Msg($"Ignored lobby sync while joining {_pendingJoinLobbyId.Value}: {push.Id}");
                 return;
             }
 
-            if (IsStaleLobbySync(push))
+            if (!force && IsStaleLobbySync(push))
             {
-                MelonLogger.Msg($"Ignored stale lobby sync: {push.Id}, revision: {push.Revision}");
+                MDEN.Managers.ClientLogManager.Msg($"Ignored stale lobby sync: {push.Id}, revision: {push.Revision}");
                 return;
             }
 
@@ -337,7 +368,7 @@ namespace MDEN.Managers
             IgnoredLobbySyncIds.Remove(push.Id);
             CurrentLobby = push;
             RememberLobbySyncRevision(push);
-            MelonLogger.Msg($"Lobby sync received: {push.Id}, players: {push.Players?.Length ?? 0}/{push.MaxPlayers}");
+            MDEN.Managers.ClientLogManager.Msg($"Lobby sync received: {push.Id}, players: {push.Players?.Length ?? 0}/{push.MaxPlayers}");
             if (pingOnlySync) return;
 
             NotifyCurrentLobbyChanged();
@@ -348,6 +379,7 @@ namespace MDEN.Managers
             var reason = string.IsNullOrWhiteSpace(push?.Reason) ? "你已被移出房间" : push.Reason;
             _pendingJoinLobbyId = null;
             CurrentLobby = null;
+            BattleManager.Reset();
             NotifyCurrentLobbyChanged();
             MainThreadDispatcher.Enqueue(() =>
             {
@@ -389,6 +421,7 @@ namespace MDEN.Managers
                 previous.IsPlaying != next.IsPlaying ||
                 previous.WatcherCount != next.WatcherCount ||
                 previous.CurrentPlaylistEntry != next.CurrentPlaylistEntry ||
+                previous.CurrentBattleId != next.CurrentBattleId ||
                 previous.CurrentBattleEntry != next.CurrentBattleEntry)
             {
                 return false;
@@ -486,15 +519,7 @@ namespace MDEN.Managers
 
         private static void EnsureReady()
         {
-            if (!NetworkClient.Instance.IsConnected)
-            {
-                throw new System.InvalidOperationException("Not connected to server.");
-            }
-
-            if (!ConnectionManager.IsLoggedIn)
-            {
-                throw new System.InvalidOperationException("Not logged in to server.");
-            }
+            ConnectionManager.EnsureCanSendRequest();
         }
     }
 }

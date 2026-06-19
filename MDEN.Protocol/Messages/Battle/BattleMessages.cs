@@ -7,6 +7,7 @@ namespace MDEN.Protocol.Messages.Battle
     /// </summary>
     public class BattleDataNotifyMsg
     {
+        public string BattleId { get; set; }
         public uint Score { get; set; }
         public float Accuracy { get; set; }
         public ushort Perfects { get; set; }
@@ -23,6 +24,16 @@ namespace MDEN.Protocol.Messages.Battle
     /// </summary>
     public class BattleDataPushMsg
     {
+        public string BattleId { get; set; }
         public BattlePlayerEntry[] Players { get; set; }
+    }
+
+    public class BattleStartFailedNotify
+    {
+        public int LobbyId { get; set; }
+        public string BattleId { get; set; }
+        public string Entry { get; set; }
+        public string ReasonCode { get; set; }
+        public string Reason { get; set; }
     }
 }

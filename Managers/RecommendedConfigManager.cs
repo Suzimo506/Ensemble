@@ -118,7 +118,7 @@ namespace MDEN.Managers
                     }
                 }
 
-                MelonLogger.Warning($"Load recommended config failed: {ex.Message}");
+                MDEN.Managers.ClientLogManager.Warning($"Load recommended config failed: {ex.Message}");
             }
         }
 

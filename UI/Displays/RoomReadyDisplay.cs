@@ -320,7 +320,7 @@ namespace MDEN.UI.Displays
             }
             catch (Exception ex)
             {
-                MelonLogger.Warning($"Set ready failed: {ex.Message}");
+                MDEN.Managers.ClientLogManager.Warning($"Set ready failed: {ex.Message}");
                 MainThreadDispatcher.Enqueue(() => ShowText.ShowInfo($"准备失败：{ex.Message}"));
             }
             finally
@@ -345,7 +345,7 @@ namespace MDEN.UI.Displays
             }
             catch (Exception ex)
             {
-                MelonLogger.Warning($"Apply recommended config failed: {ex.Message}");
+                MDEN.Managers.ClientLogManager.Warning($"Apply recommended config failed: {ex.Message}");
             }
             finally
             {
@@ -368,7 +368,7 @@ namespace MDEN.UI.Displays
             }
             catch (Exception ex)
             {
-                MelonLogger.Warning($"Stop lobby failed: {ex.Message}");
+                MDEN.Managers.ClientLogManager.Warning($"Stop lobby failed: {ex.Message}");
             }
             finally
             {

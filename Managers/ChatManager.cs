@@ -19,6 +19,7 @@ namespace MDEN.Managers
         public static async Task SendAsync(string message)
         {
             if (string.IsNullOrWhiteSpace(message)) return;
+            ConnectionManager.EnsureCanSendRequest();
 
             if (!LobbyManager.IsInLobby)
             {
@@ -33,6 +34,7 @@ namespace MDEN.Managers
         public static async Task SendMdtHostReplyAsync(string reply)
         {
             if (string.IsNullOrWhiteSpace(reply)) return;
+            ConnectionManager.EnsureCanSendRequest();
 
             if (!LobbyManager.IsInLobby)
             {

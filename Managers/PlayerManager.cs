@@ -88,8 +88,7 @@ namespace MDEN.Managers
 
         public static void SyncCurrentSelectionIfChanged()
         {
-            if (!NetworkClient.Instance.IsConnected ||
-                !ConnectionManager.IsLoggedIn ||
+            if (!ConnectionManager.CanSendRequests ||
                 string.IsNullOrEmpty(CurrentUid) ||
                 _selectionSyncInProgress)
             {
@@ -124,7 +123,7 @@ namespace MDEN.Managers
 
         public static void SyncSelectionFireAndForget(GameSelectionInfo selection)
         {
-            if (!NetworkClient.Instance.IsConnected || !ConnectionManager.IsLoggedIn || string.IsNullOrEmpty(CurrentUid)) return;
+            if (!ConnectionManager.CanSendRequests || string.IsNullOrEmpty(CurrentUid)) return;
 
             _ = SyncSelectionAsync(selection).ContinueWith(task =>
             {
@@ -177,7 +176,7 @@ namespace MDEN.Managers
 
         public static void SyncChartStateFireAndForget()
         {
-            if (!NetworkClient.Instance.IsConnected || !ConnectionManager.IsLoggedIn || string.IsNullOrEmpty(CurrentUid)) return;
+            if (!ConnectionManager.CanSendRequests || string.IsNullOrEmpty(CurrentUid)) return;
 
             _ = SyncChartStateAsync().ContinueWith(task =>
             {
@@ -319,10 +318,7 @@ namespace MDEN.Managers
 
         private static void EnsureReady()
         {
-            if (!NetworkClient.Instance.IsConnected)
-            {
-                throw new System.InvalidOperationException("Not connected to server.");
-            }
+            ConnectionManager.EnsureCanSendRequest();
 
             if (string.IsNullOrEmpty(CurrentUid))
             {
@@ -332,12 +328,12 @@ namespace MDEN.Managers
 
         private static void LogSyncFailure(string prefix, Exception ex)
         {
-            if (!NetworkClient.Instance.IsConnected || !ConnectionManager.IsLoggedIn)
+            if (!ConnectionManager.CanSendRequests)
             {
                 return;
             }
 
-            MelonLogger.Warning($"{prefix}: {ex?.Message}");
+            MDEN.Managers.ClientLogManager.Warning($"{prefix}: {ex?.Message}");
         }
 
         private static void ApplyLocalUpdate(GetPlayerResponse profile, UpdatePlayerRequest request)

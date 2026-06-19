@@ -51,7 +51,7 @@ namespace MDEN.Managers
             }
             catch (Exception ex)
             {
-                MelonLogger.Warning($"Load musedash.moe rating level failed: {uid}, {ex.Message}");
+                MDEN.Managers.ClientLogManager.Warning($"Load musedash.moe rating level failed: {uid}, {ex.Message}");
                 RatingLevelCache.TryRemove(uid, out _);
                 return null;
             }

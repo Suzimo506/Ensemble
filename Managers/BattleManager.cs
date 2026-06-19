@@ -19,6 +19,7 @@ namespace MDEN.Managers
         private static readonly object BattleDataLock = new();
         private static readonly Dictionary<string, BattlePlayerEntry> PlayerBattleData = new();
         private static CancellationTokenSource _syncCts;
+        private static string _activeBattleId;
         private static TaskStageTarget _taskStageTarget;
         private static BattleRoleAttributeComponent _battleRoleAttributeComponent;
         private static bool _synchronizing;
@@ -48,6 +49,7 @@ namespace MDEN.Managers
         public static void PrepareForNewBattle()
         {
             _battleStartedUtc = DateTime.UtcNow;
+            _activeBattleId = LobbyManager.CurrentLobby?.CurrentBattleId;
 
             lock (BattleDataLock)
             {
@@ -79,7 +81,7 @@ namespace MDEN.Managers
             }
             catch (Exception ex)
             {
-                MelonLogger.Warning($"Battle sync failed: {ex.Message}");
+                MDEN.Managers.ClientLogManager.Warning($"Battle sync failed: {ex.Message}");
             }
             finally
             {
@@ -110,13 +112,21 @@ namespace MDEN.Managers
                     OpCodes.BattleReturnedReq,
                     new BattleReturnedReq
                     {
+                        BattleId = _activeBattleId,
                         PlayedSeconds = playedSeconds
                     });
             }
             catch (Exception ex)
             {
-                MelonLogger.Warning($"Battle returned request failed: {ex.Message}");
+                MDEN.Managers.ClientLogManager.Warning($"Battle returned request failed: {ex.Message}");
             }
+        }
+
+        public static void ReportBattleStartFailed(int lobbyId, string battleId, string entry, string reasonCode, string reason)
+        {
+            if (!ConnectionManager.CanSendRequests || string.IsNullOrWhiteSpace(battleId)) return;
+
+            _ = ReportBattleStartFailedAsync(lobbyId, battleId, entry, reasonCode, reason);
         }
 
         private static float GetPlayedSeconds()
@@ -144,6 +154,7 @@ namespace MDEN.Managers
             StopSyncLoop();
             _finishReported = false;
             _forcedDead = false;
+            _activeBattleId = null;
             _taskStageTarget = null;
             _battleRoleAttributeComponent = null;
             _accuracyInitialized = false;
@@ -178,11 +189,14 @@ namespace MDEN.Managers
         private static async Task SendCurrentAsync()
         {
             if (!IsNetworkReady() || !EnsureBattleComponents()) return;
+            var battleId = GetCurrentBattleId();
+            if (string.IsNullOrWhiteSpace(battleId)) return;
 
             try
             {
                 var notify = await CreateCurrentNotifyAsync();
                 if (notify == null) return;
+                notify.BattleId = battleId;
                 ApplyLocalBattleData(notify);
 
                 await NetworkClient.Instance.SendNotifyAsync(
@@ -191,7 +205,33 @@ namespace MDEN.Managers
             }
             catch (Exception ex)
             {
-                MelonLogger.Warning($"Battle data notify failed: {ex.Message}");
+                MDEN.Managers.ClientLogManager.Warning($"Battle data notify failed: {ex.Message}");
+            }
+        }
+
+        private static async Task ReportBattleStartFailedAsync(
+            int lobbyId,
+            string battleId,
+            string entry,
+            string reasonCode,
+            string reason)
+        {
+            try
+            {
+                await NetworkClient.Instance.SendNotifyAsync(
+                    OpCodes.BattleStartFailedNotify,
+                    new BattleStartFailedNotify
+                    {
+                        LobbyId = lobbyId,
+                        BattleId = battleId,
+                        Entry = entry,
+                        ReasonCode = reasonCode,
+                        Reason = reason
+                    });
+            }
+            catch (Exception ex)
+            {
+                MDEN.Managers.ClientLogManager.Warning($"Battle start failure report failed: {ex.Message}");
             }
         }
 
@@ -247,6 +287,7 @@ namespace MDEN.Managers
 
             return new BattleDataNotifyMsg
             {
+                BattleId = GetCurrentBattleId(),
                 Score = (uint)_taskStageTarget.GetScore(),
                 Accuracy = AccuracyManager.GetCalculatedAccuracy(),
                 Perfects = (ushort)_taskStageTarget.m_PerfectResult,
@@ -261,6 +302,12 @@ namespace MDEN.Managers
 
         private static void OnBattleDataPush(BattleDataPushMsg push)
         {
+            var battleId = GetCurrentBattleId();
+            if (string.IsNullOrWhiteSpace(battleId) || push?.BattleId != battleId)
+            {
+                return;
+            }
+
             var players = push?.Players ?? Array.Empty<BattlePlayerEntry>();
             lock (BattleDataLock)
             {
@@ -298,8 +345,25 @@ namespace MDEN.Managers
         private static bool IsNetworkReady()
         {
             return LobbyManager.IsInLobby &&
-                   ConnectionManager.IsLoggedIn &&
-                   NetworkClient.Instance.IsConnected;
+                   ConnectionManager.CanSendRequests;
+        }
+
+        private static string GetCurrentBattleId()
+        {
+            var lobby = LobbyManager.CurrentLobby;
+            if (lobby == null || !lobby.IsPlaying)
+            {
+                _activeBattleId = null;
+                return null;
+            }
+
+            var currentBattleId = lobby.CurrentBattleId;
+            if (!string.IsNullOrWhiteSpace(currentBattleId))
+            {
+                _activeBattleId = currentBattleId;
+            }
+
+            return _activeBattleId;
         }
     }
 }

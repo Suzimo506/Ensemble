@@ -223,7 +223,7 @@ namespace MDEN.UI.Windows
                 var value = input.Result ?? "";
                 if (value.Length > maxLength || !validator(value))
                 {
-                    MelonLogger.Warning(validationError);
+                    MDEN.Managers.ClientLogManager.Warning(validationError);
                     MainThreadDispatcher.Enqueue(RebuildWindow);
                     return;
                 }
@@ -241,11 +241,11 @@ namespace MDEN.UI.Windows
             try
             {
                 await saveAction.Invoke(value);
-                MelonLogger.Msg($"Local profile field saved: {fieldName}");
+                MDEN.Managers.ClientLogManager.Msg($"Local profile field saved: {fieldName}");
             }
             catch (Exception ex)
             {
-                MelonLogger.Warning($"Save local profile field failed: {fieldName}, {ex.Message}");
+                MDEN.Managers.ClientLogManager.Warning($"Save local profile field failed: {fieldName}, {ex.Message}");
             }
         }
 
@@ -264,7 +264,7 @@ namespace MDEN.UI.Windows
             }
             catch (Exception ex)
             {
-                MelonLogger.Warning($"Refresh profile failed: {ex.Message}");
+                MDEN.Managers.ClientLogManager.Warning($"Refresh profile failed: {ex.Message}");
             }
         }
 

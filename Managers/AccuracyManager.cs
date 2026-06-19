@@ -77,7 +77,7 @@ namespace MDEN.Managers
             }
             catch (Exception ex)
             {
-                MelonLogger.Warning($"Accuracy manager init failed: {ex.Message}");
+                MDEN.Managers.ClientLogManager.Warning($"Accuracy manager init failed: {ex.Message}");
             }
         }
 
@@ -175,7 +175,7 @@ namespace MDEN.Managers
             }
             catch (Exception ex)
             {
-                MelonLogger.Warning($"Accuracy miss handling failed: {ex.Message}");
+                MDEN.Managers.ClientLogManager.Warning($"Accuracy miss handling failed: {ex.Message}");
             }
         }
 

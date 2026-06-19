@@ -81,7 +81,7 @@ namespace MDEN.UI.Core
             }
             catch (Exception ex)
             {
-                MelonLogger.Warning($"Toggle playlist chart failed: {ex.Message}");
+                MDEN.Managers.ClientLogManager.Warning($"Toggle playlist chart failed: {ex.Message}");
                 MainThreadDispatcher.Enqueue(() => ShowText.ShowInfo(ex.Message));
             }
             finally

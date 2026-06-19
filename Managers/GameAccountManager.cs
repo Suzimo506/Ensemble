@@ -138,7 +138,7 @@ namespace MDEN.Managers
             }
             catch (Exception ex)
             {
-                MelonLogger.Warning($"Read FavGirl {propertyName} failed: {ex.Message}");
+                MDEN.Managers.ClientLogManager.Warning($"Read FavGirl {propertyName} failed: {ex.Message}");
                 return fallback;
             }
         }

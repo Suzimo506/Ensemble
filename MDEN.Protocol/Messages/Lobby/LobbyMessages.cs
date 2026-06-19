@@ -100,6 +100,15 @@ namespace MDEN.Protocol.Messages.Lobby
     {
     }
 
+    public class GetCurrentLobbyRequest
+    {
+    }
+
+    public class GetCurrentLobbyResponse
+    {
+        public LobbySyncPush Lobby { get; set; }
+    }
+
     public class LobbyLockRequest
     {
         public bool Locked { get; set; }
@@ -134,6 +143,7 @@ namespace MDEN.Protocol.Messages.Lobby
         public bool IsPlaying { get; set; }
         public int WatcherCount { get; set; }
         public ushort CurrentPlaylistEntry { get; set; }
+        public string CurrentBattleId { get; set; }
         public string CurrentBattleEntry { get; set; }
         public string[] Players { get; set; }
         public string[] ReadyPlayers { get; set; }

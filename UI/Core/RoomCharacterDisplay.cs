@@ -347,7 +347,7 @@ namespace MDEN.UI.Core
             }
 
             slot.SetCharacter(girlIndex, newShow);
-            MelonLogger.Msg($"Room character loaded: girlIndex={girlIndex}, asset={assetName}");
+            MDEN.Managers.ClientLogManager.Msg($"Room character loaded: girlIndex={girlIndex}, asset={assetName}");
             return true;
         }
 
@@ -1325,7 +1325,7 @@ namespace MDEN.UI.Core
         {
             if (WarningKeys.Add(key))
             {
-                MelonLogger.Warning(message);
+                MDEN.Managers.ClientLogManager.Warning(message);
             }
         }
 

@@ -180,7 +180,7 @@ namespace MDEN.UI.Windows
             }
             catch (System.Exception ex)
             {
-                MelonLogger.Warning($"Remove playlist entry failed: {ex.Message}");
+                MDEN.Managers.ClientLogManager.Warning($"Remove playlist entry failed: {ex.Message}");
                 MainThreadDispatcher.Enqueue(() => ShowText.ShowInfo(ex.Message));
             }
         }

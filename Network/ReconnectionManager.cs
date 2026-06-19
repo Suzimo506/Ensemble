@@ -24,6 +24,11 @@ namespace MDEN.Network
         private void HandleDisconnect()
         {
             ConnectionManager.MarkDisconnectedByRemote();
+            if (string.IsNullOrWhiteSpace(ConnectionManager.CurrentServerAddress))
+            {
+                return;
+            }
+
             StartReconnectLoop();
         }
 
@@ -41,7 +46,7 @@ namespace MDEN.Network
             {
                 for (var attempt = 1; attempt <= MaxReconnectAttempts; attempt++)
                 {
-                    MelonLogger.Warning($"Disconnected from server. Reconnect attempt {attempt}/{MaxReconnectAttempts}...");
+                    MDEN.Managers.ClientLogManager.Warning($"Disconnected from server. Reconnect attempt {attempt}/{MaxReconnectAttempts}...");
 
                     await DelayBeforeAttemptAsync(attempt);
                     if (NetworkClient.Instance.IsConnected)
@@ -51,12 +56,18 @@ namespace MDEN.Network
 
                     if (await ConnectionManager.ReconnectToCurrentServerAsync())
                     {
-                        MelonLogger.Msg("Reconnected to server.");
+                        MDEN.Managers.ClientLogManager.Msg("Reconnected to server.");
+                        return;
+                    }
+
+                    if (ConnectionManager.State == ConnectionLifecycleState.ReconnectFailed)
+                    {
                         return;
                     }
                 }
 
-                MelonLogger.Warning("Reconnect attempts exhausted.");
+                MDEN.Managers.ClientLogManager.Warning("Reconnect attempts exhausted.");
+                ConnectionManager.MarkReconnectFailed();
             }
             finally
             {
