@@ -17,6 +17,7 @@ namespace MDEN.UI.Displays
         protected override TextAnchor TextAnchor => TextAnchor.UpperRight;
         protected override int FontSize => 26;
         protected override float EntryWidth => 460f;
+        private const string NotReadyColor = "9a8b96ff";
 
         public void Update(LobbySyncPush lobby)
         {
@@ -29,7 +30,9 @@ namespace MDEN.UI.Displays
             Create();
 
             var activeKeys = new List<string> { "title" };
-            SetEntry("title", $"{lobby.Name} <color=#{Constants.ColorYellow}>({GetPlayerCount(lobby)}/{lobby.MaxPlayers})</color>");
+            SetEntry(
+                "title",
+                $"{lobby.Name} 观众：<color=#{Constants.ColorCyan}>{lobby.WatcherCount}</color> <color=#{Constants.ColorYellow}>({GetPlayerCount(lobby)}/{lobby.MaxPlayers})</color>");
 
             foreach (var player in GetPlayers(lobby))
             {
@@ -39,10 +42,11 @@ namespace MDEN.UI.Displays
                 var hostPrefix = player.Uid == lobby.HostUid ? $"<color=#{Constants.ColorYellow}>[Host]</color> " : string.Empty;
                 var localColorStart = player.Uid == PlayerManager.CurrentUid ? $"<color=#{Constants.ColorCyan}>" : string.Empty;
                 var localColorEnd = player.Uid == PlayerManager.CurrentUid ? "</color>" : string.Empty;
+                var readyState = GetReadyStateText(lobby, player.Uid);
                 var capturedPlayer = player;
                 SetEntry(
                     key,
-                    $"{hostPrefix}{localColorStart}{player.Name}{localColorEnd}",
+                    $"{hostPrefix}{localColorStart}{player.Name}{localColorEnd}{readyState}",
                     () => WindowStackController.OpenWindow(new RoomPlayerWindow(capturedPlayer)));
             }
 
@@ -62,6 +66,19 @@ namespace MDEN.UI.Displays
 
             if (lobby.Players == null) return 0;
             return lobby.Players.Where(uid => !string.IsNullOrEmpty(uid)).Distinct().Count();
+        }
+
+        private static string GetReadyStateText(LobbySyncPush lobby, string uid)
+        {
+            if (lobby == null || !lobby.Locked || lobby.IsPlaying || string.IsNullOrEmpty(uid))
+            {
+                return string.Empty;
+            }
+
+            var isReady = lobby.ReadyPlayers != null && lobby.ReadyPlayers.Contains(uid);
+            var color = isReady ? Constants.ColorGreen : NotReadyColor;
+            var text = isReady ? "已准备" : "未准备";
+            return $" <size=22><color=#{color}>{text}</color></size>";
         }
 
         private static IEnumerable<PlayerSyncEntry> GetPlayers(LobbySyncPush lobby)

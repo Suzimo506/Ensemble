@@ -225,7 +225,7 @@ namespace MDEN.Network
 
                             if (envelope.Payload is JsonElement pushPayload)
                             {
-                                OnPushReceived?.Invoke(envelope.Op, pushPayload);
+                                DispatchPush(envelope.Op, pushPayload);
                             }
                             continue;
                         }
@@ -247,6 +247,18 @@ namespace MDEN.Network
         private bool IsCurrentConnection(int connectionId)
         {
             return connectionId == _connectionId;
+        }
+
+        private void DispatchPush(ushort opCode, JsonElement payload)
+        {
+            try
+            {
+                OnPushReceived?.Invoke(opCode, payload);
+            }
+            catch (Exception ex)
+            {
+                MelonLogger.Error($"Push handler exception, OpCode: {opCode}, error: {ex}");
+            }
         }
 
         private void DisconnectIfCurrent(int connectionId, bool notifyDisconnected)

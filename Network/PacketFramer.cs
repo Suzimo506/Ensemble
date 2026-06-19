@@ -9,6 +9,7 @@ namespace MDEN.Network
     // 处理 TCP 粘包和半包
     public class PacketFramer
     {
+        private const int MaxPayloadSize = 1048576;
         private readonly List<byte> _buffer = new List<byte>();
 
         public void AppendData(byte[] data, int offset, int length)
@@ -24,6 +25,11 @@ namespace MDEN.Network
             if (_buffer.Count < 4) return false;
 
             int bodyLength = BitConverter.ToInt32(_buffer.ToArray(), 0);
+            if (bodyLength <= 0 || bodyLength > MaxPayloadSize)
+            {
+                throw new InvalidOperationException($"Invalid packet length: {bodyLength}");
+            }
+
             if (_buffer.Count < 4 + bodyLength) return false;
 
             byte[] bodyBytes = _buffer.GetRange(4, bodyLength).ToArray();

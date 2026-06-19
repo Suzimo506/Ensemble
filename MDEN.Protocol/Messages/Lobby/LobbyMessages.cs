@@ -132,6 +132,7 @@ namespace MDEN.Protocol.Messages.Lobby
         public bool JoinLocked { get; set; }
         public bool Locked { get; set; }
         public bool IsPlaying { get; set; }
+        public int WatcherCount { get; set; }
         public ushort CurrentPlaylistEntry { get; set; }
         public string CurrentBattleEntry { get; set; }
         public string[] Players { get; set; }

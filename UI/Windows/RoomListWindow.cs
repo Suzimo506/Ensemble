@@ -1,6 +1,7 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
+using Il2CppAssets.Scripts.UI.Controls;
 using LocalizeLib;
 using MDEN.Managers;
 using MDEN.Protocol.Enums;
@@ -27,6 +28,8 @@ namespace MDEN.UI.Windows
         private LobbyListEntry[] _lobbies = new LobbyListEntry[0];
         private CancellationTokenSource _autoRefreshCts;
         private bool _refreshInProgress;
+        private bool _joinInProgress;
+        private int? _joiningLobbyId;
         private int _lastSelectedIndex = -1;
         private readonly bool _readOnly;
 
@@ -172,8 +175,13 @@ namespace MDEN.UI.Windows
             foreach (var lobby in _lobbies)
             {
                 var privateSuffix = lobby.IsPrivate ? "（私密）" : string.Empty;
-                var name = $"<color={Constants.ColorYellow}>{EscapeRichText(lobby.Name)}{privateSuffix}</color>";
-                var desc = BuildLobbyDescription(lobby);
+                var joining = _joiningLobbyId == lobby.Id;
+                var name = joining
+                    ? $"<color={Constants.ColorYellow}>{EscapeRichText(lobby.Name)}{privateSuffix} - 加入中...</color>"
+                    : $"<color={Constants.ColorYellow}>{EscapeRichText(lobby.Name)}{privateSuffix}</color>";
+                var desc = joining
+                    ? "请求已提交，正在等待服务器回应\n" + BuildLobbyDescription(lobby)
+                    : BuildLobbyDescription(lobby);
                 var item = new ForumObject(new LocalString(name), new LocalString(desc));
                 item.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("RoomList.png")?.texture;
                 _window.ForumObjects.Add(item);
@@ -249,6 +257,12 @@ namespace MDEN.UI.Windows
         {
             if (_window == null || objectIndex < 0 || objectIndex >= _window.ForumObjects.Count) return;
 
+            if (_joinInProgress)
+            {
+                ShowText.ShowInfo("正在加入房间，请稍候");
+                return;
+            }
+
             if (_lastSelectedIndex != objectIndex)
             {
                 _lastSelectedIndex = objectIndex;
@@ -296,7 +310,7 @@ namespace MDEN.UI.Windows
 
                     if (selectedLobby.JoinLocked)
                     {
-                        Il2CppAssets.Scripts.UI.Controls.ShowText.ShowInfo("房间已上锁");
+                        ShowText.ShowInfo("房间已上锁");
                         return;
                     }
 
@@ -328,6 +342,12 @@ namespace MDEN.UI.Windows
 
         private void ShowPasswordInput(LobbyListEntry lobby)
         {
+            if (_joinInProgress)
+            {
+                ShowText.ShowInfo("正在加入房间，请稍候");
+                return;
+            }
+
             if (_window != null)
             {
                 _window.ForceClose();
@@ -382,12 +402,12 @@ namespace MDEN.UI.Windows
             return _readOnly ? 1 : 3;
         }
 
-        private async Task RefreshLobbiesAsync()
+        private async System.Threading.Tasks.Task RefreshLobbiesAsync()
         {
             await RefreshLobbiesAsync(true, true);
         }
 
-        private async Task LoadInitialLobbiesAsync()
+        private async System.Threading.Tasks.Task LoadInitialLobbiesAsync()
         {
             IDisposable uiLock = null;
             try
@@ -406,7 +426,7 @@ namespace MDEN.UI.Windows
             }
         }
 
-        private async Task RefreshLobbiesAsync(bool showLock, bool forceRebuild)
+        private async System.Threading.Tasks.Task RefreshLobbiesAsync(bool showLock, bool forceRebuild)
         {
             if (_refreshInProgress) return;
             _refreshInProgress = true;
@@ -456,13 +476,13 @@ namespace MDEN.UI.Windows
             _autoRefreshCts = null;
         }
 
-        private async Task AutoRefreshLoopAsync(CancellationToken cancellationToken)
+        private async System.Threading.Tasks.Task AutoRefreshLoopAsync(CancellationToken cancellationToken)
         {
             while (!cancellationToken.IsCancellationRequested && !IsDisposed)
             {
                 try
                 {
-                    await Task.Delay(AutoRefreshIntervalMs, cancellationToken);
+                    await System.Threading.Tasks.Task.Delay(AutoRefreshIntervalMs, cancellationToken);
                     if (cancellationToken.IsCancellationRequested || IsDisposed) return;
 
                     await RefreshLobbiesAsync(false, false);
@@ -514,20 +534,61 @@ namespace MDEN.UI.Windows
                 left.Locked == right.Locked;
         }
 
-        private async Task JoinLobbyAsync(LobbyListEntry lobby, string password = null)
+        private async System.Threading.Tasks.Task JoinLobbyAsync(LobbyListEntry lobby, string password = null)
         {
+            if (_joinInProgress)
+            {
+                ShowText.ShowInfo("正在加入房间，请稍候");
+                return;
+            }
+
+            _joinInProgress = true;
+            _joiningLobbyId = lobby.Id;
+            ShowText.ShowInfo("正在加入房间...");
+            StopAutoRefresh();
+            MainThreadDispatcher.Enqueue(RebuildWindow);
+
+            var joined = false;
             using var _ = WindowStackController.LockUI("Joining lobby...");
 
             try
             {
                 await LobbyManager.JoinLobbyAsync(lobby.Id, password);
+                if (IsDisposed) return;
+
+                LobbyManager.MarkLobbyEntered(lobby);
+                joined = true;
+
                 MelonLogger.Msg($"Joined lobby: {lobby.Id}");
+                MainThreadDispatcher.Enqueue(() =>
+                {
+                    if (IsDisposed) return;
+                    Close();
+                    NavigationButton.RefreshRoomButton();
+                    WindowStackController.OpenWindow(new MyRoomWindow());
+                });
             }
             catch (Exception ex)
             {
                 MelonLogger.Warning($"Join lobby failed: {ex.Message}");
                 if (IsDisposed) return;
-                MainThreadDispatcher.Enqueue(RebuildWindow);
+                MainThreadDispatcher.Enqueue(() =>
+                {
+                    ShowText.ShowInfo($"加入失败：{ex.Message}");
+                    RebuildWindow();
+                });
+            }
+            finally
+            {
+                if (!joined && !IsDisposed)
+                {
+                    _joinInProgress = false;
+                    _joiningLobbyId = null;
+                    if (_autoRefreshCts == null)
+                    {
+                        StartAutoRefresh();
+                    }
+                }
             }
         }
 
@@ -550,6 +611,8 @@ namespace MDEN.UI.Windows
         public override void Close()
         {
             _lastSelectedIndex = -1;
+            _joinInProgress = false;
+            _joiningLobbyId = null;
             if (_window != null)
             {
                 _window.ForceClose();

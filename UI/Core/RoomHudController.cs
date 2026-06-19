@@ -75,10 +75,18 @@ namespace MDEN.UI.Core
                 _entranceTrackedLobbyId = lobby.Id;
             }
 
-            Refresh(lobby);
-            ScheduleEntranceFallback(lobby, isNewLobbyEntry);
-            NavigationButton.RefreshRoomButton();
-            PreparationStartController.BindOrRefresh();
+            if (ShouldUpdateRoomHud(lobby))
+            {
+                Refresh(lobby);
+                ScheduleEntranceFallback(lobby, isNewLobbyEntry);
+                NavigationButton.RefreshRoomButton();
+                PreparationStartController.BindOrRefresh();
+            }
+            else
+            {
+                DeferRoomHudRefresh();
+            }
+
             ChartPreviewController.OnLobbyChanged(lobby);
             MultiplayerBattleController.OnLobbyChanged();
         }
@@ -115,6 +123,12 @@ namespace MDEN.UI.Core
 
         public static void Update()
         {
+            if (ShouldPauseRoomHudUpdate())
+            {
+                RestoreNativeInput();
+                return;
+            }
+
             Chat.Update();
             UpdateNativeInputBlock();
             ReadyDisplay.Update();
@@ -147,6 +161,7 @@ namespace MDEN.UI.Core
             {
                 RoomSceneOverlay.Hide();
                 RoomCharacterDisplay.HideGeneratedObjects();
+                if (!ShouldRetryRoomHudRefresh(lobby)) return;
                 ScheduleRefreshRetry(lobby, retryCount);
                 return;
             }
@@ -155,6 +170,7 @@ namespace MDEN.UI.Core
             {
                 RoomSceneOverlay.Hide();
                 RoomCharacterDisplay.HideGeneratedObjects();
+                if (!ShouldRetryRoomHudRefresh(lobby)) return;
                 ScheduleRefreshRetry(lobby, retryCount);
                 return;
             }
@@ -180,6 +196,34 @@ namespace MDEN.UI.Core
             {
                 ScheduleRefreshRetry(lobby, retryCount);
             }
+        }
+
+        private static bool ShouldUpdateRoomHud(MDEN.Protocol.Messages.Lobby.LobbySyncPush lobby)
+        {
+            return lobby == null || !lobby.IsPlaying || RoomSceneOverlay.IsHomeVisible;
+        }
+
+        private static bool ShouldRetryRoomHudRefresh(MDEN.Protocol.Messages.Lobby.LobbySyncPush lobby)
+        {
+            return lobby == null || !lobby.IsPlaying;
+        }
+
+        private static bool ShouldPauseRoomHudUpdate()
+        {
+            var lobby = LobbyManager.CurrentLobby;
+            return lobby != null &&
+                   lobby.IsPlaying &&
+                   !RoomSceneOverlay.IsHomeReady &&
+                   !RoomSceneOverlay.IsNavigationReady;
+        }
+
+        private static void DeferRoomHudRefresh()
+        {
+            _pendingRetryGeneration++;
+            _retryDelayFrames = 0;
+            RestoreNativeInput();
+            RoomSceneOverlay.Hide();
+            RoomCharacterDisplay.HideGeneratedObjects();
         }
 
         private static void ScheduleRefreshRetry(MDEN.Protocol.Messages.Lobby.LobbySyncPush lobby, int retryCount)

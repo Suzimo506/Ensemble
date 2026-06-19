@@ -244,7 +244,8 @@ namespace MDEN.UI.Core
             var hostName = EscapeRichText(GetHostName(lobby));
             var hostColor = GetPlayerColor(lobby.HostUid);
             var otherPlayers = FormatOtherPlayers(lobby);
-            var text = $"<color=#{Constants.ColorYellow}>【{roomName}】</color> {GetPlayerCount(lobby)}/{lobby.MaxPlayers}\n" +
+            var watcherInfo = $"观众：<color=#{Constants.ColorCyan}>{lobby.WatcherCount}</color>  ";
+            var text = $"<color=#{Constants.ColorYellow}>【{roomName}】</color> {watcherInfo}{GetPlayerCount(lobby)}/{lobby.MaxPlayers}\n" +
                        $"房主：<color=#{hostColor}>【{hostName}】</color>";
 
             return string.IsNullOrEmpty(otherPlayers)

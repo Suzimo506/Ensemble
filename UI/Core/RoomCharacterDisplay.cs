@@ -612,7 +612,7 @@ namespace MDEN.UI.Core
 
         private static GameObject GetButtonGameObject(Button button)
         {
-            return button == null ? null : button.gameObject;
+            return GetComponentGameObject(button);
         }
 
         private static void SetButtonGameObjectActive(Button button, bool active)
@@ -623,8 +623,9 @@ namespace MDEN.UI.Core
 
         private static void SetButtonAsLastSibling(Button button)
         {
-            if (button == null) return;
-            button.transform.SetAsLastSibling();
+            var obj = GetButtonGameObject(button);
+            if (obj == null) return;
+            obj.transform.SetAsLastSibling();
         }
 
         private static GameObject FindCharacterRoot(string uid)
@@ -1383,8 +1384,7 @@ namespace MDEN.UI.Core
 
         private static void DestroyComponentObject(Component component)
         {
-            if (component == null) return;
-            DestroyObject(component.gameObject);
+            DestroyObject(GetComponentGameObject(component));
         }
 
         private static Transform FindChild(GameObject obj, string path)
@@ -1401,8 +1401,22 @@ namespace MDEN.UI.Core
 
         private static void SetComponentGameObjectActive(Component component, bool active)
         {
-            if (component == null) return;
-            component.gameObject.SetActive(active);
+            var obj = GetComponentGameObject(component);
+            if (obj != null) obj.SetActive(active);
+        }
+
+        private static GameObject GetComponentGameObject(Component component)
+        {
+            if (component == null) return null;
+
+            try
+            {
+                return component.gameObject;
+            }
+            catch
+            {
+                return null;
+            }
         }
 
         private static void DestroyOwnedObjectsByName()

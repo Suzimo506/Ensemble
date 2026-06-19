@@ -81,5 +81,21 @@ namespace MDEN.Protocol
         public const ushort LobbySyncPush = 0x0800;
         public const ushort LobbyAllReturnedPush = 0x0801;
         public const ushort LobbyKickedPush = 0x0802;
+
+        // === 喵斯兔联机大厅 (0x0900 ~ 0x09FF) ===
+        public const ushort MdtObserveReq = 0x0900;
+        public const ushort MdtObserveResp = 0x0901;
+        public const ushort MdtGetLobbySnapshotReq = 0x0902;
+        public const ushort MdtGetLobbySnapshotResp = 0x0903;
+        public const ushort MdtChatReq = 0x0904;
+        public const ushort MdtChatResp = 0x0905;
+        public const ushort MdtWatchLobbyReq = 0x0906;
+        public const ushort MdtWatchLobbyResp = 0x0907;
+        public const ushort MdtViewerChatReq = 0x0908;
+        public const ushort MdtViewerChatResp = 0x0909;
+        public const ushort MdtLobbySnapshotPush = 0x0910;
+        public const ushort MdtHostReplyNotify = 0x0911;
+        public const ushort MdtChatPush = 0x0912;
+        public const ushort MdtViewerChatPush = 0x0913;
     }
 }

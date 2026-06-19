@@ -6,6 +6,7 @@ using UnityEngine.Events;
 using MDEN.Managers;
 using MDEN.UI.Windows;
 using Il2CppAssets.Scripts.UI.Controls;
+using UnityEngine.AddressableAssets;
 
 namespace MDEN.UI.Core
 {
@@ -18,10 +19,15 @@ namespace MDEN.UI.Core
         private static GameObject _startBtn;
         private static GameObject _serverLabelObj;
         private static Text _serverLabel;
+        private static Sprite _serverLabelBackgroundSprite;
         private const float NavigationButtonOffset = 132f;
         private const float LeftNavigationOffset = 192f;
-        private const float ServerLabelOptionOffset = 420f;
-        private const float ServerLabelWidth = 280f;
+        private const float ServerLabelOptionOffset = 500f;
+        private const float ServerLabelYOffset = -14f;
+        private const float ServerLabelMinWidth = 104f;
+        private const float ServerLabelMaxWidth = 210f;
+        private const float ServerLabelHeight = 36f;
+        private const float ServerLabelHorizontalPadding = 34f;
         private const float NavigationIconCenterOffset = 10f;
         private const float RoomActionIconCenterOffset = 8f;
         private const string NavigationButtonSpriteName = "PcSprButton_Img.png";
@@ -147,8 +153,13 @@ namespace MDEN.UI.Core
             if (_serverLabelObj == null || _serverLabel == null) return;
 
             _serverLabelObj.SetActive(true);
+            ApplyGameFont(_serverLabel);
             var serverName = EscapeRichText(ConnectionManager.CurrentServerDisplayName);
-            _serverLabel.text = $"<color={Constants.ColorYellow}>{serverName}</color>";
+            var serverColor = ConnectionManager.CurrentServerIsOfficial
+                ? Constants.ColorYellow
+                : Constants.ColorBlue;
+            _serverLabel.text = $"<color=#{serverColor}>{serverName}</color>";
+            PositionServerLabel();
         }
 
         private static void EnsureServerLabel()
@@ -169,19 +180,34 @@ namespace MDEN.UI.Core
             rect.SetParent(topPanel, false);
             rect.localScale = Vector3.one;
 
-            _serverLabel = _serverLabelObj.AddComponent<Text>();
+            var background = _serverLabelObj.AddComponent<Image>();
+            background.sprite = GetServerLabelBackgroundSprite();
+            background.type = Image.Type.Sliced;
+            background.color = new Color(0.55f, 0.38f, 0.88f, 0.92f);
+            background.raycastTarget = false;
+
+            var textObj = new GameObject("TxtNodeName");
+            var textRect = textObj.AddComponent<RectTransform>();
+            textRect.SetParent(rect, false);
+            textRect.localScale = Vector3.one;
+            textRect.anchorMin = Vector2.zero;
+            textRect.anchorMax = Vector2.one;
+            textRect.offsetMin = new Vector2(12f, 0f);
+            textRect.offsetMax = new Vector2(-12f, 0f);
+
+            _serverLabel = textObj.AddComponent<Text>();
             ApplyGameFont(_serverLabel);
-            _serverLabel.fontSize = 28;
-            _serverLabel.alignment = TextAnchor.MiddleRight;
+            _serverLabel.fontSize = 18;
+            _serverLabel.alignment = TextAnchor.MiddleCenter;
             _serverLabel.horizontalOverflow = HorizontalWrapMode.Overflow;
             _serverLabel.verticalOverflow = VerticalWrapMode.Overflow;
             _serverLabel.supportRichText = true;
             _serverLabel.raycastTarget = false;
-            _serverLabel.color = Color.white;
+            _serverLabel.color = new Color(0.78f, 1f, 0.18f, 1f);
 
             var shadow = _serverLabelObj.AddComponent<Shadow>();
-            shadow.effectDistance = new Vector2(2f, -2f);
-            shadow.effectColor = new Color(0f, 0f, 0f, 0.35f);
+            shadow.effectDistance = new Vector2(1f, -1f);
+            shadow.effectColor = new Color(0.08f, 0.02f, 0.18f, 0.42f);
 
             PositionServerLabel();
         }
@@ -200,9 +226,17 @@ namespace MDEN.UI.Core
             rect.pivot = new Vector2(1f, sourceRect.pivot.y);
             rect.anchoredPosition = new Vector2(
                 sourceRect.anchoredPosition.x - ServerLabelOptionOffset,
-                sourceRect.anchoredPosition.y);
-            rect.sizeDelta = new Vector2(ServerLabelWidth, Mathf.Max(58f, sourceRect.sizeDelta.y));
+                sourceRect.anchoredPosition.y + ServerLabelYOffset);
+            rect.sizeDelta = new Vector2(GetServerLabelWidth(), ServerLabelHeight);
             rect.SetAsLastSibling();
+        }
+
+        private static float GetServerLabelWidth()
+        {
+            if (_serverLabel == null) return ServerLabelMinWidth;
+
+            var preferredWidth = _serverLabel.preferredWidth + ServerLabelHorizontalPadding;
+            return Mathf.Clamp(preferredWidth, ServerLabelMinWidth, ServerLabelMaxWidth);
         }
 
         private static void DestroyServerLabel()
@@ -221,7 +255,11 @@ namespace MDEN.UI.Core
             if (text == null) return;
 
             var template = FindFontTemplate();
-            if (template == null || template.font == null) return;
+            if (template == null || template.font == null)
+            {
+                text.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
+                return;
+            }
 
             text.font = template.font;
             text.material = template.material;
@@ -230,16 +268,57 @@ namespace MDEN.UI.Core
 
         private static Text FindFontTemplate()
         {
+            var inputFieldTemplate = FindInputFieldFontTemplate();
+            if (inputFieldTemplate != null) return inputFieldTemplate;
+
             var allTexts = Resources.FindObjectsOfTypeAll<Text>();
+            Text fallback = null;
             foreach (var text in allTexts)
             {
-                if (text != null && text != _serverLabel && text.font != null)
+                if (text == null || text == _serverLabel || text.font == null) continue;
+                fallback ??= text;
+
+                var fontName = text.font.name ?? string.Empty;
+                if (!fontName.Contains("Arial"))
                 {
                     return text;
                 }
             }
 
+            return fallback;
+        }
+
+        private static Text FindInputFieldFontTemplate()
+        {
+            var inputTemplates = Resources.FindObjectsOfTypeAll<Il2CppAssets.Scripts.UI.PeroInputField>();
+            if (inputTemplates == null) return null;
+
+            foreach (var template in inputTemplates)
+            {
+                if (template == null) continue;
+
+                var inputField = template.GetComponent<InputField>();
+                var text = inputField?.textComponent;
+                if (text != null && text.font != null) return text;
+            }
+
             return null;
+        }
+
+        private static Sprite GetServerLabelBackgroundSprite()
+        {
+            if (_serverLabelBackgroundSprite != null) return _serverLabelBackgroundSprite;
+
+            try
+            {
+                _serverLabelBackgroundSprite = Addressables.LoadAssetAsync<Sprite>("SprRoundedsquare").WaitForCompletion();
+            }
+            catch
+            {
+                _serverLabelBackgroundSprite = null;
+            }
+
+            return _serverLabelBackgroundSprite;
         }
 
         private static string EscapeRichText(string value)
@@ -490,7 +569,13 @@ namespace MDEN.UI.Core
             if (_serverLabelObj == null)
             {
                 _serverLabelObj = GameObject.Find("UI/Standerd/PnlNavigation/Top/TxtMDENCurrentServerNode");
-                _serverLabel = _serverLabelObj == null ? null : _serverLabelObj.GetComponent<Text>();
+                if (_serverLabelObj != null)
+                {
+                    var labelTransform = _serverLabelObj.transform.Find("TxtNodeName");
+                    _serverLabel = labelTransform == null
+                        ? _serverLabelObj.GetComponent<Text>()
+                        : labelTransform.GetComponent<Text>();
+                }
             }
         }
 

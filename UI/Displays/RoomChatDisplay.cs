@@ -614,7 +614,22 @@ namespace MDEN.UI.Displays
             try
             {
                 using var _ = WindowStackController.LockUI("Sending message...");
-                await ChatManager.SendAsync(message);
+                var mdtReply = ParseMdtReply(message);
+                if (IsMdtCommand(message) && mdtReply == null)
+                {
+                    throw new InvalidOperationException("请输入 /mdt yes 或 /mdt no");
+                }
+
+                if (mdtReply != null)
+                {
+                    await ChatManager.SendMdtHostReplyAsync(mdtReply);
+                    MainThreadDispatcher.Enqueue(() => ShowText.ShowInfo("回应成功"));
+                }
+                else
+                {
+                    await ChatManager.SendAsync(message);
+                }
+
                 MainThreadDispatcher.Enqueue(ClearSubmittedInput);
             }
             catch (Exception ex)
@@ -671,6 +686,16 @@ namespace MDEN.UI.Displays
 
         private string FormatSystemMessage(ChatPushMsg msg)
         {
+            if (!string.IsNullOrWhiteSpace(msg.Message) && msg.Message.StartsWith("【来自喵斯兔】"))
+            {
+                return ColorText(EscapeRichText(msg.Message), PinkTextColor);
+            }
+
+            if (msg.Message == "房主可以输入/mdt yes/no 来回应同意或拒绝")
+            {
+                return $"{SystemPrefix()} {ColorText("房主可以输入/mdt yes/no 来回应同意或拒绝", Constants.ColorYellow)}";
+            }
+
             if (msg.Message == "PlayerMissingChart")
             {
                 var missing = ParsePlayerMissingChart(msg);
@@ -1035,6 +1060,23 @@ namespace MDEN.UI.Displays
             }
 
             return null;
+        }
+
+        private static string ParseMdtReply(string message)
+        {
+            if (string.IsNullOrWhiteSpace(message)) return null;
+
+            var value = message.Trim();
+            if (!value.StartsWith("/mdt ", StringComparison.OrdinalIgnoreCase)) return null;
+
+            var reply = value.Substring(5).Trim().ToLowerInvariant();
+            return reply == "yes" || reply == "no" ? reply : null;
+        }
+
+        private static bool IsMdtCommand(string message)
+        {
+            return !string.IsNullOrWhiteSpace(message) &&
+                   message.Trim().StartsWith("/mdt", StringComparison.OrdinalIgnoreCase);
         }
 
         private async void RequestPlayerColor(string uid)

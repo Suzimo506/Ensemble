@@ -1,5 +1,6 @@
 using System;
 using System.Threading.Tasks;
+using Il2CppAssets.Scripts.UI.Controls;
 using LocalizeLib;
 using MDEN.Managers;
 using MDEN.Protocol.Enums;
@@ -24,6 +25,7 @@ namespace MDEN.UI.Windows
         private ForumObject _btnPassword;
         private ForumObject _btnCreate;
         private int _lastSelectedIndex = -1;
+        private bool _createInProgress;
 
         private string _roomName = "联机房间";
         private ushort _maxPlayers = 4;
@@ -87,7 +89,13 @@ namespace MDEN.UI.Windows
             _btnPassword.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("SocialNetwork.png")?.texture;
             _window.ForumObjects.Add(_btnPassword);
 
-            _btnCreate = new ForumObject(new LocalString($"<color={Constants.ColorYellow}>- 确认创建 -</color>"), new LocalString(BuildSummary()));
+            var createTitle = _createInProgress
+                ? $"<color={Constants.ColorYellow}>- 创建中... -</color>"
+                : $"<color={Constants.ColorYellow}>- 确认创建 -</color>";
+            var createDescription = _createInProgress
+                ? $"请求已提交，正在等待服务器回应\n名称: {HighlightValue(EscapeRichText(_roomName))}"
+                : BuildSummary();
+            _btnCreate = new ForumObject(new LocalString(createTitle), new LocalString(createDescription));
             _btnCreate.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("RoomList.png")?.texture;
             _window.ForumObjects.Add(_btnCreate);
         }
@@ -95,6 +103,12 @@ namespace MDEN.UI.Windows
         private async void OnSelectionChanged(PopupLib.UI.Windows.Interfaces.IListWindow window, int objectIndex)
         {
             if (_window == null || objectIndex < 0 || objectIndex >= _window.ForumObjects.Count) return;
+
+            if (_createInProgress)
+            {
+                ShowText.ShowInfo("正在创建房间，请稍候");
+                return;
+            }
 
             if (_lastSelectedIndex != objectIndex)
             {
@@ -192,8 +206,14 @@ namespace MDEN.UI.Windows
             input.Show();
         }
 
-        private async Task CreateLobbyAsync()
+        private async System.Threading.Tasks.Task CreateLobbyAsync()
         {
+            if (_createInProgress)
+            {
+                ShowText.ShowInfo("正在创建房间，请稍候");
+                return;
+            }
+
             if (!ConnectionManager.IsLoggedIn)
             {
                 MelonLogger.Warning("Create lobby skipped: not connected to server. Please choose a server again.");
@@ -202,6 +222,11 @@ namespace MDEN.UI.Windows
                 return;
             }
 
+            _createInProgress = true;
+            ShowText.ShowInfo("正在创建房间...");
+            RebuildWindow();
+
+            var keepPending = false;
             using var _ = WindowStackController.LockUI("Creating lobby...");
 
             try
@@ -222,6 +247,7 @@ namespace MDEN.UI.Windows
                 if (IsDisposed) return;
 
                 LobbyManager.MarkLobbyEntered(lobbyId, request);
+                keepPending = true;
 
                 MelonLogger.Msg($"Created lobby: {lobbyId}");
                 MainThreadDispatcher.Enqueue(() =>
@@ -235,6 +261,15 @@ namespace MDEN.UI.Windows
             catch (Exception ex)
             {
                 MelonLogger.Warning($"Create lobby failed: {ex.Message}");
+                MainThreadDispatcher.Enqueue(() => ShowText.ShowInfo($"创建失败：{ex.Message}"));
+            }
+            finally
+            {
+                if (!keepPending && !IsDisposed)
+                {
+                    _createInProgress = false;
+                    MainThreadDispatcher.Enqueue(RebuildWindow);
+                }
             }
         }
 
@@ -368,6 +403,7 @@ namespace MDEN.UI.Windows
         public override void Close()
         {
             _lastSelectedIndex = -1;
+            _createInProgress = false;
             if (_window != null)
             {
                 _window.ForceClose();
