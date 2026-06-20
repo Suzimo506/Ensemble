@@ -13,7 +13,7 @@ namespace MDEN.UI.Core
         private const string NativeBackgroundPath = "UI/Standerd/PnlHome/PnlBgSwitchFsv";
         private const string StagePanelPath = "UI/Standerd/PnlStage";
         private const string PreparationPanelPath = "UI/Standerd/PnlPreparation";
-        private const int OverlaySortingOrder = 32767;
+        private const int OverlaySortingOrder = 32750;
         private const float InfoPanelWidth = 420f;
         private const float InfoPanelPadding = 14f;
         private const float InfoPanelTop = 82f;

@@ -25,6 +25,7 @@ namespace MDEN.UI.Windows
         private readonly Dictionary<string, double?> _ratingLevels = new Dictionary<string, double?>();
         private readonly HashSet<string> _loadingRatingLevels = new HashSet<string>();
         private int _lastSelectedIndex = -1;
+        private string _lastLobbyRefreshKey;
 
         public override async void Show()
         {
@@ -41,6 +42,7 @@ namespace MDEN.UI.Windows
             _window = new ForumWindow();
             _window.AutoReset = true;
             BuildList();
+            _lastLobbyRefreshKey = BuildLobbyRefreshKey(LobbyManager.CurrentLobby);
             LobbyManager.CurrentLobbyChanged += HandleCurrentLobbyChanged;
             _window.OnSelectionChanged += OnSelectionChanged;
             _window.OnInternalShow += OnInternalShowInjectTitle;
@@ -75,8 +77,83 @@ namespace MDEN.UI.Windows
                     return;
                 }
 
+                if (ShouldSkipBackgroundRefresh(lobby))
+                {
+                    return;
+                }
+
+                var refreshKey = BuildLobbyRefreshKey(lobby);
+                if (refreshKey == _lastLobbyRefreshKey)
+                {
+                    return;
+                }
+
                 RefreshWindowContent();
             });
+        }
+
+        private static bool ShouldSkipBackgroundRefresh(LobbySyncPush lobby)
+        {
+            return lobby?.IsPlaying == true ||
+                   BattleResultFlowManager.IsBattleResultFlowPending ||
+                   BattleResultBannerDisplay.IsConsumingKeyboard;
+        }
+
+        private static string BuildLobbyRefreshKey(LobbySyncPush lobby)
+        {
+            if (lobby == null) return string.Empty;
+
+            var players = lobby.PlayerDetails != null && lobby.PlayerDetails.Length > 0
+                ? string.Join("|", lobby.PlayerDetails
+                    .Where(player => !string.IsNullOrWhiteSpace(player?.Uid))
+                    .OrderBy(player => player.Uid)
+                    .Select(player => string.Join(":",
+                        player.Uid,
+                        player.Name ?? string.Empty,
+                        player.Title ?? string.Empty,
+                        player.Bio ?? string.Empty,
+                        player.ChatColor ?? string.Empty,
+                        player.Status)))
+                : JoinOrdered(lobby.Players);
+
+            return string.Join("#",
+                lobby.Id,
+                lobby.Name ?? string.Empty,
+                lobby.HostUid ?? string.Empty,
+                lobby.HostName ?? string.Empty,
+                lobby.PlayType,
+                lobby.ChartSelection,
+                lobby.Goal,
+                lobby.MaxPlayers,
+                lobby.PlaylistSize,
+                lobby.SettlementEnabled,
+                lobby.IsPrivate,
+                lobby.JoinLocked,
+                lobby.Locked,
+                lobby.IsPlaying,
+                lobby.WatcherCount,
+                lobby.CurrentPlaylistEntry,
+                lobby.CurrentBattleId ?? string.Empty,
+                lobby.CurrentBattleEntry ?? string.Empty,
+                JoinOrdered(lobby.ReadyPlayers),
+                JoinOrdered(lobby.MutedPlayers),
+                JoinOrdered(lobby.ChartSelectBannedPlayers),
+                JoinPlaylist(lobby.Playlist),
+                players);
+        }
+
+        private static string JoinOrdered(string[] values)
+        {
+            if (values == null || values.Length == 0) return string.Empty;
+            return string.Join(",", values
+                .Where(value => !string.IsNullOrWhiteSpace(value))
+                .OrderBy(value => value));
+        }
+
+        private static string JoinPlaylist(string[] playlist)
+        {
+            if (playlist == null || playlist.Length == 0) return string.Empty;
+            return string.Join("|", playlist.Where(entry => !string.IsNullOrWhiteSpace(entry)));
         }
 
         private async Task LoadRatingLevelsForInitialShowAsync()
@@ -614,6 +691,7 @@ namespace MDEN.UI.Windows
             _window = new ForumWindow();
             _window.AutoReset = true;
             BuildList();
+            _lastLobbyRefreshKey = BuildLobbyRefreshKey(LobbyManager.CurrentLobby);
             _window.OnSelectionChanged += OnSelectionChanged;
             _window.OnInternalShow += OnInternalShowInjectTitle;
             _window.Show();
@@ -624,8 +702,12 @@ namespace MDEN.UI.Windows
         {
             if (_window == null) return;
 
-            BuildList();
-            _lastSelectedIndex = -1;
+            using (PerfTrace.Measure("MDEN.MyRoomWindow.RefreshWindowContent"))
+            {
+                BuildList();
+                _lastLobbyRefreshKey = BuildLobbyRefreshKey(LobbyManager.CurrentLobby);
+                _lastSelectedIndex = -1;
+            }
         }
     }
 }

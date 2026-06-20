@@ -120,7 +120,8 @@ namespace MDEN.Managers
                     new BattleReturnedReq
                     {
                         BattleId = _activeBattleId,
-                        PlayedSeconds = playedSeconds
+                        PlayedSeconds = playedSeconds,
+                        FinalPlayer = GetLocalBattleEntry()
                     });
             }
             catch (Exception ex)
@@ -325,6 +326,37 @@ namespace MDEN.Managers
 
                 NotifyBattleDataChanged(GetBattleDataSnapshot());
             }
+        }
+
+        private static BattlePlayerEntry GetLocalBattleEntry()
+        {
+            var uid = PlayerManager.CurrentUid;
+            if (string.IsNullOrWhiteSpace(uid)) return null;
+
+            lock (BattleDataLock)
+            {
+                return PlayerBattleData.TryGetValue(uid, out var entry) ? CloneBattleEntry(entry) : null;
+            }
+        }
+
+        private static BattlePlayerEntry CloneBattleEntry(BattlePlayerEntry entry)
+        {
+            if (entry == null) return null;
+
+            return new BattlePlayerEntry
+            {
+                Uid = entry.Uid,
+                Score = entry.Score,
+                Accuracy = entry.Accuracy,
+                Perfects = entry.Perfects,
+                Greats = entry.Greats,
+                Earlies = entry.Earlies,
+                Lates = entry.Lates,
+                Misses = entry.Misses,
+                FC = entry.FC,
+                Alive = entry.Alive,
+                PingMS = entry.PingMS
+            };
         }
 
         private static Task<BattleDataNotifyMsg> CreateCurrentNotifyAsync()

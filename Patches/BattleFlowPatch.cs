@@ -261,18 +261,16 @@ namespace MDEN.Patches
             BattleManager.MarkLocalBattleFinished(alive);
             MainThreadDispatcher.Enqueue(() => SetVictoryButtons(false));
             BattleResultFlowManager.SetLastBattleResultSnapshot(BattleManager.GetBattleDataSnapshot());
-            _ = BattleResultBannerDisplay.ShowAsync(GetBattleResultSnapshot());
 
             try
             {
                 await BattleManager.ReportBattleFinishedAsync(alive);
                 BattleResultFlowManager.SetLastBattleResultSnapshot(BattleManager.GetBattleDataSnapshot());
-                if (!BattleResultBannerDisplay.IsVisible)
-                {
-                    _ = BattleResultBannerDisplay.ShowAsync(GetBattleResultSnapshot());
-                }
+                _ = BattleResultBannerDisplay.ShowAsync(GetBattleResultSnapshot());
 
                 await WaitForLobbyBattleEndAsync(alive);
+                BattleResultFlowManager.SetLastBattleResultSnapshot(BattleManager.GetBattleDataSnapshot());
+                BattleResultBannerDisplay.RefreshIfVisible(GetBattleResultSnapshot());
 
                 if (LobbyManager.IsInLobby)
                 {

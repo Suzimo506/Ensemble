@@ -35,6 +35,8 @@ namespace MDEN.UI.Core
         private static GameObject _root;
         private static RectTransform _entryRoot;
         private static readonly List<EntryAnimation> EntryAnimations = new();
+        private static BattlePlayerEntry[] _displayedPlayers = Array.Empty<BattlePlayerEntry>();
+        private static BattlePlayerEntry[] _pendingRefreshPlayers;
         private static int _resultGeneration;
         private static int _suppressNativeMessagesUntilFrame;
         private static bool _keyboardBlocked;
@@ -44,6 +46,20 @@ namespace MDEN.UI.Core
         public static bool IsVisible => _root != null;
         public static bool IsConsumingKeyboard => IsVisible || ShowingResults;
         private static bool IsSuppressingNativeMessages => IsVisible || Time.frameCount <= _suppressNativeMessagesUntilFrame;
+
+        public static void RefreshIfVisible(BattlePlayerEntry[] players)
+        {
+            if (!IsVisible) return;
+            if (ShowingResults)
+            {
+                _pendingRefreshPlayers = CloneBattleEntries(players);
+                return;
+            }
+
+            if (!HasResultChanged(players)) return;
+
+            _ = ShowAsync(players);
+        }
 
         public static void Update()
         {
@@ -89,6 +105,17 @@ namespace MDEN.UI.Core
                     var text = BattleLobbyDisplay.FormatResultEntry(player, i + 1);
                     await AddOneAsync(text, i, orderedPlayers.Length, generation);
                 }
+
+                if (generation == _resultGeneration)
+                {
+                    _displayedPlayers = orderedPlayers.Select(CloneBattleEntry).ToArray();
+                    var pending = _pendingRefreshPlayers;
+                    _pendingRefreshPlayers = null;
+                    if (pending != null && HasResultChanged(pending))
+                    {
+                        _ = ShowAsync(pending);
+                    }
+                }
             }
             finally
             {
@@ -126,6 +153,8 @@ namespace MDEN.UI.Core
             _resultGeneration++;
             _suppressNativeMessagesUntilFrame = 0;
             _nativeMessagePanels = Array.Empty<PnlMessage>();
+            _displayedPlayers = Array.Empty<BattlePlayerEntry>();
+            _pendingRefreshPlayers = null;
             _nextNativeMessageDirectLookupFrame = 0;
             _nextNativeMessagePanelLookupFrame = 0;
             _nextNativeMessageSuppressFrame = 0;
@@ -281,6 +310,65 @@ namespace MDEN.UI.Core
             UnityEngine.Object.Destroy(_root);
             _root = null;
             _entryRoot = null;
+        }
+
+        private static bool HasResultChanged(BattlePlayerEntry[] players)
+        {
+            var orderedPlayers = BattleLobbyDisplay
+                .OrderPlayers(players ?? Array.Empty<BattlePlayerEntry>())
+                .ToArray();
+            if (orderedPlayers.Length == 0) return false;
+            if (orderedPlayers.Length != _displayedPlayers.Length) return true;
+
+            for (var i = 0; i < orderedPlayers.Length; i++)
+            {
+                if (!SameBattleEntry(orderedPlayers[i], _displayedPlayers[i])) return true;
+            }
+
+            return false;
+        }
+
+        private static bool SameBattleEntry(BattlePlayerEntry left, BattlePlayerEntry right)
+        {
+            if (left == null || right == null) return left == right;
+
+            return left.Uid == right.Uid &&
+                   left.Score == right.Score &&
+                   Math.Abs(left.Accuracy - right.Accuracy) < 0.0001f &&
+                   left.Perfects == right.Perfects &&
+                   left.Greats == right.Greats &&
+                   left.Earlies == right.Earlies &&
+                   left.Lates == right.Lates &&
+                   left.Misses == right.Misses &&
+                   left.FC == right.FC &&
+                   left.Alive == right.Alive;
+        }
+
+        private static BattlePlayerEntry CloneBattleEntry(BattlePlayerEntry entry)
+        {
+            if (entry == null) return null;
+
+            return new BattlePlayerEntry
+            {
+                Uid = entry.Uid,
+                Score = entry.Score,
+                Accuracy = entry.Accuracy,
+                Perfects = entry.Perfects,
+                Greats = entry.Greats,
+                Earlies = entry.Earlies,
+                Lates = entry.Lates,
+                Misses = entry.Misses,
+                FC = entry.FC,
+                Alive = entry.Alive,
+                PingMS = entry.PingMS
+            };
+        }
+
+        private static BattlePlayerEntry[] CloneBattleEntries(BattlePlayerEntry[] players)
+        {
+            return (players ?? Array.Empty<BattlePlayerEntry>())
+                .Select(CloneBattleEntry)
+                .ToArray();
         }
 
         private static void StartNativeMessageSuppression()
