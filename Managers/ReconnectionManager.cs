@@ -1,8 +1,8 @@
 using System.Threading.Tasks;
-using MDEN.Managers;
+using MDEN.Network;
 using MelonLoader;
 
-namespace MDEN.Network
+namespace MDEN.Managers
 {
     // 负责断线重连逻辑
     public class ReconnectionManager

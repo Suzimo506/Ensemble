@@ -4,6 +4,8 @@ Assets/**
 !Assets/UI/
 !Assets/UI/**/
 !Assets/UI/**/*.png
+!Assets/Sound/
+!Assets/Sound/Yes.wav
 bin/
 obj/
 .vs/

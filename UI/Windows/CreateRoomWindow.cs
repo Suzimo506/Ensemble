@@ -69,11 +69,11 @@ namespace MDEN.UI.Windows
             _btnName.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("HomePanel.png")?.texture;
             _window.ForumObjects.Add(_btnName);
 
-            _btnMaxPlayers = new ForumObject(new LocalString("人数"), new LocalString($"最多人数: {HighlightValue(_maxPlayers)}\n点击在 2/4/6/8/10 间切换"));
+            _btnMaxPlayers = new ForumObject(new LocalString("人数"), new LocalString($"最多人数: {HighlightValue(_maxPlayers)}\n点击后输入人数，范围 2-10"));
             _btnMaxPlayers.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("PlayerCard.png")?.texture;
             _window.ForumObjects.Add(_btnMaxPlayers);
 
-            _btnPlaylistSize = new ForumObject(new LocalString("歌曲列表长度"), new LocalString($"列表长度: {HighlightValue(_playlistSize)}\n点击在 8/12/16/24/32 间切换"));
+            _btnPlaylistSize = new ForumObject(new LocalString("歌曲列表长度"), new LocalString($"列表长度: {HighlightValue(_playlistSize)}\n点击后输入歌曲列表长度，范围 2-32"));
             _btnPlaylistSize.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("RoomList.png")?.texture;
             _window.ForumObjects.Add(_btnPlaylistSize);
 
@@ -128,13 +128,11 @@ namespace MDEN.UI.Windows
             }
             else if (button == _btnMaxPlayers)
             {
-                CycleMaxPlayers();
-                RebuildWindow();
+                ShowMaxPlayersInput();
             }
             else if (button == _btnPlaylistSize)
             {
-                CyclePlaylistSize();
-                RebuildWindow();
+                ShowPlaylistSizeInput();
             }
             else if (button == _btnGoal)
             {
@@ -199,6 +197,41 @@ namespace MDEN.UI.Windows
                 else if (!string.IsNullOrEmpty(value))
                 {
                     MDEN.Managers.ClientLogManager.Warning("Room password is too long. Max length is 16.");
+                }
+
+                RebuildWindow();
+            };
+            input.Show();
+        }
+
+        private void ShowMaxPlayersInput()
+        {
+            ShowNumberInput("人数", 2, 10, value => _maxPlayers = value);
+        }
+
+        private void ShowPlaylistSizeInput()
+        {
+            ShowNumberInput("歌曲列表长度", 2, 32, value => _playlistSize = value);
+        }
+
+        private void ShowNumberInput(string fieldName, int min, int max, Action<ushort> applyValue)
+        {
+            if (_window != null)
+            {
+                _window.ForceClose();
+            }
+
+            var input = new InputWindow();
+            input.OnCompletion += (w) =>
+            {
+                var value = input.Result?.Trim();
+                if (TryParseNumberInRange(value, min, max, out var parsed))
+                {
+                    applyValue((ushort)parsed);
+                }
+                else
+                {
+                    ShowText.ShowInfo($"{fieldName}必须在 {min}-{max} 之间");
                 }
 
                 RebuildWindow();
@@ -280,28 +313,13 @@ namespace MDEN.UI.Windows
             }
         }
 
-        private void CycleMaxPlayers()
+        private static bool TryParseNumberInRange(string value, int min, int max, out int parsed)
         {
-            _maxPlayers = _maxPlayers switch
-            {
-                2 => 4,
-                4 => 6,
-                6 => 8,
-                8 => 10,
-                _ => 2
-            };
-        }
-
-        private void CyclePlaylistSize()
-        {
-            _playlistSize = _playlistSize switch
-            {
-                8 => 12,
-                12 => 16,
-                16 => 24,
-                24 => 32,
-                _ => 8
-            };
+            parsed = 0;
+            return !string.IsNullOrWhiteSpace(value) &&
+                   int.TryParse(value, out parsed) &&
+                   parsed >= min &&
+                   parsed <= max;
         }
 
         private string BuildSummary()

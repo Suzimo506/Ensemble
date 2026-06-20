@@ -6,6 +6,7 @@ using Il2CppDG.Tweening;
 using MDEN.Managers;
 using MDEN.Protocol.Enums;
 using MDEN.Protocol.Models;
+using MDEN.UI.Core;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -22,15 +23,18 @@ namespace MDEN.UI.Displays
         private const string ColorPurple = "9b55ffff";
         private const string ColorRed = "ff5555ff";
         private const string ColorWhite = "ffffffff";
-        private static Text _fontTemplate;
         private static readonly object ColorLock = new object();
         private static readonly Dictionary<string, string> PlayerColorCache = new Dictionary<string, string>();
         private static readonly HashSet<string> PendingColorRequests = new HashSet<string>();
+        private static GameObject _infoPlusLabel;
+        private static int? _infoPlusInstanceId;
+        private static bool? _infoPlusWasActive;
 
         private readonly Dictionary<string, Text> _entries = new Dictionary<string, Text>();
         private readonly Dictionary<string, BattleEntryState> _previousEntries = new Dictionary<string, BattleEntryState>();
         private readonly List<string> _entryOrder = new List<string>();
         private GameObject _frame;
+        private Canvas _canvas;
 
         public bool IsCreated => _frame != null;
 
@@ -56,9 +60,9 @@ namespace MDEN.UI.Displays
             rect.anchoredPosition3D = Vector3.zero;
             rect.sizeDelta = Vector2.zero;
 
-            var canvas = _frame.AddComponent<Canvas>();
-            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-            canvas.sortingOrder = OverlaySortingOrder;
+            _canvas = _frame.AddComponent<Canvas>();
+            _canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            _canvas.sortingOrder = OverlaySortingOrder;
 
             var scaler = _frame.AddComponent<CanvasScaler>();
             scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
@@ -77,6 +81,9 @@ namespace MDEN.UI.Displays
                 DestroyObject(_frame);
                 _frame = null;
             }
+
+            _canvas = null;
+            RestoreInfoPlusLabel();
         }
 
         public void Refresh(BattlePlayerEntry[] players)
@@ -132,7 +139,10 @@ namespace MDEN.UI.Displays
                 _entryOrder.Add(uid);
             }
 
-            text.text = value;
+            if (text.text != value)
+            {
+                text.text = value;
+            }
         }
 
         private Text CreateText(string uid)
@@ -513,7 +523,11 @@ namespace MDEN.UI.Displays
             {
                 if (!_entries.TryGetValue(_entryOrder[i], out var text) || text == null) continue;
                 var rect = text.GetComponent<RectTransform>();
-                rect.anchoredPosition = new Vector2(24f, 30f + EntryHeight * (_entryOrder.Count - 1 - i));
+                var position = new Vector2(24f, 30f + EntryHeight * (_entryOrder.Count - 1 - i));
+                if (rect.anchoredPosition != position)
+                {
+                    rect.anchoredPosition = position;
+                }
             }
         }
 
@@ -531,52 +545,51 @@ namespace MDEN.UI.Displays
 
         private void EnsureOverlayOrder()
         {
-            if (_frame == null) return;
-            var canvas = _frame.GetComponent<Canvas>();
-            if (canvas != null) canvas.sortingOrder = OverlaySortingOrder;
+            if (_canvas != null) _canvas.sortingOrder = OverlaySortingOrder;
         }
 
         private static void HideInfoPlusLabel()
         {
-            var infoPlusLabel = GameObject.Find("InfoPlus_TextLowerLeft");
+            var infoPlusLabel = FindInfoPlusLabel();
             if (infoPlusLabel != null)
             {
+                var instanceId = infoPlusLabel.GetInstanceID();
+                if (_infoPlusInstanceId != instanceId)
+                {
+                    _infoPlusInstanceId = instanceId;
+                    _infoPlusWasActive = infoPlusLabel.activeSelf;
+                }
+
                 infoPlusLabel.SetActive(false);
             }
         }
 
-        private static void ApplyGameFont(Text text)
+        private static void RestoreInfoPlusLabel()
         {
-            if (text == null) return;
-
-            var template = FindNativeFontTemplate();
-            if (template != null && template.font != null)
+            var infoPlusLabel = FindInfoPlusLabel();
+            if (infoPlusLabel != null && _infoPlusWasActive.HasValue)
             {
-                text.font = template.font;
-                text.material = template.material;
-                return;
+                infoPlusLabel.SetActive(_infoPlusWasActive.Value);
             }
 
-            text.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
+            _infoPlusLabel = null;
+            _infoPlusInstanceId = null;
+            _infoPlusWasActive = null;
         }
 
-        private static Text FindNativeFontTemplate()
+        private static GameObject FindInfoPlusLabel()
         {
-            if (_fontTemplate != null && _fontTemplate.font != null) return _fontTemplate;
-
-            var candidates = Resources.FindObjectsOfTypeAll<Text>();
-            foreach (var text in candidates)
+            if (_infoPlusLabel == null)
             {
-                if (text == null || text.font == null) continue;
-                var fontName = text.font.name ?? string.Empty;
-                if (!fontName.Contains("Arial"))
-                {
-                    _fontTemplate = text;
-                    return _fontTemplate;
-                }
+                _infoPlusLabel = GameObject.Find("InfoPlus_TextLowerLeft");
             }
 
-            return null;
+            return _infoPlusLabel;
+        }
+
+        private static void ApplyGameFont(Text text)
+        {
+            NativeFontCache.ApplyTo(text);
         }
 
         private static string EscapeRichText(string value)

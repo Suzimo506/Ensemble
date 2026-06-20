@@ -6,6 +6,7 @@ using MDEN.Protocol;
 using MDEN.Protocol.Enums;
 using MDEN.Protocol.Messages.Lobby;
 using MDEN.Protocol.Messages.Playlist;
+using MDEN.Protocol.Rules;
 
 namespace MDEN.Managers
 {
@@ -20,8 +21,11 @@ namespace MDEN.Managers
         private const int AddSuccess = 0;
         private const int AddHidden = 2;
         private const int AddNotSynced = 3;
+        private const int AddUnsupported = 4;
         private const int LockSuccess = 0;
         private const int LockNotSynced = 5;
+        private const int LockUnsupported = 6;
+        private const string UnsupportedChartMessage = "该谱面暂不支持联机";
 
         public static bool CanChangePlaylist
         {
@@ -37,6 +41,14 @@ namespace MDEN.Managers
         {
             var entry = ChartManager.GetCurrentEntry();
             return !string.IsNullOrEmpty(entry) && ContainsEntry(entry);
+        }
+
+        public static bool IsCurrentChartUnsupported()
+        {
+            var entry = ChartManager.GetCurrentEntry();
+            return !string.IsNullOrEmpty(entry) &&
+                   !ContainsEntry(entry) &&
+                   ChartSelectionRules.IsUnsupportedPlaylistEntry(entry);
         }
 
         public static bool ContainsEntry(string entry)
@@ -91,7 +103,9 @@ namespace MDEN.Managers
         {
             if (!LobbyManager.IsInLobby) return "PLAY!";
             if (!CanChangePlaylist) return LobbyManager.CurrentLobby?.Locked == true ? "等待准备" : "等待房主选歌";
-            if (IsCurrentChartInPlaylist()) return "移除歌曲列表";
+            var entry = ChartManager.GetCurrentEntry();
+            if (!string.IsNullOrEmpty(entry) && ContainsEntry(entry)) return "移除歌曲列表";
+            if (IsCurrentChartUnsupported()) return UnsupportedChartMessage;
             if (IsPlaylistFull()) return "歌曲列表已满";
             return "加入歌曲列表";
         }
@@ -100,7 +114,9 @@ namespace MDEN.Managers
         {
             if (!LobbyManager.IsInLobby) return true;
             if (!CanChangePlaylist) return false;
-            return IsCurrentChartInPlaylist() || !IsPlaylistFull();
+            var entry = ChartManager.GetCurrentEntry();
+            if (!string.IsNullOrEmpty(entry) && ContainsEntry(entry)) return true;
+            return !ChartSelectionRules.IsUnsupportedPlaylistEntry(entry) && !IsPlaylistFull();
         }
 
         public static async Task<PlaylistToggleResult> ToggleCurrentChartAsync()
@@ -118,6 +134,7 @@ namespace MDEN.Managers
                 return PlaylistToggleResult.Removed;
             }
 
+            EnsureEntrySupported(entry);
             await AddAsync(entry);
             return PlaylistToggleResult.Added;
         }
@@ -125,6 +142,7 @@ namespace MDEN.Managers
         public static async Task AddAsync(string entry)
         {
             EnsureReady();
+            EnsureEntrySupported(entry);
             await PlayerManager.SyncChartStateAsync();
             var response = await NetworkClient.Instance.SendRequestAsync<PlaylistAddRequest, PlaylistAddResponse>(
                 OpCodes.PlaylistAddReq,
@@ -143,6 +161,11 @@ namespace MDEN.Managers
                 throw new System.InvalidOperationException("有人未下载该谱面");
             }
 
+            if (result == AddUnsupported)
+            {
+                throw new System.InvalidOperationException(UnsupportedChartMessage);
+            }
+
             throw new System.InvalidOperationException($"添加歌曲失败，错误码 {result}。");
         }
 
@@ -158,6 +181,7 @@ namespace MDEN.Managers
         public static async Task StartPrepareAsync()
         {
             EnsureReady();
+            EnsurePlaylistSupported();
             await PlayerManager.SyncChartStateAsync();
 
             var response = await NetworkClient.Instance.SendRequestAsync<LobbyLockRequest, LobbyLockResponse>(
@@ -172,6 +196,11 @@ namespace MDEN.Managers
             if (response.Result == LockNotSynced)
             {
                 throw new System.InvalidOperationException("有人未下载该谱面");
+            }
+
+            if (response.Result == LockUnsupported)
+            {
+                throw new System.InvalidOperationException("歌曲列表包含暂不支持联机的谱面");
             }
 
             if (response.Result != LockSuccess)
@@ -214,6 +243,25 @@ namespace MDEN.Managers
         {
             var playlist = LobbyManager.CurrentLobby?.Playlist;
             return playlist?.FirstOrDefault(item => ChartManager.IsSameChart(item, entry));
+        }
+
+        private static void EnsureEntrySupported(string entry)
+        {
+            if (ChartSelectionRules.IsUnsupportedPlaylistEntry(entry))
+            {
+                throw new System.InvalidOperationException(UnsupportedChartMessage);
+            }
+        }
+
+        private static void EnsurePlaylistSupported()
+        {
+            var playlist = LobbyManager.CurrentLobby?.Playlist;
+            if (playlist == null) return;
+
+            if (playlist.Any(ChartSelectionRules.IsUnsupportedPlaylistEntry))
+            {
+                throw new System.InvalidOperationException("歌曲列表包含暂不支持联机的谱面");
+            }
         }
 
         private static void EnsureReady()

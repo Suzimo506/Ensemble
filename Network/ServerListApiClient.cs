@@ -37,7 +37,7 @@ namespace MDEN.Network
         {
             Timeout = TimeSpan.FromSeconds(5)
         };
-        private const string ApiUrl = "https://api.xmjjs.top/mpmd/serverlist.php";
+        private const string ApiUrl = "https://mden.top/api/?r=serverlist";
 
         static ServerListApiClient()
         {

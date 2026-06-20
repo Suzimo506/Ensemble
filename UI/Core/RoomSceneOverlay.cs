@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using MDEN.Managers;
 using MDEN.Protocol.Messages.Lobby;
 using UnityEngine;
+using UnityEngine.AddressableAssets;
 using UnityEngine.UI;
 
 namespace MDEN.UI.Core
@@ -10,20 +11,59 @@ namespace MDEN.UI.Core
     public static class RoomSceneOverlay
     {
         private const string NativeBackgroundPath = "UI/Standerd/PnlHome/PnlBgSwitchFsv";
+        private const string StagePanelPath = "UI/Standerd/PnlStage";
+        private const string PreparationPanelPath = "UI/Standerd/PnlPreparation";
         private const int OverlaySortingOrder = 32767;
+        private const float InfoPanelWidth = 420f;
+        private const float InfoPanelPadding = 14f;
+        private const float InfoPanelTop = 82f;
+        private const float InfoPanelRight = 20f;
+        private const float InfoTitleTop = 12f;
+        private const float InfoTitleHeight = 24f;
+        private const float InfoMetaTop = 38f;
+        private const float InfoMetaHeight = 22f;
+        private const float PlayerListTop = 68f;
+        private const float PlayerLineHeight = 27f;
+        private const float PlayerRowGap = 5f;
+        private const float PlayerRowInset = 10f;
+        private const float PlayerNameWidth = 270f;
+        private const float PlayerStateWidth = 82f;
+        private const int InfoTitleFontSize = 20;
+        private const int InfoMetaFontSize = 17;
+        private const int PlayerNameFontSize = 17;
+        private const int PlayerStateFontSize = 17;
+        private const string PlayerNotReadyColor = "ff7777ff";
+        private const string PlayerSelectingColor = Constants.ColorYellow;
+        private const string PlayerPlayingColor = Constants.ColorRed;
+        private const string PlayerReadyColor = Constants.ColorSoftGreen;
+
+        private static readonly string[] NativeSettingsPanelPaths =
+        {
+            "UI/Standerd/PnlOption",
+            "UI/Standerd/PnlSetting",
+            "UI/Standerd/PnlSettings",
+            "PnlOption",
+            "PnlSetting",
+            "PnlSettings"
+        };
 
         private static readonly Dictionary<string, HiddenObjectState> OriginalStates = new Dictionary<string, HiddenObjectState>();
         private static readonly Dictionary<string, string> PlayerColorCache = new Dictionary<string, string>();
         private static readonly HashSet<string> PendingColorRequests = new HashSet<string>();
         private static GameObject _frame;
-        private static Text _roomInfo;
-        private static Text _fontTemplate;
+        private static GameObject _roomInfoPanel;
+        private static RectTransform _roomInfoPanelRect;
+        private static Text _roomTitle;
+        private static Text _roomMeta;
+        private static Sprite _roundedSprite;
+        private static readonly List<PlayerRowView> PlayerRows = new List<PlayerRowView>();
 
         public static bool IsCreated => _frame != null;
         public static bool IsHomeReady => GameObject.Find("UI/Standerd/PnlHome") != null;
         public static bool IsNavigationReady => GameObject.Find("UI/Standerd/PnlNavigation") != null;
         public static bool IsReady => IsHomeReady && IsNavigationReady;
         public static bool IsHomeVisible => GetHomeVisible();
+        public static bool IsRoomInfoVisible => GetRoomInfoVisible();
 
         public static void InvalidatePlayerColors()
         {
@@ -46,20 +86,31 @@ namespace MDEN.UI.Core
                 return;
             }
 
+            var homeVisible = IsHomeVisible;
+            if (lobby.IsPlaying && !homeVisible)
+            {
+                Hide();
+                return;
+            }
+
             EnsureFrame();
             if (_frame == null) return;
 
-            if (!IsHomeVisible)
+            if (IsNativeSettingsVisible() || (!homeVisible && !IsStageVisible()))
             {
                 _frame.SetActive(false);
                 return;
             }
 
-            EnsureNativeBackgroundVisible();
-            HideSinglePlayerControls();
+            if (homeVisible)
+            {
+                EnsureNativeBackgroundVisible();
+                HideSinglePlayerControls();
+            }
+
             _frame.SetActive(true);
             EnsureOverlayOrder();
-            _roomInfo.text = FormatRoomInfo(lobby);
+            UpdateRoomInfo(lobby);
         }
 
         public static void Hide()
@@ -70,17 +121,22 @@ namespace MDEN.UI.Core
         public static void UpdateVisibility()
         {
             if (_frame == null) return;
-            var visible = LobbyManager.IsInLobby && IsHomeVisible;
+            var lobby = LobbyManager.CurrentLobby;
+            var homeVisible = IsHomeVisible;
+            var visible = LobbyManager.IsInLobby &&
+                          !IsNativeSettingsVisible() &&
+                          (homeVisible || (lobby?.IsPlaying != true && IsStageVisible()));
             _frame.SetActive(visible);
             if (visible)
             {
-                EnsureNativeBackgroundVisible();
-                HideSinglePlayerControls();
-                EnsureOverlayOrder();
-                if (_roomInfo != null)
+                if (homeVisible)
                 {
-                    _roomInfo.text = FormatRoomInfo(LobbyManager.CurrentLobby);
+                    EnsureNativeBackgroundVisible();
+                    HideSinglePlayerControls();
                 }
+
+                EnsureOverlayOrder();
+                UpdateRoomInfo(lobby);
             }
         }
 
@@ -92,14 +148,28 @@ namespace MDEN.UI.Core
             if (_frame != null)
             {
                 UnityEngine.Object.Destroy(_frame);
-                _frame = null;
-                _roomInfo = null;
             }
+
+            ClearFrameReferences();
         }
 
         private static void EnsureFrame()
         {
-            if (_frame != null) return;
+            if (_frame != null &&
+                _roomInfoPanel != null &&
+                _roomInfoPanelRect != null &&
+                _roomTitle != null &&
+                _roomMeta != null)
+            {
+                return;
+            }
+
+            if (_frame != null)
+            {
+                UnityEngine.Object.Destroy(_frame);
+            }
+
+            ClearFrameReferences();
 
             _frame = new GameObject("MDENRoomSceneOverlay");
             var rect = _frame.AddComponent<RectTransform>();
@@ -120,7 +190,17 @@ namespace MDEN.UI.Core
             scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
             scaler.matchWidthOrHeight = 0.5f;
 
-            _roomInfo = CreateText("RoomInfo", -25f, -90f, 26, TextAnchor.UpperRight);
+            CreateRoomInfoPanel();
+        }
+
+        private static void ClearFrameReferences()
+        {
+            _frame = null;
+            _roomInfoPanel = null;
+            _roomInfoPanelRect = null;
+            _roomTitle = null;
+            _roomMeta = null;
+            PlayerRows.Clear();
         }
 
         private static void EnsureOverlayOrder()
@@ -135,8 +215,18 @@ namespace MDEN.UI.Core
             var home = GameObject.Find("UI/Standerd/PnlHome");
             return home != null &&
                    home.activeInHierarchy &&
-                   !IsPanelVisible("UI/Standerd/PnlStage") &&
-                   !IsPanelVisible("UI/Standerd/PnlPreparation");
+                   !IsPanelVisible(StagePanelPath) &&
+                   !IsPanelVisible(PreparationPanelPath);
+        }
+
+        private static bool GetRoomInfoVisible()
+        {
+            return !IsNativeSettingsVisible() && (GetHomeVisible() || IsStageVisible());
+        }
+
+        private static bool IsStageVisible()
+        {
+            return IsPanelVisible(StagePanelPath) && !IsPanelVisible(PreparationPanelPath);
         }
 
         private static bool IsPanelVisible(string path)
@@ -145,23 +235,62 @@ namespace MDEN.UI.Core
             return obj != null && obj.activeInHierarchy;
         }
 
-        private static Text CreateText(string name, float x, float y, int fontSize, TextAnchor anchor)
+        private static bool IsNativeSettingsVisible()
+        {
+            foreach (var path in NativeSettingsPanelPaths)
+            {
+                if (IsPanelVisible(path)) return true;
+            }
+
+            return false;
+        }
+
+        private static void CreateRoomInfoPanel()
+        {
+            _roomInfoPanel = new GameObject("RoomInfoPanel");
+            _roomInfoPanelRect = _roomInfoPanel.AddComponent<RectTransform>();
+            _roomInfoPanelRect.SetParent(_frame.transform, false);
+            _roomInfoPanelRect.localScale = Vector3.one;
+            _roomInfoPanelRect.anchorMin = new Vector2(1f, 1f);
+            _roomInfoPanelRect.anchorMax = new Vector2(1f, 1f);
+            _roomInfoPanelRect.pivot = new Vector2(1f, 1f);
+            _roomInfoPanelRect.anchoredPosition = new Vector2(-InfoPanelRight, -InfoPanelTop);
+            _roomInfoPanelRect.sizeDelta = new Vector2(InfoPanelWidth, 180f);
+
+            var background = _roomInfoPanel.AddComponent<Image>();
+            background.sprite = GetRoundedSprite();
+            background.type = background.sprite != null ? Image.Type.Sliced : Image.Type.Simple;
+            background.color = new Color(0f, 0f, 0f, 0.38f);
+            background.raycastTarget = false;
+
+            _roomTitle = CreatePanelText("RoomTitle", InfoPanelPadding, InfoTitleTop, InfoPanelWidth - InfoPanelPadding * 2f, InfoTitleHeight, InfoTitleFontSize, TextAnchor.UpperLeft);
+            _roomMeta = CreatePanelText("RoomMeta", InfoPanelPadding, InfoMetaTop, InfoPanelWidth - InfoPanelPadding * 2f, InfoMetaHeight, InfoMetaFontSize, TextAnchor.UpperLeft);
+        }
+
+        private static Text CreatePanelText(
+            string name,
+            float x,
+            float y,
+            float width,
+            float height,
+            int fontSize,
+            TextAnchor anchor)
         {
             var obj = new GameObject(name);
             var rect = obj.AddComponent<RectTransform>();
-            rect.SetParent(_frame.transform);
+            rect.SetParent(_roomInfoPanel.transform, false);
             rect.localScale = Vector3.one;
-            rect.anchorMin = new Vector2(1f, 1f);
-            rect.anchorMax = new Vector2(1f, 1f);
-            rect.pivot = new Vector2(1f, 1f);
-            rect.anchoredPosition = new Vector2(x, y);
-            rect.sizeDelta = new Vector2(620f, fontSize * 12f);
+            rect.anchorMin = new Vector2(0f, 1f);
+            rect.anchorMax = new Vector2(0f, 1f);
+            rect.pivot = new Vector2(0f, 1f);
+            rect.anchoredPosition = new Vector2(x, -y);
+            rect.sizeDelta = new Vector2(width, height);
 
             var text = obj.AddComponent<Text>();
             ApplyGameFont(text);
             text.fontSize = fontSize;
             text.alignment = anchor;
-            text.horizontalOverflow = HorizontalWrapMode.Wrap;
+            text.horizontalOverflow = HorizontalWrapMode.Overflow;
             text.verticalOverflow = VerticalWrapMode.Overflow;
             text.supportRichText = true;
             text.raycastTarget = false;
@@ -172,6 +301,78 @@ namespace MDEN.UI.Core
             shadow.effectColor = new Color(0f, 0f, 0f, 0.3f);
 
             return text;
+        }
+
+        private static void EnsurePlayerRowCount(int count)
+        {
+            if (PlayerRows.Exists(row => row == null || !row.IsAlive))
+            {
+                PlayerRows.Clear();
+            }
+
+            while (PlayerRows.Count < count)
+            {
+                PlayerRows.Add(CreatePlayerRow(PlayerRows.Count));
+            }
+        }
+
+        private static PlayerRowView CreatePlayerRow(int index)
+        {
+            var root = new GameObject("PlayerRow_" + index);
+            var rootRect = root.AddComponent<RectTransform>();
+            rootRect.SetParent(_roomInfoPanel.transform, false);
+            rootRect.localScale = Vector3.one;
+            rootRect.anchorMin = new Vector2(0f, 1f);
+            rootRect.anchorMax = new Vector2(0f, 1f);
+            rootRect.pivot = new Vector2(0f, 1f);
+            rootRect.sizeDelta = new Vector2(InfoPanelWidth - InfoPanelPadding * 2f, PlayerLineHeight);
+
+            var image = root.AddComponent<Image>();
+            image.sprite = GetRoundedSprite();
+            image.type = image.sprite != null ? Image.Type.Sliced : Image.Type.Simple;
+            image.color = new Color(0f, 0f, 0f, 0.24f);
+            image.raycastTarget = false;
+
+            var nameText = CreateRowText(rootRect, "PlayerName", PlayerRowInset, PlayerNameWidth, TextAnchor.MiddleLeft, PlayerNameFontSize);
+            var stateText = CreateRowText(rootRect, "PlayerState", InfoPanelWidth - InfoPanelPadding * 2f - PlayerRowInset - PlayerStateWidth, PlayerStateWidth, TextAnchor.MiddleRight, PlayerStateFontSize);
+            return new PlayerRowView(root, rootRect, nameText, stateText);
+        }
+
+        private static Text CreateRowText(RectTransform parent, string name, float x, float width, TextAnchor anchor, int fontSize)
+        {
+            var obj = new GameObject(name);
+            var rect = obj.AddComponent<RectTransform>();
+            rect.SetParent(parent, false);
+            rect.localScale = Vector3.one;
+            rect.anchorMin = new Vector2(0f, 0.5f);
+            rect.anchorMax = new Vector2(0f, 0.5f);
+            rect.pivot = new Vector2(0f, 0.5f);
+            rect.anchoredPosition = new Vector2(x, 0f);
+            rect.sizeDelta = new Vector2(width, PlayerLineHeight);
+
+            var text = obj.AddComponent<Text>();
+            ApplyGameFont(text);
+            text.fontSize = fontSize;
+            text.alignment = anchor;
+            text.horizontalOverflow = HorizontalWrapMode.Overflow;
+            text.verticalOverflow = VerticalWrapMode.Overflow;
+            text.supportRichText = true;
+            text.raycastTarget = false;
+            text.color = Color.white;
+
+            var shadow = obj.AddComponent<Shadow>();
+            shadow.effectDistance = new Vector2(1.5f, -1.5f);
+            shadow.effectColor = new Color(0f, 0f, 0f, 0.42f);
+
+            return text;
+        }
+
+        private static void HidePlayerRowsFrom(int index)
+        {
+            for (var i = index; i < PlayerRows.Count; i++)
+            {
+                PlayerRows[i].Hide();
+            }
         }
 
         private static void HideSinglePlayerControls()
@@ -238,57 +439,102 @@ namespace MDEN.UI.Core
             return transform.gameObject;
         }
 
-        private static string FormatRoomInfo(LobbySyncPush lobby)
+        private static void UpdateRoomInfo(LobbySyncPush lobby)
         {
+            if (lobby == null || _roomInfoPanelRect == null || _roomTitle == null || _roomMeta == null)
+            {
+                return;
+            }
+
+            var players = GetRoomInfoPlayers(lobby);
+            var playerRows = Math.Max(1, players.Length);
+            var playerListHeight = playerRows * PlayerLineHeight + Math.Max(0, playerRows - 1) * PlayerRowGap;
+            var panelHeight = PlayerListTop + playerListHeight + InfoPanelPadding;
+            _roomInfoPanelRect.sizeDelta = new Vector2(InfoPanelWidth, panelHeight);
+
             var roomName = EscapeRichText(lobby.Name);
             var hostName = EscapeRichText(GetHostName(lobby));
-            var hostColor = GetPlayerColor(lobby.HostUid);
-            var otherPlayers = FormatOtherPlayers(lobby);
-            var watcherInfo = lobby.WatcherCount > 0
-                ? $"观众：<color=#{Constants.ColorCyan}>{lobby.WatcherCount}</color>  "
-                : string.Empty;
-            var text = $"{watcherInfo}<color=#{Constants.ColorYellow}>【{roomName}】</color> {GetPlayerCount(lobby)}/{lobby.MaxPlayers}\n" +
-                       $"房主：<color=#{hostColor}>【{hostName}】</color>";
+            _roomTitle.text = $"<color=#{Constants.ColorYellow}>【{roomName}】</color>";
+            _roomMeta.text =
+                $"房主：<color=#{GetPlayerColor(lobby.HostUid)}>{hostName}</color>  " +
+                $"人数：<color=#{Constants.ColorCyan}>{GetPlayerCount(lobby)}/{lobby.MaxPlayers}</color>  " +
+                $"观众：<color=#{Constants.ColorCyan}>{lobby.WatcherCount}</color>";
 
-            return string.IsNullOrEmpty(otherPlayers)
-                ? text
-                : $"{text}\n成员：{otherPlayers}";
+            if (players.Length == 0)
+            {
+                EnsurePlayerRowCount(1);
+                PlayerRows[0].Set(PlayerListTop, "暂无玩家", "ffffffff", string.Empty, "ffffffff");
+                HidePlayerRowsFrom(1);
+                return;
+            }
+
+            EnsurePlayerRowCount(players.Length);
+            for (var i = 0; i < players.Length; i++)
+            {
+                var player = players[i];
+                var state = GetPlayerState(lobby, player.Uid);
+                var y = PlayerListTop + i * (PlayerLineHeight + PlayerRowGap);
+                PlayerRows[i].Set(
+                    y,
+                    Truncate(EscapeRichText(player.Name), 16),
+                    GetPlayerColor(player.Uid),
+                    state.Text,
+                    state.Color);
+            }
+
+            HidePlayerRowsFrom(players.Length);
         }
 
-        private static string FormatOtherPlayers(LobbySyncPush lobby)
+        private static PlayerStateText GetPlayerState(LobbySyncPush lobby, string uid)
         {
-            var names = GetOtherPlayerNames(lobby)
-                .Select(name => $"<color=#ffffffff>【{EscapeRichText(name)}】</color>")
-                .ToArray();
-            return names.Length == 0 ? string.Empty : string.Join(" ", names);
+            if (lobby.IsPlaying)
+            {
+                return new PlayerStateText("游戏中", PlayerPlayingColor);
+            }
+
+            if (!lobby.Locked)
+            {
+                return new PlayerStateText("选歌中", PlayerSelectingColor);
+            }
+
+            var ready = !string.IsNullOrEmpty(uid) &&
+                        lobby.ReadyPlayers != null &&
+                        Array.IndexOf(lobby.ReadyPlayers, uid) >= 0;
+            return ready
+                ? new PlayerStateText("已准备", PlayerReadyColor)
+                : new PlayerStateText("未准备", PlayerNotReadyColor);
         }
 
-        private static IEnumerable<string> GetOtherPlayerNames(LobbySyncPush lobby)
+        private static RoomInfoPlayer[] GetRoomInfoPlayers(LobbySyncPush lobby)
         {
+            var players = new List<RoomInfoPlayer>();
             var seenUids = new HashSet<string>();
             if (lobby.PlayerDetails != null && lobby.PlayerDetails.Length > 0)
             {
                 foreach (var player in lobby.PlayerDetails)
                 {
                     if (string.IsNullOrEmpty(player?.Uid)) continue;
-                    if (player.Uid == lobby.HostUid) continue;
                     if (!seenUids.Add(player.Uid)) continue;
-                    yield return string.IsNullOrEmpty(player.Name) ? player.Uid : player.Name;
+                    players.Add(new RoomInfoPlayer(player.Uid, string.IsNullOrEmpty(player.Name) ? player.Uid : player.Name));
                 }
-
-                yield break;
             }
-
-            if (lobby.Players == null) yield break;
-            foreach (var uid in lobby.Players)
+            else if (lobby.Players != null)
             {
-                if (string.IsNullOrEmpty(uid)) continue;
-                if (uid == lobby.HostUid) continue;
-                if (!seenUids.Add(uid)) continue;
-                yield return uid == PlayerManager.CurrentUid && !string.IsNullOrEmpty(PlayerManager.CurrentProfile?.Name)
-                    ? PlayerManager.CurrentProfile.Name
-                    : uid;
+                foreach (var uid in lobby.Players)
+                {
+                    if (string.IsNullOrEmpty(uid)) continue;
+                    if (!seenUids.Add(uid)) continue;
+                    players.Add(new RoomInfoPlayer(
+                        uid,
+                        uid == PlayerManager.CurrentUid && !string.IsNullOrEmpty(PlayerManager.CurrentProfile?.Name)
+                            ? PlayerManager.CurrentProfile.Name
+                            : uid));
+                }
             }
+
+            return players
+                .OrderBy(player => player.Uid == lobby.HostUid ? 0 : 1)
+                .ToArray();
         }
 
         private static string GetHostName(LobbySyncPush lobby)
@@ -412,38 +658,31 @@ namespace MDEN.UI.Core
             return value?.Replace("<", "＜").Replace(">", "＞") ?? string.Empty;
         }
 
-        private static void ApplyGameFont(Text text)
+        private static string Truncate(string value, int maxLength)
         {
-            if (text == null) return;
-
-            var template = FindNativeFontTemplate();
-            if (template != null && template.font != null)
-            {
-                text.font = template.font;
-                text.material = template.material;
-                return;
-            }
-
-            text.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
+            if (string.IsNullOrEmpty(value) || value.Length <= maxLength) return value;
+            return value.Substring(0, maxLength) + "...";
         }
 
-        private static Text FindNativeFontTemplate()
+        private static void ApplyGameFont(Text text)
         {
-            if (_fontTemplate != null && _fontTemplate.font != null) return _fontTemplate;
+            NativeFontCache.ApplyTo(text);
+        }
 
-            var candidates = Resources.FindObjectsOfTypeAll<Text>();
-            foreach (var text in candidates)
+        private static Sprite GetRoundedSprite()
+        {
+            if (_roundedSprite != null) return _roundedSprite;
+
+            try
             {
-                if (text == null || text.font == null) continue;
-                var fontName = text.font.name ?? string.Empty;
-                if (!fontName.Contains("Arial"))
-                {
-                    _fontTemplate = text;
-                    return _fontTemplate;
-                }
+                _roundedSprite = Addressables.LoadAssetAsync<Sprite>("SprRoundedsquare").WaitForCompletion();
+            }
+            catch
+            {
+                _roundedSprite = null;
             }
 
-            return null;
+            return _roundedSprite;
         }
 
         private sealed class HiddenObjectState
@@ -456,6 +695,81 @@ namespace MDEN.UI.Core
 
             public GameObject Target { get; }
             public bool ActiveSelf { get; }
+        }
+
+        private sealed class RoomInfoPlayer
+        {
+            public RoomInfoPlayer(string uid, string name)
+            {
+                Uid = uid;
+                Name = string.IsNullOrWhiteSpace(name) ? uid : name;
+            }
+
+            public string Uid { get; }
+            public string Name { get; }
+        }
+
+        private sealed class PlayerRowView
+        {
+            private readonly GameObject _root;
+            private readonly RectTransform _rect;
+            private readonly Text _name;
+            private readonly Text _state;
+
+            public PlayerRowView(GameObject root, RectTransform rect, Text name, Text state)
+            {
+                _root = root;
+                _rect = rect;
+                _name = name;
+                _state = state;
+            }
+
+            public bool IsAlive => _root != null &&
+                                   _rect != null &&
+                                   _name != null &&
+                                   _state != null;
+
+            public void Set(float y, string playerName, string playerColor, string stateText, string stateColor)
+            {
+                if (_root != null && !_root.activeSelf)
+                {
+                    _root.SetActive(true);
+                }
+
+                if (_rect != null)
+                {
+                    _rect.anchoredPosition = new Vector2(InfoPanelPadding, -y);
+                }
+
+                if (_name != null)
+                {
+                    _name.text = $"<color=#{playerColor}>{playerName}</color>";
+                }
+
+                if (_state != null)
+                {
+                    _state.text = string.IsNullOrEmpty(stateText)
+                        ? string.Empty
+                        : $"<color=#{stateColor}>{stateText}</color>";
+                }
+            }
+
+            public void Hide()
+            {
+                if (_root != null) _root.SetActive(false);
+            }
+        }
+
+        private readonly struct PlayerStateText
+        {
+            public PlayerStateText(string text, string color)
+            {
+                Text = text;
+                Color = color;
+            }
+
+            public string Text { get; }
+            public string Color { get; }
         }
     }
 }

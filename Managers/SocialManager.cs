@@ -3,7 +3,6 @@ using MDEN.Network;
 using MDEN.Protocol;
 using MDEN.Protocol.Messages.Social;
 using MDEN.UI.Core;
-using MelonLoader;
 
 namespace MDEN.Managers
 {
@@ -45,13 +44,13 @@ namespace MDEN.Managers
                 return;
             }
 
-            Il2CppAssets.Scripts.UI.Controls.ShowText.ShowInfo(GetNotifyMessage(push));
+            UiNotificationManager.RequestToast(GetNotifyMessage(push));
         }
 
         private static void ShowFriendRequestDialog(FriendNotifyPush push)
         {
             var name = GetPlayerName(push);
-            NativeConfirmDialog.Show(
+            UiNotificationManager.RequestConfirm(
                 "好友请求",
                 $"{name} 想添加你为好友",
                 confirmed => _ = RespondFriendRequestSafelyAsync(push.PlayerUid, confirmed));
@@ -63,12 +62,12 @@ namespace MDEN.Managers
             {
                 var response = await RespondFriendRequestAsync(friendUid, accept);
                 var message = GetResponseMessage(response?.Action ?? 0);
-                MainThreadDispatcher.Enqueue(() => Il2CppAssets.Scripts.UI.Controls.ShowText.ShowInfo(message));
+                UiNotificationManager.RequestToast(message);
             }
             catch (System.Exception ex)
             {
                 MDEN.Managers.ClientLogManager.Warning($"Respond friend request failed: {ex.Message}");
-                MainThreadDispatcher.Enqueue(() => Il2CppAssets.Scripts.UI.Controls.ShowText.ShowInfo(ex.Message));
+                UiNotificationManager.RequestToast(ex.Message);
             }
         }
 

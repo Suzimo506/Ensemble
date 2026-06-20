@@ -139,6 +139,11 @@ namespace MDEN.UI.Core
 
         private static void ShowConnectionStateToast(ConnectionLifecycleState previousState, ConnectionLifecycleState currentState)
         {
+            if (BattleManager.IsActiveMultiplayerBattle)
+            {
+                return;
+            }
+
             if (currentState == ConnectionLifecycleState.Reconnecting)
             {
                 ShowText.ShowInfo("连接中断，正在重连...");
@@ -231,7 +236,7 @@ namespace MDEN.UI.Core
             var background = _serverLabelObj.AddComponent<Image>();
             background.sprite = GetServerLabelBackgroundSprite();
             background.type = Image.Type.Sliced;
-            background.color = new Color(0.55f, 0.38f, 0.88f, 0.92f);
+            background.color = new Color(0.24f, 0.07f, 0.46f, 0.94f);
             background.raycastTarget = false;
 
             var textObj = new GameObject("TxtNodeName");
@@ -453,6 +458,12 @@ namespace MDEN.UI.Core
 
         private static async System.Threading.Tasks.Task StartPrepareAsync()
         {
+            if (CustomAlbumsWindowGuard.CloseIfOpen("start prepare"))
+            {
+                MainThreadDispatcher.Enqueue(() => ShowText.ShowInfo("已关闭自制谱窗口，请重新开始准备"));
+                return;
+            }
+
             using var _ = WindowStackController.LockUI("Starting lobby...");
 
             try

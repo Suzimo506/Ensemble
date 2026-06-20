@@ -57,7 +57,7 @@ namespace MDEN.UI.Core
                 return;
             }
 
-            var enabled = !_busy && PlaylistManager.CanUsePreparationButton();
+            var enabled = !_busy && (PlaylistManager.CanUsePreparationButton() || PlaylistManager.IsCurrentChartUnsupported());
             _boundButton.enabled = enabled;
             if (_boundKeyBinding != null) _boundKeyBinding.enabled = enabled;
             if (_boundKeyIcon != null) _boundKeyIcon.SetActive(enabled);
@@ -68,6 +68,12 @@ namespace MDEN.UI.Core
         {
             if (_busy) return;
             if (!LobbyManager.IsInLobby) return;
+
+            if (PlaylistManager.IsCurrentChartUnsupported())
+            {
+                ShowText.ShowInfo(PlaylistManager.GetPreparationButtonText());
+                return;
+            }
 
             _busy = true;
             Refresh();

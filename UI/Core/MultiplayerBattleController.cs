@@ -1,19 +1,19 @@
 using Il2Cpp;
 using Il2CppAssets.Scripts.Database;
 using Il2CppAssets.Scripts.UI.Controls;
-using MDEN.Patches;
-using MelonLoader;
 using UnityEngine;
 
 namespace MDEN.UI.Core
 {
     public static class MultiplayerBattleController
     {
-        private const int StartRetryCount = 20;
+        private const int StartRetryCount = 60;
         private const int StartRetryDelayFrames = 3;
+        private const int StartNavigationRetryInterval = 10;
         private static int _startedLobbyId;
         private static string _startedBattleId;
         private static string _startedBattleEntry;
+        private static string _navigatedBattleId;
         private static int _startGeneration;
 
         public static void OnLobbyChanged()
@@ -22,7 +22,7 @@ namespace MDEN.UI.Core
             if (lobby == null || !lobby.IsPlaying)
             {
                 Reset();
-                if (!BattleFlowPatch.IsHoldingBattleResult)
+                if (!Managers.BattleResultFlowManager.IsHoldingBattleResult)
                 {
                     Managers.BattleManager.Reset();
                 }
@@ -53,6 +53,7 @@ namespace MDEN.UI.Core
             _startedLobbyId = 0;
             _startedBattleId = null;
             _startedBattleEntry = null;
+            _navigatedBattleId = null;
         }
 
         private static void ScheduleStartCurrentPlaylistEntry(int lobbyId, string battleId, string entryText)
@@ -78,7 +79,7 @@ namespace MDEN.UI.Core
                 return;
             }
 
-            if (TryStartCurrentPlaylistEntry(entryText))
+            if (TryStartCurrentPlaylistEntry(battleId, entryText, retriesRemaining))
             {
                 return;
             }
@@ -104,7 +105,7 @@ namespace MDEN.UI.Core
             MainThreadDispatcher.Enqueue(() => RunStartRetry(generation, lobbyId, battleId, entryText, retriesRemaining - 1, StartRetryDelayFrames));
         }
 
-        private static bool TryStartCurrentPlaylistEntry(string entryText)
+        private static bool TryStartCurrentPlaylistEntry(string battleId, string entryText, int retriesRemaining)
         {
             var entry = Managers.ChartManager.ParseEntry(entryText);
             if (entry == null)
@@ -130,20 +131,42 @@ namespace MDEN.UI.Core
                 return true;
             }
 
-            NativeChartNavigator.JumpToChart(musicInfo);
-            HiddenDifficultyController.Sync(musicInfo, entry.Difficulty);
-            GlobalDataBase.dbMusicTag.selectedDiffTglIndex = entry.Difficulty == 4 ? 3 : entry.Difficulty;
-            GlobalDataBase.dbMusicTag.pnlSelectMusicUid = musicInfo.uid;
-            GlobalDataBase.dbMusicTag.m_CurSelectedMusicInfo = musicInfo;
+            if (ShouldNavigateToBattleChart(battleId, retriesRemaining))
+            {
+                NativeChartNavigator.JumpToChart(musicInfo);
+                _navigatedBattleId = battleId;
+            }
+
+            SyncSelectedChart(musicInfo, entry.Difficulty);
 
             if (!IsNativeChartSelectionReady(musicInfo))
             {
                 return false;
             }
 
-            BattleFlowPatch.MarkMultiplayerBattleStarting();
+            if (CustomAlbumsWindowGuard.CloseIfOpen("battle start"))
+            {
+                ShowText.ShowInfo("已关闭自制谱窗口，正在重新尝试进入多人游戏");
+                return false;
+            }
+
+            Managers.BattleManager.MarkMultiplayerBattleStarting();
             BattleHelper.GameBattleStart(new Il2CppSystem.Object());
             return true;
+        }
+
+        private static bool ShouldNavigateToBattleChart(string battleId, int retriesRemaining)
+        {
+            if (_navigatedBattleId != battleId) return true;
+            return retriesRemaining > 0 && retriesRemaining % StartNavigationRetryInterval == 0;
+        }
+
+        private static void SyncSelectedChart(MusicInfo musicInfo, int difficulty)
+        {
+            HiddenDifficultyController.Sync(musicInfo, difficulty);
+            GlobalDataBase.dbMusicTag.selectedDiffTglIndex = difficulty == 4 ? 3 : difficulty;
+            GlobalDataBase.dbMusicTag.pnlSelectMusicUid = musicInfo.uid;
+            GlobalDataBase.dbMusicTag.m_CurSelectedMusicInfo = musicInfo;
         }
 
         private static bool IsNativeChartSelectionReady(MusicInfo musicInfo)

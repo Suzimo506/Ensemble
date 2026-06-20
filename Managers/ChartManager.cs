@@ -13,7 +13,9 @@ namespace MDEN.Managers
         public int Difficulty { get; set; }
         public string OwnerName { get; set; }
         public string ChartName { get; set; }
-        public string DisplayName => string.IsNullOrWhiteSpace(ChartName) ? $"Unknown Chart {Difficulty}" : ChartName;
+        public string DisplayName => string.IsNullOrWhiteSpace(ChartName)
+            ? $"Unknown Chart {Difficulty}"
+            : ChartName;
     }
 
     public static class ChartManager
@@ -110,16 +112,19 @@ namespace MDEN.Managers
                 };
             }
 
-            return new PlaylistEntryViewModel
+            var chartName = parts.Length > 3 ? string.Join("#", parts, 3, parts.Length - 3) : null;
+            var parsed = new PlaylistEntryViewModel
             {
                 Entry = entry,
                 ChartKey = parts[0],
                 Difficulty = difficulty,
                 OwnerName = parts.Length > 2 && !string.IsNullOrWhiteSpace(parts[2]) ? parts[2] : "Unknown",
-                ChartName = parts.Length > 3 && !string.IsNullOrWhiteSpace(parts[3])
-                    ? string.Join("#", parts, 3, parts.Length - 3)
+                ChartName = !string.IsNullOrWhiteSpace(chartName)
+                    ? chartName
                     : $"Unknown Chart {difficulty}"
             };
+            TryRepairUnknownChartName(parsed);
+            return parsed;
         }
 
         public static bool IsSameChart(string leftEntry, string rightEntry)
@@ -181,16 +186,16 @@ namespace MDEN.Managers
             if (musicInfo == null) return $"Unknown Chart {difficulty}";
 
             var level = musicInfo.GetMusicLevelStringByDiff(difficulty);
+            var album = GetCustomAlbum(musicInfo);
             if (difficulty == 4 && musicInfo.uid.StartsWith($"{AlbumManager.Uid}-"))
             {
-                var album = AlbumManager.GetByUid(musicInfo.uid);
                 if (album != null && !string.IsNullOrEmpty(album.Info.HideBmsDifficulty) && album.Info.HideBmsDifficulty != "0")
                 {
                     level = album.Info.HideBmsDifficulty;
                 }
             }
 
-            var chartName = musicInfo.name;
+            var chartName = GetBestChartName(musicInfo, album);
             if (!musicInfo.uid.StartsWith("999-"))
             {
                 try
@@ -208,6 +213,57 @@ namespace MDEN.Managers
             }
 
             return $"{chartName} {level}★";
+        }
+
+        private static void TryRepairUnknownChartName(PlaylistEntryViewModel entry)
+        {
+            if (entry == null || !IsUnknownChartName(entry.ChartName)) return;
+
+            var musicInfo = GetMusicInfo(entry.ChartKey);
+            if (musicInfo == null) return;
+
+            var repaired = GetNiceChartName(musicInfo, entry.Difficulty);
+            if (!IsUnknownChartName(repaired))
+            {
+                entry.ChartName = repaired;
+            }
+        }
+
+        private static bool IsUnknownChartName(string chartName)
+        {
+            return string.IsNullOrWhiteSpace(chartName) ||
+                   chartName.TrimStart().StartsWith("Unknown Chart", System.StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static string GetBestChartName(MusicInfo musicInfo, Album album)
+        {
+            if (!string.IsNullOrWhiteSpace(album?.Info?.Name))
+            {
+                return album.Info.Name;
+            }
+
+            if (!string.IsNullOrWhiteSpace(musicInfo?.name))
+            {
+                return musicInfo.name;
+            }
+
+            return "Unknown Chart";
+        }
+
+        private static Album GetCustomAlbum(MusicInfo musicInfo)
+        {
+            if (musicInfo == null || string.IsNullOrWhiteSpace(musicInfo.uid)) return null;
+
+            var album = AlbumManager.GetByUid(musicInfo.uid);
+            if (album != null) return album;
+
+            var md5 = GetMd5(musicInfo.uid);
+            if (!string.IsNullOrEmpty(md5) && CustomAlbumsByMd5.TryGetValue(md5, out album))
+            {
+                return album;
+            }
+
+            return null;
         }
 
         private static string GetEntryKey(MusicInfo musicInfo)

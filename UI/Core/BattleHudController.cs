@@ -29,9 +29,12 @@ namespace MDEN.UI.Core
         {
             if (!LobbyManager.IsInLobby) return;
             _battleActive = true;
-            BattleChartOwnerDisplay.Show();
-            Display.Create();
-            Display.Refresh(BattleManager.GetBattleDataSnapshot());
+            using (PerfTrace.Measure("MDEN.BattleHud.OnBattleStarted"))
+            {
+                BattleChartOwnerDisplay.Show();
+                Display.Create();
+                Display.Refresh(BattleManager.GetBattleDataSnapshot());
+            }
         }
 
         public static void Destroy()
@@ -45,11 +48,18 @@ namespace MDEN.UI.Core
         {
             if (!_battleActive || !LobbyManager.IsInLobby)
             {
-                Display.Destroy();
+                if (Display.IsCreated)
+                {
+                    Display.Destroy();
+                }
+
                 return;
             }
 
-            Display.Refresh(players);
+            using (PerfTrace.Measure("MDEN.BattleHud.Refresh"))
+            {
+                Display.Refresh(players);
+            }
         }
     }
 }

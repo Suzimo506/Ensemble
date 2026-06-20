@@ -99,7 +99,7 @@ namespace MDEN.UI.Windows
             if (button == _btnHideBattleHealthBar)
             {
                 ModConfigManager.SetHideBattleHealthBar(!ModConfigManager.HideBattleHealthBar);
-                Patches.BattleFlowPatch.ApplyBattleHealthBarVisibility();
+                BattleHealthBarController.ApplyVisibility();
                 RebuildWindow();
                 return;
             }

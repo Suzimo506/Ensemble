@@ -10,7 +10,7 @@ namespace MDEN.Patches
     {
         private static void Postfix(int idx, byte result, bool isMulStart = false, bool isMulEnd = false, bool isLeft = false)
         {
-            if (!LobbyManager.IsInLobby) return;
+            if (!BattleManager.IsActiveMultiplayerBattle) return;
 
             AccuracyManager.HandleSetPlayResult(idx, result, isMulStart, isMulEnd, isLeft);
         }
@@ -21,7 +21,7 @@ namespace MDEN.Patches
     {
         private static void Postfix(int idx, decimal currentTick)
         {
-            if (!LobbyManager.IsInLobby) return;
+            if (!BattleManager.IsActiveMultiplayerBattle) return;
 
             AccuracyManager.HandleMissCube(idx, currentTick);
         }

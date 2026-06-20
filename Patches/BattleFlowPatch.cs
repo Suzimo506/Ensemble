@@ -20,33 +20,38 @@ namespace MDEN.Patches
 {
     internal static class BattleFlowPatch
     {
-        private static bool _canExitBattleResult;
-        private static bool _battleResultFlowPending;
-        private static bool _multiplayerBattleActive;
+        private const int BattleEndPollIntervalMs = 500;
+        private const int VictoryBattleEndWaitTimeoutMs = 90000;
+        private const int FailedBattleEndWaitTimeoutMs = 180000;
         private static int _nextPauseButtonHideFrame;
-        private static BattlePlayerEntry[] _lastBattleResultSnapshot = System.Array.Empty<BattlePlayerEntry>();
+        private static GameObject _pauseButton;
+        private static int _nextVictoryPanelLookupFrame;
+        private static PnlVictory _pnlVictory;
 
-        internal static bool IsHoldingBattleResult => !_canExitBattleResult && _lastBattleResultSnapshot.Length > 0;
-        internal static bool IsBattleResultFlowPending => LobbyManager.IsInLobby && _battleResultFlowPending;
-        private static bool IsMultiplayerBattleContext => _multiplayerBattleActive || LobbyManager.CurrentLobby?.IsPlaying == true;
+        private static bool IsMultiplayerBattleContext => BattleManager.IsActiveMultiplayerBattle;
 
         internal static void MarkMultiplayerBattleStarting()
         {
-            _multiplayerBattleActive = true;
+            BattleManager.MarkMultiplayerBattleStarting();
             _nextPauseButtonHideFrame = 0;
+            _nextVictoryPanelLookupFrame = 0;
+            _pauseButton = null;
+            _pnlVictory = null;
         }
 
         internal static void ResetBattleSceneState()
         {
-            _multiplayerBattleActive = false;
-            _battleResultFlowPending = false;
-            _lastBattleResultSnapshot = System.Array.Empty<BattlePlayerEntry>();
-            _canExitBattleResult = true;
+            BattleManager.MarkMultiplayerBattleEnded();
+            BattleResultFlowManager.Reset();
             _nextPauseButtonHideFrame = 0;
+            _nextVictoryPanelLookupFrame = 0;
+            _pauseButton = null;
+            _pnlVictory = null;
         }
 
         internal static void UpdateBattleUiState()
         {
+            TryShowBattleResultByKeyboard();
             if (!IsMultiplayerBattleContext) return;
             if (Time.frameCount < _nextPauseButtonHideFrame) return;
 
@@ -56,15 +61,19 @@ namespace MDEN.Patches
 
         public static void SceneLoaded()
         {
-            _canExitBattleResult = false;
-            ApplyBattleHealthBarVisibility();
-            if (!LobbyManager.IsInLobby && !_multiplayerBattleActive)
+            _pauseButton = null;
+            _pnlVictory = null;
+            _nextVictoryPanelLookupFrame = 0;
+            BattleResultFlowManager.SetCanExitBattleResult(false);
+            if (!IsMultiplayerBattleContext)
             {
-                _canExitBattleResult = true;
+                BattleResultFlowManager.SetCanExitBattleResult(true);
+                ApplyBattleHealthBarVisibility();
                 return;
             }
 
-            _multiplayerBattleActive = true;
+            BattleManager.MarkMultiplayerBattleStarting();
+            ApplyBattleHealthBarVisibility();
             HideBattleControls();
         }
 
@@ -74,13 +83,17 @@ namespace MDEN.Patches
         {
             private static void Postfix()
             {
-                ApplyBattleHealthBarVisibility();
-                if (!LobbyManager.IsInLobby && !_multiplayerBattleActive) return;
+                if (!IsMultiplayerBattleContext)
+                {
+                    ApplyBattleHealthBarVisibility();
+                    return;
+                }
 
-                _multiplayerBattleActive = true;
-                _canExitBattleResult = false;
-                _battleResultFlowPending = false;
-                _lastBattleResultSnapshot = System.Array.Empty<BattlePlayerEntry>();
+                BattleManager.MarkMultiplayerBattleStarting();
+                BattleResultFlowManager.SetCanExitBattleResult(false);
+                BattleResultFlowManager.SetBattleResultFlowPending(false);
+                BattleResultFlowManager.SetLastBattleResultSnapshot(System.Array.Empty<BattlePlayerEntry>());
+                ApplyBattleHealthBarVisibility();
                 HideBattleControls();
                 BattleManager.PrepareForNewBattle();
                 BattleHudController.OnBattleStarted();
@@ -100,7 +113,7 @@ namespace MDEN.Patches
             {
                 if (!LobbyManager.IsInLobby)
                 {
-                    _canExitBattleResult = true;
+                    BattleResultFlowManager.SetCanExitBattleResult(true);
                     BattleHudController.Destroy();
                     return;
                 }
@@ -140,8 +153,10 @@ namespace MDEN.Patches
 
             private static bool Prefix()
             {
+                if (!IsMultiplayerBattleContext) return true;
+
                 HidePauseButton();
-                return !IsMultiplayerBattleContext;
+                return false;
             }
         }
 
@@ -174,26 +189,40 @@ namespace MDEN.Patches
         {
             private static bool Prefix()
             {
-                return !IsMultiplayerBattleContext || _canExitBattleResult;
+                return !IsMultiplayerBattleContext || BattleResultFlowManager.CanExitBattleResult;
             }
 
             private static void Postfix()
             {
                 if (!LobbyManager.IsInLobby)
                 {
-                    _multiplayerBattleActive = false;
                     BattleManager.Reset();
                     BattleHudController.Destroy();
                 }
             }
         }
 
+        private static void TryShowBattleResultByKeyboard()
+        {
+            if (!LobbyManager.IsInLobby) return;
+            if (BattleResultBannerDisplay.IsConsumingKeyboard) return;
+            if (BattleResultFlowManager.GetLastBattleResultSnapshot().Length == 0) return;
+            if (!Input.GetKeyDown(KeyCode.R)) return;
+
+            BattleResultBannerDisplay.ClearAll();
+            _ = BattleResultBannerDisplay.ShowAsync(GetBattleResultSnapshot());
+        }
+
         private static void HidePauseButton()
         {
-            var pauseButton = GameObject.Find("UI_2D/Standard/PnlBattle/PnlBattleUI/PnlBattleOthers/Up/BtnPause");
-            if (pauseButton != null)
+            if (_pauseButton == null)
             {
-                pauseButton.SetActive(false);
+                _pauseButton = GameObject.Find("UI_2D/Standard/PnlBattle/PnlBattleUI/PnlBattleOthers/Up/BtnPause");
+            }
+
+            if (_pauseButton != null)
+            {
+                _pauseButton.SetActive(false);
             }
         }
 
@@ -206,18 +235,7 @@ namespace MDEN.Patches
 
         public static void ApplyBattleHealthBarVisibility()
         {
-            var healthBar = GameObject.Find("UI_2D/Standard/PnlBattle/PnlBattleUI/PnlBattleOthers/Below");
-            if (healthBar == null)
-            {
-                var battleOthers = GameObject.Find("PnlBattleOthers");
-                var below = battleOthers == null ? null : battleOthers.transform.Find("Below");
-                healthBar = below == null ? null : below.gameObject;
-            }
-
-            if (healthBar != null)
-            {
-                healthBar.SetActive(!ModConfigManager.HideBattleHealthBar);
-            }
+            BattleHealthBarController.ApplyVisibility();
         }
 
         private static void HideFailRestartButton()
@@ -237,40 +255,64 @@ namespace MDEN.Patches
 
         private static async Task FinishBattleAndShowResultsAsync(bool alive)
         {
-            _canExitBattleResult = false;
-            _battleResultFlowPending = true;
+            BattleResultFlowManager.SetCanExitBattleResult(false);
+            BattleResultFlowManager.SetBattleResultFlowPending(true);
             BattleResultBannerDisplay.ClearAll();
+            BattleManager.MarkLocalBattleFinished(alive);
             MainThreadDispatcher.Enqueue(() => SetVictoryButtons(false));
-            await BattleManager.ReportBattleFinishedAsync(alive);
-            _lastBattleResultSnapshot = BattleManager.GetBattleDataSnapshot();
-            await WaitForLobbyBattleEndAsync();
+            BattleResultFlowManager.SetLastBattleResultSnapshot(BattleManager.GetBattleDataSnapshot());
+            _ = BattleResultBannerDisplay.ShowAsync(GetBattleResultSnapshot());
 
-            if (!LobbyManager.IsInLobby)
+            try
             {
-                _battleResultFlowPending = false;
-                return;
-            }
+                await BattleManager.ReportBattleFinishedAsync(alive);
+                BattleResultFlowManager.SetLastBattleResultSnapshot(BattleManager.GetBattleDataSnapshot());
+                if (!BattleResultBannerDisplay.IsVisible)
+                {
+                    _ = BattleResultBannerDisplay.ShowAsync(GetBattleResultSnapshot());
+                }
 
-            MainThreadDispatcher.Enqueue(RoomHudController.RebuildRoomCharacters);
-            BattleResultBannerDisplay.ClearAll();
-            await BattleResultBannerDisplay.ShowAsync(GetBattleResultSnapshot());
-            _canExitBattleResult = true;
-            _battleResultFlowPending = false;
-            MainThreadDispatcher.Enqueue(() => SetVictoryButtons(true));
+                await WaitForLobbyBattleEndAsync(alive);
+
+                if (LobbyManager.IsInLobby)
+                {
+                    MainThreadDispatcher.Enqueue(RoomHudController.RebuildRoomCharacters);
+                }
+            }
+            catch (System.Exception ex)
+            {
+                MDEN.Managers.ClientLogManager.Warning($"Finish battle result flow failed: {ex.Message}");
+            }
+            finally
+            {
+                BattleResultFlowManager.SetCanExitBattleResult(true);
+                BattleResultFlowManager.SetBattleResultFlowPending(false);
+                MainThreadDispatcher.Enqueue(() => SetVictoryButtons(true));
+            }
         }
 
-        private static async Task WaitForLobbyBattleEndAsync()
+        private static async Task WaitForLobbyBattleEndAsync(bool alive)
         {
+            var timeoutMs = alive ? VictoryBattleEndWaitTimeoutMs : FailedBattleEndWaitTimeoutMs;
+            var waitedMs = 0;
             while (LobbyManager.IsInLobby && LobbyManager.CurrentLobby?.IsPlaying == true)
             {
+                if (waitedMs >= timeoutMs)
+                {
+                    MDEN.Managers.ClientLogManager.Warning($"Timed out waiting for lobby battle end. waitedMs={waitedMs}, alive={alive}");
+                    return;
+                }
+
                 MainThreadDispatcher.Enqueue(() => SetVictoryButtons(false));
-                await Task.Delay(500);
+                BattleResultBannerDisplay.SuppressNativeMessages();
+                await Task.Delay(BattleEndPollIntervalMs);
+                waitedMs += BattleEndPollIntervalMs;
             }
         }
 
         private static void SetVictoryButtons(bool canContinue)
         {
-            var pnlVictory = GameObject.FindObjectOfType<PnlVictory>();
+            var pnlVictory = FindVictoryPanel();
             if (pnlVictory == null || pnlVictory.m_CurControls == null) return;
 
             var btnContinue = pnlVictory.m_CurControls.btnContinue;
@@ -307,16 +349,36 @@ namespace MDEN.Patches
             }
         }
 
+        private static PnlVictory FindVictoryPanel()
+        {
+            if (_pnlVictory != null && _pnlVictory.gameObject != null) return _pnlVictory;
+            if (Time.frameCount < _nextVictoryPanelLookupFrame) return null;
+
+            _nextVictoryPanelLookupFrame = Time.frameCount + 30;
+            using (PerfTrace.Measure("MDEN.BattleFlow.FindVictoryPanel"))
+            {
+                var obj = GameObject.Find("UI_2D/Standard/PnlVictory");
+                if (obj != null)
+                {
+                    _pnlVictory = obj.GetComponent<PnlVictory>();
+                    if (_pnlVictory != null) return _pnlVictory;
+                }
+
+                _pnlVictory = GameObject.FindObjectOfType<PnlVictory>();
+                return _pnlVictory;
+            }
+        }
+
         private static BattlePlayerEntry[] GetBattleResultSnapshot()
         {
             var current = BattleManager.GetBattleDataSnapshot();
             if (current != null && current.Length > 0)
             {
-                _lastBattleResultSnapshot = current;
+                BattleResultFlowManager.SetLastBattleResultSnapshot(current);
                 return current;
             }
 
-            return _lastBattleResultSnapshot ?? System.Array.Empty<BattlePlayerEntry>();
+            return BattleResultFlowManager.GetLastBattleResultSnapshot();
         }
     }
 }

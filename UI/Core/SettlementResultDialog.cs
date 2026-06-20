@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using System.Reflection;
 using MDEN.Managers;
 using MDEN.Protocol.Messages.Battle;
@@ -15,17 +16,20 @@ namespace MDEN.UI.Core
     public static class SettlementResultDialog
     {
         private const string RootName = "MDENSettlementResultDialog";
-        private const int SortingOrder = 32760;
+        private const int SortingOrder = 32767;
         private const float PanelWidth = 1120f;
         private const float PanelHeight = 760f;
         private const float SidePadding = 54f;
         private const float AwardCardWidth = 242f;
         private const float AwardCardHeight = 154f;
         private const float ChartViewportHeight = 290f;
+        private const float CloseSoundVolume = 1.35f;
 
         private static GameObject _root;
+        private static RectTransform _panelRoot;
         private static Font _cachedFont;
         private static Sprite _roundedSprite;
+        private static bool _closing;
 
         public static void Show(SettlementResultPush result)
         {
@@ -34,17 +38,20 @@ namespace MDEN.UI.Core
                 Destroy();
 
                 _root = CreateRoot();
-                var panel = CreatePanel(_root.transform);
-                if (panel == null)
+                try
                 {
-                    Destroy();
-                    return;
+                    var panel = CreatePanel(_root.transform);
+                    CreateHeader(panel);
+                    CreateAwardCards(panel, result);
+                    CreatePlayedCharts(panel, result);
+                    CreateCloseButton(panel);
                 }
-
-                CreateHeader(panel);
-                CreateAwardCards(panel, result);
-                CreatePlayedCharts(panel, result);
-                CreateCloseButton(panel);
+                catch (Exception ex)
+                {
+                    MelonLogger.Error($"Show settlement result overlay failed, fallback UI will be used: {ex}");
+                    ClearRootChildren();
+                    CreateFallback(result);
+                }
             }
             catch (Exception ex)
             {
@@ -59,6 +66,30 @@ namespace MDEN.UI.Core
 
             UnityEngine.Object.Destroy(_root);
             _root = null;
+            _panelRoot = null;
+            _closing = false;
+        }
+
+        private static void CloseWithSound()
+        {
+            if (_root == null || _closing) return;
+
+            _closing = true;
+            UiSoundManager.Play(UiSound.Yes, CloseSoundVolume);
+            Destroy();
+        }
+
+        private static void ClearRootChildren()
+        {
+            if (_root == null) return;
+
+            var transform = _root.transform;
+            for (var i = transform.childCount - 1; i >= 0; i--)
+            {
+                UnityEngine.Object.Destroy(transform.GetChild(i).gameObject);
+            }
+
+            _panelRoot = null;
         }
 
         private static GameObject CreateRoot()
@@ -94,20 +125,85 @@ namespace MDEN.UI.Core
             shadeRect.offsetMax = Vector2.zero;
 
             var shadeImage = shade.AddComponent<Image>();
-            shadeImage.color = new Color(0.05f, 0.02f, 0.08f, 0.66f);
+            shadeImage.color = new Color(0f, 0f, 0f, 0.62f);
             shadeImage.raycastTarget = true;
 
             var shadeButton = shade.AddComponent<Button>();
             shadeButton.targetGraphic = shadeImage;
             shadeButton.transition = Selectable.Transition.None;
-            shadeButton.onClick.AddListener((UnityAction)new Action(Destroy));
+            shadeButton.onClick.AddListener((UnityAction)new Action(CloseWithSound));
 
             return root;
         }
 
+        private static void CreateFallback(SettlementResultPush result)
+        {
+            var root = _root.transform;
+
+            var shade = new GameObject("FallbackShade");
+            shade.transform.SetParent(root, false);
+            var shadeRect = shade.AddComponent<RectTransform>();
+            shadeRect.anchorMin = Vector2.zero;
+            shadeRect.anchorMax = Vector2.one;
+            shadeRect.offsetMin = Vector2.zero;
+            shadeRect.offsetMax = Vector2.zero;
+
+            var shadeImage = shade.AddComponent<Image>();
+            shadeImage.color = new Color(0f, 0f, 0f, 0.68f);
+            shadeImage.raycastTarget = true;
+
+            var shadeButton = shade.AddComponent<Button>();
+            shadeButton.targetGraphic = shadeImage;
+            shadeButton.transition = Selectable.Transition.None;
+            shadeButton.onClick.AddListener((UnityAction)new Action(CloseWithSound));
+
+            var panel = new GameObject("FallbackPanel");
+            panel.transform.SetParent(root, false);
+            var panelRect = panel.AddComponent<RectTransform>();
+            panelRect.anchorMin = new Vector2(0.5f, 0.5f);
+            panelRect.anchorMax = new Vector2(0.5f, 0.5f);
+            panelRect.pivot = new Vector2(0.5f, 0.5f);
+            panelRect.sizeDelta = new Vector2(960f, 660f);
+            panelRect.anchoredPosition = Vector2.zero;
+
+            var panelImage = panel.AddComponent<Image>();
+            panelImage.color = new Color(0.42f, 0.13f, 0.50f, 0.92f);
+            panelImage.raycastTarget = true;
+
+            var title = CreateText(panelRect, "FallbackTitle", "结算", 46, TextAnchor.MiddleCenter);
+            title.color = new Color(1f, 0.86f, 1f, 1f);
+            title.fontStyle = FontStyle.Bold;
+            var titleRect = title.rectTransform;
+            titleRect.anchorMin = new Vector2(0f, 1f);
+            titleRect.anchorMax = new Vector2(1f, 1f);
+            titleRect.pivot = new Vector2(0.5f, 1f);
+            titleRect.offsetMin = new Vector2(40f, -88f);
+            titleRect.offsetMax = new Vector2(-40f, -26f);
+
+            var content = CreateText(panelRect, "FallbackContent", BuildFallbackContent(result), 24, TextAnchor.UpperLeft);
+            content.color = Color.white;
+            content.lineSpacing = 1.18f;
+            var contentRect = content.rectTransform;
+            contentRect.anchorMin = new Vector2(0f, 0f);
+            contentRect.anchorMax = new Vector2(1f, 1f);
+            contentRect.offsetMin = new Vector2(56f, 112f);
+            contentRect.offsetMax = new Vector2(-56f, -112f);
+
+            CreateCloseButton(panelRect);
+        }
+
         private static RectTransform CreatePanel(Transform root)
         {
-            var shadow = CreateImage(root, "PanelShadow", new Color(0.05f, 0f, 0.10f, 0.40f));
+            var panelRoot = new GameObject("PanelRoot");
+            panelRoot.transform.SetParent(root, false);
+            _panelRoot = panelRoot.AddComponent<RectTransform>();
+            _panelRoot.anchorMin = new Vector2(0.5f, 0.5f);
+            _panelRoot.anchorMax = new Vector2(0.5f, 0.5f);
+            _panelRoot.pivot = new Vector2(0.5f, 0.5f);
+            _panelRoot.sizeDelta = new Vector2(PanelWidth + 36f, PanelHeight + 36f);
+            _panelRoot.anchoredPosition = Vector2.zero;
+
+            var shadow = CreateImage(_panelRoot, "PanelShadow", new Color(0.05f, 0f, 0.10f, 0.40f));
             shadow.anchorMin = new Vector2(0.5f, 0.5f);
             shadow.anchorMax = new Vector2(0.5f, 0.5f);
             shadow.pivot = new Vector2(0.5f, 0.5f);
@@ -115,7 +211,7 @@ namespace MDEN.UI.Core
             shadow.anchoredPosition = new Vector2(0f, -10f);
 
             var panel = new GameObject("Panel");
-            panel.transform.SetParent(root, false);
+            panel.transform.SetParent(_panelRoot, false);
             var panelRect = panel.AddComponent<RectTransform>();
             panelRect.anchorMin = new Vector2(0.5f, 0.5f);
             panelRect.anchorMax = new Vector2(0.5f, 0.5f);
@@ -360,7 +456,7 @@ namespace MDEN.UI.Core
                 colorMultiplier = 1f,
                 fadeDuration = 0.08f
             };
-            button.onClick.AddListener((UnityAction)new Action(Destroy));
+            button.onClick.AddListener((UnityAction)new Action(CloseWithSound));
 
             var label = CreateText(rect, "Label", "确认", 27, TextAnchor.MiddleCenter);
             label.color = Color.white;
@@ -477,6 +573,17 @@ namespace MDEN.UI.Core
             }
 
             return string.Join("\n", lines);
+        }
+
+        private static string BuildFallbackContent(SettlementResultPush result)
+        {
+            return $"{ColorLabel("龙币", "ffd700ff")}：{FormatNames(result?.DragonCoinUids, result)}\n" +
+                   $"{ColorLabel("最能连之人", Constants.ColorBlue)}：{FormatNames(result?.ComboUids, result)}\n" +
+                   $"{ColorLabel("P佬", Constants.ColorPink)}：{FormatNames(result?.PerfectUids, result)}\n" +
+                   $"{ColorLabel("真·梦游少女", "ff9f1aff")}：{FormatNames(result?.SleepwalkUids, result)}\n\n" +
+                   $"{ColorLabel("本次游玩时长", Constants.ColorCyan)}：{ColorLabel(GetTotalDurationText(result?.PlayedCharts), "ffffffff")}\n" +
+                   $"{ColorLabel("游玩曲目", Constants.ColorBlue)}：\n" +
+                   BuildChartList(result?.PlayedCharts);
         }
 
         private static float? GetDurationSeconds(SettlementChartEntry chart)
@@ -778,5 +885,6 @@ namespace MDEN.UI.Core
             if (string.IsNullOrWhiteSpace(color)) return "ffffffff";
             return color.Trim().TrimStart('#');
         }
+
     }
 }

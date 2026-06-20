@@ -309,6 +309,11 @@ namespace MDEN.UI.Displays
         private async void OnReadyClicked()
         {
             if (_busy || LobbyManager.CurrentLobby?.IsPlaying == true) return;
+            if (CustomAlbumsWindowGuard.CloseIfOpen("ready"))
+            {
+                MainThreadDispatcher.Enqueue(() => ShowText.ShowInfo("已关闭自制谱窗口，请重新准备"));
+                return;
+            }
 
             _busy = true;
             RefreshButtonStates(LobbyManager.CurrentLobby);

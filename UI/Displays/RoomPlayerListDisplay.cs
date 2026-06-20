@@ -12,9 +12,9 @@ namespace MDEN.UI.Displays
     public sealed class RoomPlayerListDisplay : LobbyDisplayBase
     {
         protected override string FrameParentPath => "UI/Standerd/PnlNavigation";
-        protected override Vector2 AnchorPosition => new Vector2(-25f, -90f);
+        protected override Vector2 AnchorPosition => new Vector2(-65f, -90f);
         protected override Vector2 Pivot => new Vector2(1f, 1f);
-        protected override TextAnchor TextAnchor => TextAnchor.UpperRight;
+        protected override TextAnchor TextAnchor => TextAnchor.UpperLeft;
         protected override int FontSize => 26;
         protected override float EntryWidth => 460f;
         private const string NotReadyColor = "9a8b96ff";

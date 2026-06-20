@@ -135,7 +135,7 @@ namespace MDEN.UI.Windows
 
                 _btnSettlement = new ForumObject(
                     new LocalString("结算功能"),
-                    new LocalString($"当前: {Highlight(lobby.SettlementEnabled ? "开启" : "关闭", Constants.ColorYellow)}\n点击{Highlight(lobby.SettlementEnabled ? "关闭" : "开启", Constants.ColorCyan)}五首一结算"));
+                    new LocalString($"当前: {Highlight(lobby.SettlementEnabled ? "开启" : "关闭", Constants.ColorYellow)}\n点击{Highlight(lobby.SettlementEnabled ? "关闭" : "开启", Constants.ColorCyan)}每五首结算"));
                 _btnSettlement.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("OptionsPanel.png")?.texture;
                 _window.ForumObjects.Add(_btnSettlement);
             }

@@ -6,6 +6,9 @@ using Il2CppAssets.Scripts.PeroTools.Commons;
 using Il2CppAssets.Scripts.PeroTools.Managers;
 using Il2CppAssets.Scripts.UI;
 using Il2CppAssets.Scripts.UI.Controls;
+using Il2CppAssets.Scripts.UI.Panels;
+using Il2CppAssets.Scripts.UI.Panels.PnlRole;
+using Il2CppInterop.Runtime.InteropTypes.Arrays;
 using Il2CppPeroTools2.Resources;
 using MDEN.Managers;
 using MDEN.Protocol.Enums;
@@ -16,6 +19,7 @@ using MelonLoader;
 using UnityEngine;
 using UnityEngine.Events;
 using UnityEngine.UI;
+using Il2CppObjectList = Il2CppSystem.Collections.Generic.List<UnityEngine.Object>;
 
 namespace MDEN.UI.Core
 {
@@ -84,8 +88,12 @@ namespace MDEN.UI.Core
         private static Vector3 _nativePosition;
         private static Vector3 _nativeScale;
         private static bool _created;
-        private static Text _fontTemplate;
+        private static PnlRole _pnlRole;
+        private static SelectableFancyPanel _girlFancyPanel;
+        private static bool _rolePanelCellsPrepared;
         private static readonly HashSet<string> WarningKeys = new HashSet<string>();
+        private static readonly HashSet<string> PendingCharacterPreloads = new HashSet<string>();
+        private static readonly HashSet<string> CompletedCharacterPreloads = new HashSet<string>();
         private static readonly Dictionary<string, int> TalkBubbleGenerations = new Dictionary<string, int>();
 
         public static bool IsCreated => _created;
@@ -188,7 +196,11 @@ namespace MDEN.UI.Core
             DestroyGeneratedObjects();
             _nativeMuseShow = null;
             _nativeElfinShow = null;
-            _fontTemplate = null;
+            _pnlRole = null;
+            _girlFancyPanel = null;
+            _rolePanelCellsPrepared = false;
+            PendingCharacterPreloads.Clear();
+            CompletedCharacterPreloads.Clear();
             TalkBubbleGenerations.Clear();
             WarningKeys.Clear();
             _created = false;
@@ -230,6 +242,7 @@ namespace MDEN.UI.Core
             _currentPage = 0;
             _currentLobbyId = -1;
             _created = false;
+            PendingCharacterPreloads.Clear();
             DestroyOwnedObjectsByName();
         }
 
@@ -242,7 +255,12 @@ namespace MDEN.UI.Core
 
         private static bool EnsureCreated()
         {
-            if (_created && _nativeMuseShow != null && _localLabels != null && !_localLabels.IsDestroyed)
+            if (_created &&
+                _nativeMuseShow != null &&
+                HasUsableCharacterRoot(_nativeMuseShow) &&
+                _localLabels != null &&
+                !_localLabels.IsDestroyed &&
+                OtherSlots.All(slot => slot.IsBound && slot.HasPrefabTransform))
             {
                 return true;
             }
@@ -267,6 +285,7 @@ namespace MDEN.UI.Core
                 var root = UnityEngine.Object.Instantiate(_nativeMuseShow, _nativeMuseShow.transform.parent);
                 root.name = $"MDENRoomCharacterOther{i}";
                 PrepareMuseShow(root, false);
+                InitializeCharacterHost(root);
                 root.SetActive(false);
                 OtherSlots[i].Bind(
                     root,
@@ -309,9 +328,10 @@ namespace MDEN.UI.Core
             var prefabTransform = slot.PrefabTransform;
             if (prefabTransform == null)
             {
-                WarnOnce("prefab-transform-missing", "Character prefab transform is missing.");
+                WarnOnce($"prefab-transform-missing-{slot.DebugName}", $"Character prefab transform is missing. slot={slot.DebugName}, children={DescribeChildren(slot.Root)}");
                 return false;
             }
+            prefabTransform.gameObject.SetActive(true);
 
             var charInfo = GetCharacterInfo(girlIndex);
             var assetName = charInfo?.mainShow;
@@ -321,21 +341,26 @@ namespace MDEN.UI.Core
                 return false;
             }
 
-            var sourcePrefab = LoadCharacterPrefab(assetName);
-            if (sourcePrefab == null)
+            ClearCharacterPrefab(slot.Root);
+            var sourceKind = "role-panel";
+            var newShow = InstantiateRolePanelCharacter(prefabTransform, charInfo, girlIndex, slot.SortingOrder, assetName);
+            if (newShow == null)
             {
-                WarnOnce($"prefab-not-loaded-{assetName}", $"Character prefab is not loaded. asset={assetName}");
-                return false;
+                sourceKind = "resource";
+                var sourcePrefab = LoadCharacterPrefab(assetName);
+                if (sourcePrefab == null)
+                {
+                    RequestCharacterPrefabPreload(assetName, slot.DebugName, girlIndex, refreshAfterLoad: true);
+                    return false;
+                }
+
+                ClearCharacterPrefab(slot.Root);
+                newShow = InstantiateCharacterPrefab(sourcePrefab, prefabTransform, girlIndex, slot.SortingOrder, assetName, sourceKind);
             }
 
-            ClearCharacterPrefab(slot.Root);
-            var newShow = UnityEngine.Object.Instantiate(sourcePrefab, prefabTransform);
-            NormalizeCharacterPrefab(newShow, girlIndex, slot.SortingOrder);
-            RemoveSpecialCharacterExtras(newShow, girlIndex);
-            if (!HasVisibleCharacterContent(newShow))
+            if (newShow == null)
             {
-                WarnOnce($"visible-content-missing-{girlIndex}", $"Character has no visible content after load. girlIndex={girlIndex}");
-                DestroyObject(newShow);
+                RequestCharacterPrefabPreload(assetName, slot.DebugName, girlIndex, refreshAfterLoad: false);
                 return false;
             }
 
@@ -347,8 +372,174 @@ namespace MDEN.UI.Core
             }
 
             slot.SetCharacter(girlIndex, newShow);
-            MDEN.Managers.ClientLogManager.Msg($"Room character loaded: girlIndex={girlIndex}, asset={assetName}");
             return true;
+        }
+
+        private static GameObject InstantiateRolePanelCharacter(
+            Transform prefabTransform,
+            Il2CppAssets.Scripts.Database.CharacterInfo charInfo,
+            int girlIndex,
+            int sortingOrder,
+            string assetName)
+        {
+            var sourcePrefab = LoadCharacterApplyPrefab(girlIndex, charInfo);
+            return sourcePrefab == null
+                ? null
+                : InstantiateCharacterPrefab(sourcePrefab, prefabTransform, girlIndex, sortingOrder, assetName, "role-panel");
+        }
+
+        private static GameObject InstantiateCharacterPrefab(
+            GameObject sourcePrefab,
+            Transform prefabTransform,
+            int girlIndex,
+            int sortingOrder,
+            string assetName,
+            string sourceKind)
+        {
+            if (sourcePrefab == null || prefabTransform == null) return null;
+
+            var newShow = UnityEngine.Object.Instantiate(sourcePrefab, prefabTransform);
+            NormalizeCharacterPrefab(newShow, girlIndex, sortingOrder);
+            RemoveSpecialCharacterExtras(newShow, girlIndex);
+            if (!HasVisibleCharacterContent(newShow))
+            {
+                ActivateHierarchy(newShow.transform);
+                NormalizeCharacterPrefab(newShow, girlIndex, sortingOrder);
+                if (!HasVisibleCharacterContent(newShow))
+                {
+                    WarnOnce(
+                        $"visible-content-missing-{sourceKind}-{girlIndex}",
+                        $"Character has no visible content after load. source={sourceKind}, girlIndex={girlIndex}, asset={assetName}, children={DescribeChildren(newShow)}");
+                    DestroyObject(newShow);
+                    return null;
+                }
+            }
+
+            return newShow;
+        }
+
+        private static GameObject LoadCharacterApplyPrefab(int girlIndex, Il2CppAssets.Scripts.Database.CharacterInfo charInfo)
+        {
+            if (charInfo == null) return null;
+
+            try
+            {
+                if (!EnsureRolePanelReady(girlIndex, charInfo))
+                {
+                    WarnOnce($"role-panel-not-ready-{girlIndex}", $"Role panel is not ready for character fallback. girlIndex={girlIndex}");
+                    return null;
+                }
+
+                var orderIndex = charInfo.order - 1;
+                var subControl = _girlFancyPanel?.GetCellComponent<PnlRoleSubControl>(orderIndex);
+                if (subControl == null)
+                {
+                    WarnOnce($"role-panel-cell-missing-{girlIndex}", $"Role panel cell is missing. girlIndex={girlIndex}, orderIndex={orderIndex}");
+                    return null;
+                }
+
+                if (!subControl.m_Init) subControl.Init();
+
+                var charApply = subControl.characterApply;
+                if (charApply == null || charApply.gameObject == null)
+                {
+                    WarnOnce($"role-panel-apply-missing-{girlIndex}", $"Role panel characterApply is missing. girlIndex={girlIndex}, orderIndex={orderIndex}");
+                    return null;
+                }
+
+                return charApply.gameObject;
+            }
+            catch (Exception ex)
+            {
+                ResetRolePanelCache();
+                WarnOnce($"role-panel-fallback-error-{girlIndex}", $"Role panel character fallback failed. girlIndex={girlIndex}, error={ex.Message}");
+                return null;
+            }
+        }
+
+        private static bool EnsureRolePanelReady(int girlIndex, Il2CppAssets.Scripts.Database.CharacterInfo charInfo)
+        {
+            if (_pnlRole != null && !IsLiveSceneComponent(_pnlRole))
+            {
+                ResetRolePanelCache();
+            }
+
+            if (_pnlRole == null)
+            {
+                _pnlRole = FindRolePanel();
+            }
+
+            if (_pnlRole == null)
+            {
+                WarnOnce(
+                    $"role-panel-not-found-{girlIndex}",
+                    $"role panel fallback unavailable: PnlRole not found. girlIndex={girlIndex}");
+                return false;
+            }
+
+            if (!_pnlRole.m_IsInit)
+            {
+                _pnlRole.Init();
+            }
+
+            _girlFancyPanel = _pnlRole.fancyPanel;
+            if (_girlFancyPanel == null)
+            {
+                WarnOnce(
+                    $"role-panel-fancy-missing-{girlIndex}",
+                    $"role panel fallback unavailable: fancyPanel missing. girlIndex={girlIndex}");
+                return false;
+            }
+
+            var scrollView = _girlFancyPanel.m_FancyScrollView;
+            if (scrollView != null)
+            {
+                if (!_rolePanelCellsPrepared)
+                {
+                    var itemCount = Math.Max(0, scrollView.itemCount);
+                    for (var i = 0; i < itemCount; i++)
+                    {
+                        scrollView.ScrollToDataIndex(i, 0, true);
+                    }
+
+                    _rolePanelCellsPrepared = true;
+                }
+
+                var orderIndex = charInfo.order - 1;
+                if (orderIndex >= 0)
+                {
+                    scrollView.ScrollToDataIndex(orderIndex, 0, true);
+                }
+            }
+
+            return true;
+        }
+
+        private static void ResetRolePanelCache()
+        {
+            _pnlRole = null;
+            _girlFancyPanel = null;
+            _rolePanelCellsPrepared = false;
+        }
+
+        private static PnlRole FindRolePanel()
+        {
+            var fromPath = FindByPathIncludingInactive("UI/Standerd/PnlMenu/Panels/PnlRole")?.GetComponent<PnlRole>();
+            if (fromPath != null) return fromPath;
+
+            var panels = UnityEngine.Resources.FindObjectsOfTypeAll<PnlRole>();
+            if (panels == null) return null;
+
+            foreach (var panel in panels)
+            {
+                if (panel == null) continue;
+                var obj = GetComponentGameObject(panel);
+                if (obj == null) continue;
+                if (!obj.scene.IsValid() || !obj.scene.isLoaded) continue;
+                return panel;
+            }
+
+            return null;
         }
 
         private static Il2CppAssets.Scripts.Database.CharacterInfo GetCharacterInfo(int girlIndex)
@@ -380,6 +571,73 @@ namespace MDEN.UI.Core
             }
         }
 
+        private static void RequestCharacterPrefabPreload(string assetName, string slotName, int girlIndex, bool refreshAfterLoad)
+        {
+            if (string.IsNullOrEmpty(assetName)) return;
+            if (CompletedCharacterPreloads.Contains(assetName))
+            {
+                WarnOnce(
+                    $"prefab-unusable-after-preload-{assetName}",
+                    $"Character prefab is still unusable after preload. slot={slotName}, girlIndex={girlIndex}, asset={assetName}");
+                return;
+            }
+
+            if (!PendingCharacterPreloads.Add(assetName))
+            {
+                return;
+            }
+
+            try
+            {
+                var manager = ResourcesManager.instance;
+                if (manager == null)
+                {
+                    PendingCharacterPreloads.Remove(assetName);
+                    return;
+                }
+
+                Il2CppSystem.Action<Il2CppObjectList> callback = (Action<Il2CppObjectList>)(objects =>
+                {
+                    PendingCharacterPreloads.Remove(assetName);
+                    CompletedCharacterPreloads.Add(assetName);
+                    if (refreshAfterLoad)
+                    {
+                        MainThreadDispatcher.Enqueue(RoomHudController.RequestRefresh);
+                    }
+                });
+                manager.PreloadAssets(new Il2CppStringArray(new[] { assetName }), callback);
+                ScheduleCharacterPreloadTimeout(assetName, 60, refreshAfterLoad);
+            }
+            catch (Exception ex)
+            {
+                PendingCharacterPreloads.Remove(assetName);
+                MelonLogger.Warning($"[MDEN.RoomCharacter] preload failed asset={assetName}, error={ex.Message}");
+            }
+        }
+
+        private static void ScheduleCharacterPreloadTimeout(string assetName, int framesRemaining, bool refreshAfterLoad)
+        {
+            if (string.IsNullOrEmpty(assetName)) return;
+
+            MainThreadDispatcher.Enqueue(() =>
+            {
+                if (framesRemaining > 0)
+                {
+                    ScheduleCharacterPreloadTimeout(assetName, framesRemaining - 1, refreshAfterLoad);
+                    return;
+                }
+
+                if (PendingCharacterPreloads.Remove(assetName))
+                {
+                    CompletedCharacterPreloads.Add(assetName);
+                    if (refreshAfterLoad)
+                    {
+                        RoomHudController.RequestRefresh();
+                    }
+                }
+            });
+        }
+
         private static void PrepareMuseShow(GameObject museShow, bool local)
         {
             if (museShow == null) return;
@@ -398,6 +656,19 @@ namespace MDEN.UI.Core
             else
             {
                 PruneDuplicateCharacterPrefabs(museShow);
+            }
+        }
+
+        private static void InitializeCharacterHost(GameObject museShow)
+        {
+            var prefabTransform = FindCharacterPrefabTransform(museShow);
+            if (prefabTransform == null) return;
+
+            prefabTransform.gameObject.SetActive(true);
+            var museComponent = prefabTransform.gameObject.GetComponent<MuseShow>();
+            if (museComponent != null)
+            {
+                museComponent.m_MuseShow = museShow;
             }
         }
 
@@ -776,7 +1047,7 @@ namespace MDEN.UI.Core
 
         private static void ClearCharacterPrefab(GameObject museShow)
         {
-            var prefabTransform = FindChild(museShow, "ShowLocalization/SpinePerfab_other");
+            var prefabTransform = FindCharacterPrefabTransform(museShow);
             if (prefabTransform == null) return;
 
             for (var i = prefabTransform.childCount - 1; i >= 0; i--)
@@ -790,7 +1061,7 @@ namespace MDEN.UI.Core
 
         private static void PruneDuplicateCharacterPrefabs(GameObject museShow)
         {
-            var prefabTransform = FindChild(museShow, "ShowLocalization/SpinePerfab_other");
+            var prefabTransform = FindCharacterPrefabTransform(museShow);
             if (prefabTransform == null || prefabTransform.childCount <= 1) return;
 
             GameObject keptObject = null;
@@ -1031,7 +1302,6 @@ namespace MDEN.UI.Core
             foreach (var player in GetPlayers(lobby))
             {
                 if (IsSameUid(player.Uid, currentUid)) continue;
-                if (player.Status == (byte)PlayerStatus.Offline) continue;
                 yield return player;
             }
         }
@@ -1086,7 +1356,7 @@ namespace MDEN.UI.Core
                     ChatColor = IsSameUid(uid, PlayerManager.CurrentUid) ? PlayerManager.CurrentProfile?.ChatColor : null,
                     GirlIndex = GetGirlIndex(uid, character),
                     ElfinIndex = GetElfinIndex(uid, character),
-                    Status = (byte)(IsSameUid(uid, PlayerManager.CurrentUid) ? PlayerStatus.InLobby : PlayerStatus.Offline),
+                    Status = (byte)PlayerStatus.InLobby,
                     IsHost = IsSameUid(uid, lobby.HostUid)
                 };
             }
@@ -1301,6 +1571,40 @@ namespace MDEN.UI.Core
             return null;
         }
 
+        private static Transform FindCharacterPrefabTransform(GameObject root)
+        {
+            return FindChild(root, "ShowLocalization/SpinePerfab_other") ??
+                   FindChildByName(root?.transform, "SpinePerfab_other")?.transform;
+        }
+
+        private static bool HasUsableCharacterRoot(GameObject root)
+        {
+            var prefabTransform = FindCharacterPrefabTransform(root);
+            return prefabTransform != null &&
+                   prefabTransform.gameObject != null &&
+                   prefabTransform.gameObject.activeInHierarchy;
+        }
+
+        private static string DescribeChildren(GameObject root)
+        {
+            if (root == null) return "null";
+
+            var names = new List<string>();
+            var limit = Mathf.Min(root.transform.childCount, 16);
+            for (var i = 0; i < limit; i++)
+            {
+                var child = root.transform.GetChild(i);
+                if (child != null) names.Add(child.name);
+            }
+
+            if (root.transform.childCount > limit)
+            {
+                names.Add("...");
+            }
+
+            return names.Count == 0 ? "no children" : string.Join(", ", names);
+        }
+
         private static string DescribeHomeChildren()
         {
             var home = FindByPathIncludingInactive("UI/Standerd/PnlHome") ?? FindSceneObjectByName("PnlHome");
@@ -1325,53 +1629,13 @@ namespace MDEN.UI.Core
         {
             if (WarningKeys.Add(key))
             {
-                MDEN.Managers.ClientLogManager.Warning(message);
+                MelonLogger.Warning($"[MDEN.RoomCharacter] {message}");
             }
         }
 
         private static void ApplyGameFont(Text text)
         {
-            if (text == null) return;
-
-            var template = FindNativeFontTemplate();
-            if (template != null && template.font != null)
-            {
-                text.font = template.font;
-                text.material = template.material;
-                return;
-            }
-
-            text.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
-        }
-
-        private static Text FindNativeFontTemplate()
-        {
-            if (_fontTemplate != null && _fontTemplate.font != null)
-            {
-                return _fontTemplate;
-            }
-
-            Text fallback = null;
-            var texts = UnityEngine.Resources.FindObjectsOfTypeAll<Text>();
-            if (texts != null)
-            {
-                for (var i = 0; i < texts.Length; i++)
-                {
-                    var text = texts[i];
-                    if (text == null || text.font == null) continue;
-                    fallback ??= text;
-
-                    var fontName = text.font.name ?? string.Empty;
-                    if (!fontName.Contains("Arial"))
-                    {
-                        _fontTemplate = text;
-                        return _fontTemplate;
-                    }
-                }
-            }
-
-            _fontTemplate = fallback;
-            return _fontTemplate;
+            NativeFontCache.ApplyTo(text);
         }
 
         private static void DestroyObject(GameObject obj)
@@ -1419,6 +1683,12 @@ namespace MDEN.UI.Core
             }
         }
 
+        private static bool IsLiveSceneComponent(Component component)
+        {
+            var obj = GetComponentGameObject(component);
+            return obj != null && obj.scene.IsValid() && obj.scene.isLoaded;
+        }
+
         private static void DestroyOwnedObjectsByName()
         {
             foreach (var objectName in OwnedObjectNames)
@@ -1450,8 +1720,11 @@ namespace MDEN.UI.Core
             public SlotLabels Labels { get; private set; }
             public int SortingOrder { get; private set; }
             public bool IsActive => Root != null && Root.activeSelf;
+            public bool IsBound => Root != null && Labels != null && !Labels.IsDestroyed;
             public bool HasCharacterPrefab => _currentShow != null && _currentShow.activeSelf && HasVisibleCharacterContent(_currentShow);
-            public Transform PrefabTransform => FindChild(Root, "ShowLocalization/SpinePerfab_other");
+            public bool HasPrefabTransform => PrefabTransform != null;
+            public string DebugName => Root == null ? "null" : Root.name;
+            public Transform PrefabTransform => FindCharacterPrefabTransform(Root);
 
             public void Bind(GameObject root, SlotLabels labels)
             {

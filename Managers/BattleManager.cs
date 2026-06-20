@@ -17,8 +17,11 @@ namespace MDEN.Managers
     {
         private const int BattleUpdateIntervalMs = 500;
         private static readonly object BattleDataLock = new();
+        private static readonly object BattleDataDispatchLock = new();
         private static readonly Dictionary<string, BattlePlayerEntry> PlayerBattleData = new();
         private static CancellationTokenSource _syncCts;
+        private static BattlePlayerEntry[] _pendingBattleDataDispatch = Array.Empty<BattlePlayerEntry>();
+        private static bool _battleDataDispatchQueued;
         private static string _activeBattleId;
         private static TaskStageTarget _taskStageTarget;
         private static BattleRoleAttributeComponent _battleRoleAttributeComponent;
@@ -26,9 +29,12 @@ namespace MDEN.Managers
         private static bool _finishReported;
         private static bool _forcedDead;
         private static bool _accuracyInitialized;
+        private static bool _multiplayerBattleActive;
         private static DateTime _battleStartedUtc;
 
         public static bool Synchronizing => _synchronizing;
+        public static bool IsActiveMultiplayerBattle =>
+            LobbyManager.IsInLobby && (_multiplayerBattleActive || LobbyManager.CurrentLobby?.IsPlaying == true);
         public static event Action<BattlePlayerEntry[]> BattleDataChanged;
 
         public static void Init()
@@ -48,6 +54,7 @@ namespace MDEN.Managers
 
         public static void PrepareForNewBattle()
         {
+            MarkMultiplayerBattleStarting();
             _battleStartedUtc = DateTime.UtcNow;
             _activeBattleId = LobbyManager.CurrentLobby?.CurrentBattleId;
 
@@ -61,7 +68,7 @@ namespace MDEN.Managers
 
         public static async Task SyncStartAsync()
         {
-            if (_synchronizing || !LobbyManager.IsInLobby) return;
+            if (_synchronizing || !IsActiveMultiplayerBattle) return;
 
             _finishReported = false;
             _forcedDead = false;
@@ -86,7 +93,7 @@ namespace MDEN.Managers
             finally
             {
                 _synchronizing = false;
-                if (LobbyManager.IsInLobby)
+                if (IsActiveMultiplayerBattle)
                 {
                     await SendCurrentAsync();
                 }
@@ -122,6 +129,51 @@ namespace MDEN.Managers
             }
         }
 
+        public static void MarkLocalBattleFinished(bool alive)
+        {
+            _forcedDead = !alive;
+
+            var uid = PlayerManager.CurrentUid;
+            if (string.IsNullOrWhiteSpace(uid)) return;
+
+            try
+            {
+                if (EnsureBattleComponents())
+                {
+                    var notify = CreateCurrentNotify();
+                    if (notify != null)
+                    {
+                        ApplyLocalBattleData(notify);
+                        return;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MDEN.Managers.ClientLogManager.Warning($"Failed to mark local battle finish state: {ex.Message}");
+            }
+
+            lock (BattleDataLock)
+            {
+                if (PlayerBattleData.TryGetValue(uid, out var existing))
+                {
+                    existing.Alive = alive;
+                    existing.FC = alive && existing.FC;
+                }
+                else
+                {
+                    PlayerBattleData[uid] = new BattlePlayerEntry
+                    {
+                        Uid = uid,
+                        Alive = alive,
+                        FC = false
+                    };
+                }
+            }
+
+            NotifyBattleDataChanged(GetBattleDataSnapshot());
+        }
+
         public static void ReportBattleStartFailed(int lobbyId, string battleId, string entry, string reasonCode, string reason)
         {
             if (!ConnectionManager.CanSendRequests || string.IsNullOrWhiteSpace(battleId)) return;
@@ -149,9 +201,20 @@ namespace MDEN.Managers
             }
         }
 
+        public static void MarkMultiplayerBattleStarting()
+        {
+            _multiplayerBattleActive = true;
+        }
+
+        public static void MarkMultiplayerBattleEnded()
+        {
+            _multiplayerBattleActive = false;
+        }
+
         public static void Reset()
         {
             StopSyncLoop();
+            MarkMultiplayerBattleEnded();
             _finishReported = false;
             _forcedDead = false;
             _activeBattleId = null;
@@ -170,7 +233,7 @@ namespace MDEN.Managers
 
         private static async Task SyncLoopAsync(CancellationToken cancellationToken)
         {
-            while (!cancellationToken.IsCancellationRequested && LobbyManager.IsInLobby)
+            while (!cancellationToken.IsCancellationRequested && IsActiveMultiplayerBattle)
             {
                 await SendCurrentAsync();
                 await Task.Delay(BattleUpdateIntervalMs, cancellationToken);
@@ -237,28 +300,31 @@ namespace MDEN.Managers
 
         private static void ApplyLocalBattleData(BattleDataNotifyMsg notify)
         {
-            var uid = PlayerManager.CurrentUid;
-            if (string.IsNullOrWhiteSpace(uid)) return;
-
-            lock (BattleDataLock)
+            using (PerfTrace.Measure("MDEN.BattleManager.ApplyLocalBattleData"))
             {
-                PlayerBattleData[uid] = new BattlePlayerEntry
-                {
-                    Uid = uid,
-                    Score = notify.Score,
-                    Accuracy = notify.Accuracy,
-                    Perfects = notify.Perfects,
-                    Greats = notify.Greats,
-                    Earlies = notify.Earlies,
-                    Lates = notify.Lates,
-                    Misses = notify.Misses,
-                    FC = notify.FC,
-                    Alive = notify.Alive,
-                    PingMS = 0
-                };
-            }
+                var uid = PlayerManager.CurrentUid;
+                if (string.IsNullOrWhiteSpace(uid)) return;
 
-            NotifyBattleDataChanged(GetBattleDataSnapshot());
+                lock (BattleDataLock)
+                {
+                    PlayerBattleData[uid] = new BattlePlayerEntry
+                    {
+                        Uid = uid,
+                        Score = notify.Score,
+                        Accuracy = notify.Accuracy,
+                        Perfects = notify.Perfects,
+                        Greats = notify.Greats,
+                        Earlies = notify.Earlies,
+                        Lates = notify.Lates,
+                        Misses = notify.Misses,
+                        FC = notify.FC,
+                        Alive = notify.Alive,
+                        PingMS = 0
+                    };
+                }
+
+                NotifyBattleDataChanged(GetBattleDataSnapshot());
+            }
         }
 
         private static Task<BattleDataNotifyMsg> CreateCurrentNotifyAsync()
@@ -280,24 +346,27 @@ namespace MDEN.Managers
 
         private static BattleDataNotifyMsg CreateCurrentNotify()
         {
-            EnsureBattleComponents();
-            if (_taskStageTarget == null) return null;
-
-            var alive = !_forcedDead && (_battleRoleAttributeComponent == null || !_battleRoleAttributeComponent.IsDead());
-
-            return new BattleDataNotifyMsg
+            using (PerfTrace.Measure("MDEN.BattleManager.CreateCurrentNotify"))
             {
-                BattleId = GetCurrentBattleId(),
-                Score = (uint)_taskStageTarget.GetScore(),
-                Accuracy = AccuracyManager.GetCalculatedAccuracy(),
-                Perfects = (ushort)_taskStageTarget.m_PerfectResult,
-                Greats = (ushort)_taskStageTarget.m_GreatResult,
-                Earlies = (ushort)(_battleRoleAttributeComponent?.early ?? 0),
-                Lates = (ushort)(_battleRoleAttributeComponent?.late ?? 0),
-                Misses = (ushort)_taskStageTarget.GetComboMiss(),
-                FC = _taskStageTarget.IsFullCombo(),
-                Alive = alive
-            };
+                EnsureBattleComponents();
+                if (_taskStageTarget == null) return null;
+
+                var alive = !_forcedDead && (_battleRoleAttributeComponent == null || !_battleRoleAttributeComponent.IsDead());
+
+                return new BattleDataNotifyMsg
+                {
+                    BattleId = GetCurrentBattleId(),
+                    Score = (uint)_taskStageTarget.GetScore(),
+                    Accuracy = AccuracyManager.GetCalculatedAccuracy(),
+                    Perfects = (ushort)_taskStageTarget.m_PerfectResult,
+                    Greats = (ushort)_taskStageTarget.m_GreatResult,
+                    Earlies = (ushort)(_battleRoleAttributeComponent?.early ?? 0),
+                    Lates = (ushort)(_battleRoleAttributeComponent?.late ?? 0),
+                    Misses = (ushort)_taskStageTarget.GetComboMiss(),
+                    FC = _taskStageTarget.IsFullCombo(),
+                    Alive = alive
+                };
+            }
         }
 
         private static void OnBattleDataPush(BattleDataPushMsg push)
@@ -323,7 +392,31 @@ namespace MDEN.Managers
 
         private static void NotifyBattleDataChanged(BattlePlayerEntry[] players)
         {
-            MainThreadDispatcher.Enqueue(() => BattleDataChanged?.Invoke(players));
+            lock (BattleDataDispatchLock)
+            {
+                _pendingBattleDataDispatch = players ?? Array.Empty<BattlePlayerEntry>();
+                if (_battleDataDispatchQueued) return;
+
+                _battleDataDispatchQueued = true;
+            }
+
+            MainThreadDispatcher.Enqueue(DispatchBattleDataChanged);
+        }
+
+        private static void DispatchBattleDataChanged()
+        {
+            BattlePlayerEntry[] players;
+            lock (BattleDataDispatchLock)
+            {
+                players = _pendingBattleDataDispatch ?? Array.Empty<BattlePlayerEntry>();
+                _pendingBattleDataDispatch = Array.Empty<BattlePlayerEntry>();
+                _battleDataDispatchQueued = false;
+            }
+
+            using (PerfTrace.Measure("MDEN.BattleManager.NotifyBattleDataChanged"))
+            {
+                BattleDataChanged?.Invoke(players);
+            }
         }
 
         private static bool EnsureBattleComponents()
@@ -344,7 +437,7 @@ namespace MDEN.Managers
 
         private static bool IsNetworkReady()
         {
-            return LobbyManager.IsInLobby &&
+            return IsActiveMultiplayerBattle &&
                    ConnectionManager.CanSendRequests;
         }
 

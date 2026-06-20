@@ -11,7 +11,7 @@ namespace MDEN.Managers
 {
     public static class VersionCheckManager
     {
-        private const string VersionCheckUrl = "https://api.xmjjs.top/mpmd/version.php";
+        private const string VersionCheckUrl = "https://mden.top/api/?r=version";
         private const string OutdatedMessage = "当前Ensemble版本过低，请前往喵斯兔群聊更新最新模组\n点击确认自动跳转至更新网站\n<color=#ff3333>不更新无法进行游戏</color>";
         private const bool ForceShowUpdateDialogForTest = false;
         private static readonly HttpClient Http = new HttpClient

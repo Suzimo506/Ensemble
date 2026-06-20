@@ -238,13 +238,14 @@ namespace MDEN.UI.Displays
             _scrollRect = null;
         }
 
-        public void AddMessage(ChatPushMsg message)
+        public void AddMessage(ChatPushMsg message, bool updateSceneObjects = true)
         {
             if (message == null) return;
 
             _messages.Add(message);
             TrimExcessMessages();
 
+            if (!updateSceneObjects) return;
             if (_frame == null || _scrollRect == null) return;
 
             var text = AddTextToContent(message, _scrollRect.content);
@@ -1330,16 +1331,7 @@ namespace MDEN.UI.Displays
         {
             if (_gameInputBlocked == blocked) return;
             _gameInputBlocked = blocked;
-
-            try
-            {
-                var manager = Il2CppAssets.Scripts.PeroTools.Managers.InputManager.instance;
-                if (manager != null) manager.isStopKeyAction = blocked;
-            }
-            catch (Exception ex)
-            {
-                MDEN.Managers.ClientLogManager.Warning($"Set game input block failed: {ex.Message}");
-            }
+            NativeInputBlocker.SetBlocked("RoomChatInput", blocked);
         }
     }
 }

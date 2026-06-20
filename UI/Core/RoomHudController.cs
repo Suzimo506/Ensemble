@@ -2,7 +2,6 @@ using System.Collections.Generic;
 using MDEN.Managers;
 using MDEN.Protocol.Messages.Chat;
 using MDEN.UI.Displays;
-using PeroInputManager = Il2CppAssets.Scripts.PeroTools.Managers.InputManager;
 
 namespace MDEN.UI.Core
 {
@@ -11,6 +10,8 @@ namespace MDEN.UI.Core
         private const int MaxRefreshRetries = 120;
         private const int EntranceFallbackDelayFrames = 20;
         private const int CharacterRepairCooldownFrames = 30;
+        private const int CharacterRebuildDelayFrames = 8;
+        private static readonly int[] PostBattleCharacterRebuildDelays = { 8, 30, 90 };
         private static readonly RoomPlayerListDisplay PlayerList = new RoomPlayerListDisplay();
         private static readonly RoomChatDisplay Chat = new RoomChatDisplay();
         private static readonly RoomReadyDisplay ReadyDisplay = new RoomReadyDisplay();
@@ -25,6 +26,8 @@ namespace MDEN.UI.Core
         private static bool _characterNotReadyLogged;
         private static int _characterRepairCooldownFrames;
         private static bool _nativeInputBlockedByChat;
+        private static bool _battleSceneActive;
+        private static bool _roomHudDeferred;
 
         public static void Initialize()
         {
@@ -77,6 +80,7 @@ namespace MDEN.UI.Core
 
             if (ShouldUpdateRoomHud(lobby))
             {
+                _roomHudDeferred = false;
                 Refresh(lobby);
                 ScheduleEntranceFallback(lobby, isNewLobbyEntry);
                 NavigationButton.RefreshRoomButton();
@@ -116,6 +120,34 @@ namespace MDEN.UI.Core
 
         public static void RebuildRoomCharacters()
         {
+            for (var i = 0; i < PostBattleCharacterRebuildDelays.Length; i++)
+            {
+                RebuildRoomCharactersDelayed(PostBattleCharacterRebuildDelays[i], i + 1);
+            }
+        }
+
+        public static void SetBattleSceneActive(bool active)
+        {
+            _battleSceneActive = active;
+            if (!active)
+            {
+                _roomHudDeferred = false;
+            }
+        }
+
+        private static void RebuildRoomCharactersDelayed(int framesRemaining)
+        {
+            RebuildRoomCharactersDelayed(framesRemaining, 0);
+        }
+
+        private static void RebuildRoomCharactersDelayed(int framesRemaining, int generationOffset)
+        {
+            if (framesRemaining > 0)
+            {
+                MainThreadDispatcher.Enqueue(() => RebuildRoomCharactersDelayed(framesRemaining - 1, generationOffset));
+                return;
+            }
+
             RoomCharacterDisplay.DestroyGeneratedObjects();
             _characterRepairCooldownFrames = 0;
             RequestRefresh();
@@ -157,7 +189,7 @@ namespace MDEN.UI.Core
                 ReadyDisplay.Refresh(lobby);
             }
 
-            if (!RoomSceneOverlay.IsHomeReady)
+            if (!RoomSceneOverlay.IsRoomInfoVisible)
             {
                 RoomSceneOverlay.Hide();
                 RoomCharacterDisplay.HideGeneratedObjects();
@@ -168,10 +200,8 @@ namespace MDEN.UI.Core
 
             if (!RoomSceneOverlay.IsHomeVisible)
             {
-                RoomSceneOverlay.Hide();
                 RoomCharacterDisplay.HideGeneratedObjects();
-                if (!ShouldRetryRoomHudRefresh(lobby)) return;
-                ScheduleRefreshRetry(lobby, retryCount);
+                RoomSceneOverlay.Refresh(lobby);
                 return;
             }
 
@@ -200,30 +230,38 @@ namespace MDEN.UI.Core
 
         private static bool ShouldUpdateRoomHud(MDEN.Protocol.Messages.Lobby.LobbySyncPush lobby)
         {
+            if (lobby != null && lobby.IsPlaying && _battleSceneActive) return false;
             return lobby == null || !lobby.IsPlaying || RoomSceneOverlay.IsHomeVisible;
         }
 
         private static bool ShouldRetryRoomHudRefresh(MDEN.Protocol.Messages.Lobby.LobbySyncPush lobby)
         {
+            if (lobby != null && lobby.IsPlaying && _battleSceneActive) return false;
             return lobby == null || !lobby.IsPlaying;
         }
 
         private static bool ShouldPauseRoomHudUpdate()
         {
             var lobby = LobbyManager.CurrentLobby;
-            return lobby != null &&
-                   lobby.IsPlaying &&
-                   !RoomSceneOverlay.IsHomeReady &&
-                   !RoomSceneOverlay.IsNavigationReady;
+            if (lobby == null || !lobby.IsPlaying) return false;
+            if (_battleSceneActive) return true;
+
+            return !RoomSceneOverlay.IsHomeVisible;
         }
 
         private static void DeferRoomHudRefresh()
         {
+            if (_roomHudDeferred) return;
+
+            _roomHudDeferred = true;
             _pendingRetryGeneration++;
             _retryDelayFrames = 0;
             RestoreNativeInput();
+            PlayerList.Destroy();
+            Chat.ResetSceneObjects();
+            ReadyDisplay.Destroy();
             RoomSceneOverlay.Hide();
-            RoomCharacterDisplay.HideGeneratedObjects();
+            RoomCharacterDisplay.DestroyGeneratedObjects();
         }
 
         private static void ScheduleRefreshRetry(MDEN.Protocol.Messages.Lobby.LobbySyncPush lobby, int retryCount)
@@ -265,6 +303,7 @@ namespace MDEN.UI.Core
             }
 
             if (lobby == null || !LobbyManager.IsInLobby || !RoomSceneOverlay.IsHomeVisible) return;
+            if (lobby.IsPlaying) return;
             if (RoomCharacterDisplay.HasExpectedCharacterContent(lobby)) return;
 
             _characterRepairCooldownFrames = CharacterRepairCooldownFrames;
@@ -275,6 +314,7 @@ namespace MDEN.UI.Core
         {
             _pendingRetryGeneration++;
             _retryDelayFrames = 0;
+            _roomHudDeferred = false;
             ResetEntranceFallback();
             _characterNotReadyLogged = false;
             _characterRepairCooldownFrames = 0;
@@ -293,6 +333,7 @@ namespace MDEN.UI.Core
         {
             _pendingRetryGeneration++;
             _retryDelayFrames = 0;
+            _roomHudDeferred = false;
             ResetEntranceFallback(false);
             _characterNotReadyLogged = false;
             _characterRepairCooldownFrames = 0;
@@ -321,7 +362,10 @@ namespace MDEN.UI.Core
                 EntranceAnnouncedLobbyIds.Add(lobbyId);
             }
 
-            Chat.AddMessage(message);
+            var hudPaused = ShouldPauseRoomHudUpdate();
+            Chat.AddMessage(message, !hudPaused);
+            if (hudPaused) return;
+
             if (!message.IsSystem)
             {
                 RoomCharacterDisplay.ShowChatBubble(message.AuthorUid, message.Message);
@@ -420,17 +464,7 @@ namespace MDEN.UI.Core
 
         private static void SetNativeInputBlocked(bool blocked)
         {
-            try
-            {
-                if (PeroInputManager.instance != null)
-                {
-                    PeroInputManager.instance.isStopKeyAction = blocked;
-                }
-            }
-            catch
-            {
-                // Native input manager may be unavailable during scene transitions.
-            }
+            NativeInputBlocker.SetBlocked("RoomChat", blocked);
         }
     }
 }

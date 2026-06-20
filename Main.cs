@@ -23,6 +23,7 @@ namespace MDEN
             ChartManager.Initialize();
             BattleManager.Init();
             SettlementManager.Init();
+            UiNotificationController.Initialize();
             BattleHudController.Initialize();
             SettlementHudController.Initialize();
             RoomHudController.Initialize();
@@ -34,7 +35,11 @@ namespace MDEN
             if (sceneName == "UISystem_PC")
             {
                 WindowStackController.ForceUnlock();
+                NativeInputBlocker.ClearAll();
+                BattleResultBannerDisplay.ClearAll();
                 Patches.BattleFlowPatch.ResetBattleSceneState();
+                RoomHudController.SetBattleSceneActive(false);
+                PerfTrace.SetGameMain(false);
                 NavigationButton.ResetSceneObjects();
                 RoomHudController.ResetSceneObjects();
 
@@ -51,22 +56,65 @@ namespace MDEN
             else if (sceneName == "GameMain")
             {
                 WindowStackController.ForceUnlock();
+                CustomAlbumsWindowGuard.CloseIfOpen("GameMain scene load");
+                NativeInputBlocker.ClearAll();
+                BattleResultBannerDisplay.ClearAll();
+                RoomHudController.SetBattleSceneActive(true);
+                PerfTrace.SetGameMain(true);
                 Patches.BattleFlowPatch.SceneLoaded();
+            }
+            else
+            {
+                PerfTrace.SetGameMain(false);
             }
         }
 
         public override void OnUpdate()
         {
-            MainThreadDispatcher.ProcessQueue();
-            PlayerManager.SyncCurrentSelectionIfChanged();
-            Patches.BattleFlowPatch.UpdateBattleUiState();
-            RoomHudController.Update();
+            PerfTrace.BeginFrame();
+            using (PerfTrace.Measure("MDEN.Main.OnUpdate"))
+            {
+                using (PerfTrace.Measure("MDEN.MainThreadDispatcher.ProcessQueue"))
+                {
+                    MainThreadDispatcher.ProcessQueue();
+                }
+
+                if (!BattleManager.IsActiveMultiplayerBattle)
+                {
+                    using (PerfTrace.Measure("MDEN.PlayerManager.SyncSelection"))
+                    {
+                        PlayerManager.SyncCurrentSelectionIfChanged();
+                    }
+                }
+
+                using (PerfTrace.Measure("MDEN.BattleFlow.UpdateUiState"))
+                {
+                    Patches.BattleFlowPatch.UpdateBattleUiState();
+                }
+
+                using (PerfTrace.Measure("MDEN.BattleResultBanner.Update"))
+                {
+                    BattleResultBannerDisplay.Update();
+                }
+
+                using (PerfTrace.Measure("MDEN.RoomHud.Update"))
+                {
+                    RoomHudController.Update();
+                }
+            }
+
+            PerfTrace.UpdateReport();
         }
 
         public override void OnDeinitializeMelon()
         {
+            NativeInputBlocker.ClearAll();
+            BattleResultBannerDisplay.ClearAll();
+            PerfTrace.SetGameMain(false);
+            RoomHudController.SetBattleSceneActive(false);
             BattleHudController.Deinitialize();
             SettlementHudController.Deinitialize();
+            UiNotificationController.Deinitialize();
             RoomHudController.Deinitialize();
             ConnectionManager.Disconnect();
         }

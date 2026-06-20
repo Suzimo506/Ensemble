@@ -6,8 +6,6 @@ using MDEN.Protocol;
 using MDEN.Protocol.Enums;
 using MDEN.Protocol.Messages.Lobby;
 using MDEN.Protocol.Models;
-using MDEN.UI.Core;
-using MDEN.UI.Windows;
 using MelonLoader;
 
 namespace MDEN.Managers
@@ -381,13 +379,8 @@ namespace MDEN.Managers
             CurrentLobby = null;
             BattleManager.Reset();
             NotifyCurrentLobbyChanged();
-            MainThreadDispatcher.Enqueue(() =>
-            {
-                Il2CppAssets.Scripts.UI.Controls.ShowText.ShowInfo(reason);
-                NavigationButton.RefreshRoomButton();
-                RoomHudController.Refresh();
-                WindowStackController.OpenWindow(new RoomListWindow());
-            });
+            UiNotificationManager.RequestToast(reason);
+            UiNotificationManager.RequestKickedToLobbyList();
         }
 
         private static void NotifyCurrentLobbyChanged()

@@ -152,22 +152,21 @@ namespace MDEN.UI.Windows
                 foreach (var server in servers)
                 {
                     var info = await ServerManager.PingServerAsync(server.Address);
-                    string displayName = server.Name;
+                    string displayName = NormalizeServerDisplayName(server.Name);
                     string desc = BuildServerStatsDescription(info);
 
-                    if (info != null)
+                    if (info != null && string.IsNullOrWhiteSpace(displayName))
                     {
-                        if (info.NodeId == "shanghai") displayName = "上海";
-                        else if (info.NodeId == "shandong") displayName = "山东";
-                        else if (info.NodeId == "hubei") displayName = "湖北";
-                        else if (info.NodeId == "hongkong") displayName = "香港";
-                        else if (info.NodeId == "us") displayName = "美国";
-                        else if (info.NodeId == "test") displayName = "内测节点";
-                        else displayName = info.NodeId;
+                        displayName = GetServerDisplayNameFromNodeId(info.NodeId);
+                    }
+
+                    if (string.IsNullOrWhiteSpace(displayName))
+                    {
+                        displayName = server.Address;
                     }
 
                     plainNames.Add(displayName);
-                    displayData.Add(new Tuple<string, string>($"<color={Constants.ColorYellow}>{displayName}</color>", desc));
+                    displayData.Add(new Tuple<string, string>($"<color={Constants.ColorYellow}>{EscapeRichText(displayName)}</color>", desc));
                 }
 
                 var customStatusDescriptions = new Dictionary<string, string>();
@@ -274,6 +273,29 @@ namespace MDEN.UI.Windows
             }
 
             return $"IP地址: {server.Address}\n{status}\n点击后管理该服务器";
+        }
+
+        private static string NormalizeServerDisplayName(string name)
+        {
+            return string.IsNullOrWhiteSpace(name) ? null : name.Trim();
+        }
+
+        private static string GetServerDisplayNameFromNodeId(string nodeId)
+        {
+            if (string.IsNullOrWhiteSpace(nodeId)) return null;
+
+            if (nodeId == "shanghai") return "上海";
+            if (nodeId == "shandong") return "山东";
+            if (nodeId == "hubei") return "湖北";
+            if (nodeId == "hongkong") return "香港";
+            if (nodeId == "us") return "美国";
+            if (nodeId == "test") return "内测节点";
+            return nodeId;
+        }
+
+        private static string EscapeRichText(string value)
+        {
+            return value?.Replace("<", "＜").Replace(">", "＞") ?? string.Empty;
         }
 
         private void RebuildWindow()
