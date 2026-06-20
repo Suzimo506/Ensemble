@@ -8,6 +8,8 @@ namespace MDEN.UI.Core
 {
     public static class MainThreadDispatcher
     {
+        private const int MaxActionsPerFrame = 64;
+        private const double MaxMillisecondsPerFrame = 4.0;
         private static readonly ConcurrentQueue<QueuedAction> _executionQueue = new ConcurrentQueue<QueuedAction>();
 
         public static void Enqueue(
@@ -24,6 +26,8 @@ namespace MDEN.UI.Core
         internal static void ProcessQueue()
         {
             var count = _executionQueue.Count;
+            var processed = 0;
+            var startedAt = System.Diagnostics.Stopwatch.GetTimestamp();
             for (var i = 0; i < count && _executionQueue.TryDequeue(out var queued); i++)
             {
                 try
@@ -37,7 +41,20 @@ namespace MDEN.UI.Core
                 {
                     MelonLogger.Error($"[MainThreadDispatcher] Error executing action: {ex}");
                 }
+
+                processed++;
+                if (processed >= MaxActionsPerFrame || HasExceededFrameBudget(startedAt))
+                {
+                    break;
+                }
             }
+        }
+
+        private static bool HasExceededFrameBudget(long startedAt)
+        {
+            var elapsedMs = (System.Diagnostics.Stopwatch.GetTimestamp() - startedAt) * 1000d /
+                            System.Diagnostics.Stopwatch.Frequency;
+            return elapsedMs >= MaxMillisecondsPerFrame;
         }
 
         private static string BuildActionName(string callerMemberName, string callerFilePath)

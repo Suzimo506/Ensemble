@@ -18,6 +18,7 @@ namespace MDEN.UI.Core
         private const string ResultEntryName = "MDENBattleResultEntry";
         private const int OverlaySortingOrder = 32766;
         private const int NativeMessageSuppressionFrames = 600;
+        private const int NativeMessageSuppressIntervalFrames = 10;
         private const int NativeMessagePanelLookupIntervalFrames = 30;
         private const float EntryWidth = 1180f;
         private const float EntryHeight = 58f;
@@ -30,6 +31,7 @@ namespace MDEN.UI.Core
         private static PnlMessage[] _nativeMessagePanels = Array.Empty<PnlMessage>();
         private static int _nextNativeMessageDirectLookupFrame;
         private static int _nextNativeMessagePanelLookupFrame;
+        private static int _nextNativeMessageSuppressFrame;
         private static GameObject _root;
         private static RectTransform _entryRoot;
         private static readonly List<EntryAnimation> EntryAnimations = new();
@@ -48,8 +50,9 @@ namespace MDEN.UI.Core
             UpdateKeyboardBlock();
             HandleEnterKeyEdge();
             UpdateEntryAnimations();
-            if (IsSuppressingNativeMessages)
+            if (IsSuppressingNativeMessages && Time.frameCount >= _nextNativeMessageSuppressFrame)
             {
+                _nextNativeMessageSuppressFrame = Time.frameCount + NativeMessageSuppressIntervalFrames;
                 SuppressNativeMessagesNow();
             }
         }
@@ -125,6 +128,7 @@ namespace MDEN.UI.Core
             _nativeMessagePanels = Array.Empty<PnlMessage>();
             _nextNativeMessageDirectLookupFrame = 0;
             _nextNativeMessagePanelLookupFrame = 0;
+            _nextNativeMessageSuppressFrame = 0;
             ShowingResults = false;
             _enterWasDown = false;
             SetKeyboardBlocked(false);
@@ -284,6 +288,7 @@ namespace MDEN.UI.Core
             _suppressNativeMessagesUntilFrame = Math.Max(
                 _suppressNativeMessagesUntilFrame,
                 Time.frameCount + NativeMessageSuppressionFrames);
+            _nextNativeMessageSuppressFrame = Time.frameCount + NativeMessageSuppressIntervalFrames;
             SuppressNativeMessagesNow();
         }
 
@@ -302,7 +307,11 @@ namespace MDEN.UI.Core
         {
             if (!IsScenePnlMessage(pnlMessage)) return false;
 
-            ClearNativeEntries(pnlMessage);
+            if (pnlMessage.layout != null && pnlMessage.layout.childCount > 0)
+            {
+                ClearNativeEntries(pnlMessage);
+            }
+
             if (pnlMessage.gameObject.activeSelf)
             {
                 pnlMessage.gameObject.SetActive(false);
