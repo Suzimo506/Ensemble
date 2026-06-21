@@ -27,9 +27,11 @@ namespace MDEN.UI.Core
 
         private static GameObject _root;
         private static RectTransform _panelRoot;
+        private static RectTransform _closeButtonRect;
         private static Font _cachedFont;
         private static Sprite _roundedSprite;
         private static bool _closing;
+        private static bool _enterWasDown;
 
         public static void Show(SettlementResultPush result)
         {
@@ -52,6 +54,8 @@ namespace MDEN.UI.Core
                     ClearRootChildren();
                     CreateFallback(result);
                 }
+
+                _enterWasDown = IsEnterKeyDown();
             }
             catch (Exception ex)
             {
@@ -60,14 +64,28 @@ namespace MDEN.UI.Core
             }
         }
 
+        public static void Update()
+        {
+            if (_root == null || _closing) return;
+
+            HandleEnterKeyFallback();
+            if (_root == null || _closing) return;
+
+            HandleCloseButtonMouseFallback();
+        }
+
         public static void Destroy()
         {
-            if (_root == null) return;
+            if (_root != null)
+            {
+                UnityEngine.Object.Destroy(_root);
+            }
 
-            UnityEngine.Object.Destroy(_root);
             _root = null;
             _panelRoot = null;
+            _closeButtonRect = null;
             _closing = false;
+            _enterWasDown = false;
         }
 
         private static void CloseWithSound()
@@ -90,6 +108,33 @@ namespace MDEN.UI.Core
             }
 
             _panelRoot = null;
+            _closeButtonRect = null;
+        }
+
+        private static void HandleEnterKeyFallback()
+        {
+            var enterDown = IsEnterKeyDown();
+            if (enterDown && !_enterWasDown)
+            {
+                CloseWithSound();
+                return;
+            }
+
+            _enterWasDown = enterDown;
+        }
+
+        private static void HandleCloseButtonMouseFallback()
+        {
+            if (_closeButtonRect == null || !_closeButtonRect.gameObject.activeInHierarchy) return;
+            if (!Input.GetMouseButtonDown(0)) return;
+            if (!RectTransformUtility.RectangleContainsScreenPoint(_closeButtonRect, Input.mousePosition, null)) return;
+
+            CloseWithSound();
+        }
+
+        private static bool IsEnterKeyDown()
+        {
+            return Input.GetKey(KeyCode.Return) || Input.GetKey(KeyCode.KeypadEnter);
         }
 
         private static GameObject CreateRoot()
@@ -438,6 +483,7 @@ namespace MDEN.UI.Core
             rect.pivot = new Vector2(0.5f, 0f);
             rect.sizeDelta = new Vector2(220f, 56f);
             rect.anchoredPosition = new Vector2(0f, 30f);
+            _closeButtonRect = rect;
 
             var image = buttonObj.AddComponent<Image>();
             image.sprite = GetRoundedSprite();

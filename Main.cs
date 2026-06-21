@@ -97,6 +97,11 @@ namespace MDEN
                     BattleResultBannerDisplay.Update();
                 }
 
+                using (PerfTrace.Measure("MDEN.SettlementResultDialog.Update"))
+                {
+                    SettlementResultDialog.Update();
+                }
+
                 using (PerfTrace.Measure("MDEN.RoomHud.Update"))
                 {
                     RoomHudController.Update();
