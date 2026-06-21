@@ -5,6 +5,7 @@ namespace MDEN.Protocol.Messages.Mdt
 {
     public class MdtObserveRequest
     {
+        public string Uid { get; set; }
         public string ClientName { get; set; }
     }
 
