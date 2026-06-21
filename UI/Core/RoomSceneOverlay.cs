@@ -28,6 +28,8 @@ namespace MDEN.UI.Core
         private const float PlayerRowInset = 10f;
         private const float PlayerNameWidth = 270f;
         private const float PlayerStateWidth = 82f;
+        private const int MaxVisiblePlayerRows = 8;
+        private const int MaxLockedVisiblePlayerRows = 4;
         private const int InfoTitleFontSize = 20;
         private const int InfoMetaFontSize = 17;
         private const int PlayerNameFontSize = 17;
@@ -447,7 +449,10 @@ namespace MDEN.UI.Core
             }
 
             var players = GetRoomInfoPlayers(lobby);
-            var playerRows = Math.Max(1, players.Length);
+            var maxVisibleRows = GetMaxVisiblePlayerRows(lobby);
+            var hasOverflow = players.Length > maxVisibleRows;
+            var visiblePlayerCount = hasOverflow ? maxVisibleRows - 1 : players.Length;
+            var playerRows = players.Length == 0 ? 1 : Math.Min(players.Length, maxVisibleRows);
             var playerListHeight = playerRows * PlayerLineHeight + Math.Max(0, playerRows - 1) * PlayerRowGap;
             var panelHeight = PlayerListTop + playerListHeight + InfoPanelPadding;
             _roomInfoPanelRect.sizeDelta = new Vector2(InfoPanelWidth, panelHeight);
@@ -468,8 +473,8 @@ namespace MDEN.UI.Core
                 return;
             }
 
-            EnsurePlayerRowCount(players.Length);
-            for (var i = 0; i < players.Length; i++)
+            EnsurePlayerRowCount(playerRows);
+            for (var i = 0; i < visiblePlayerCount; i++)
             {
                 var player = players[i];
                 var state = GetPlayerState(lobby, player.Uid);
@@ -482,7 +487,24 @@ namespace MDEN.UI.Core
                     state.Color);
             }
 
-            HidePlayerRowsFrom(players.Length);
+            if (hasOverflow)
+            {
+                var hiddenCount = players.Length - visiblePlayerCount;
+                var y = PlayerListTop + visiblePlayerCount * (PlayerLineHeight + PlayerRowGap);
+                PlayerRows[visiblePlayerCount].Set(
+                    y,
+                    $"还有 {hiddenCount} 人",
+                    "ffffffff",
+                    "更多",
+                    Constants.ColorCyan);
+            }
+
+            HidePlayerRowsFrom(playerRows);
+        }
+
+        private static int GetMaxVisiblePlayerRows(LobbySyncPush lobby)
+        {
+            return lobby != null && lobby.Locked ? MaxLockedVisiblePlayerRows : MaxVisiblePlayerRows;
         }
 
         private static PlayerStateText GetPlayerState(LobbySyncPush lobby, string uid)
