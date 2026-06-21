@@ -256,8 +256,11 @@ namespace MDEN.UI.Displays
                 if (result != 0) return result;
             }
 
-            return GetPlayerSortIndex(left.Uid, playerOrder)
+            result = GetPlayerSortIndex(left.Uid, playerOrder)
                 .CompareTo(GetPlayerSortIndex(right.Uid, playerOrder));
+            if (result != 0) return result;
+
+            return StringComparer.Ordinal.Compare(left.Uid, right.Uid);
         }
 
         private static int CompareBoolDescending(bool left, bool right)

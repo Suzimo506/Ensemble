@@ -250,7 +250,7 @@ namespace MDEN.Managers
 
         private static async Task SendCurrentAsync()
         {
-            if (!IsNetworkReady() || !EnsureBattleComponents()) return;
+            if (!IsNetworkReady()) return;
             var battleId = GetCurrentBattleId();
             if (string.IsNullOrWhiteSpace(battleId)) return;
 

@@ -6,6 +6,7 @@ using MDEN.Protocol;
 using MDEN.Protocol.Enums;
 using MDEN.Protocol.Messages.Lobby;
 using MDEN.Protocol.Models;
+using MDEN.UI.Core;
 using MelonLoader;
 
 namespace MDEN.Managers
@@ -41,12 +42,12 @@ namespace MDEN.Managers
         {
             EnsureReady();
             _pendingJoinLobbyId = lobbyId;
-            await PlayerManager.SyncLocalProfileToServerAsync();
-            await PlayerManager.SyncCurrentSelectionAsync();
-            await PlayerManager.SyncChartStateAsync();
 
             try
             {
+                await PlayerManager.SyncLocalProfileToServerAsync();
+                await PlayerManager.SyncCurrentSelectionAsync();
+                await PlayerManager.SyncChartStateAsync();
                 await NetworkClient.Instance.SendRequestAsync<JoinLobbyRequest, JoinLobbyResponse>(
                     OpCodes.JoinLobbyReq,
                     new JoinLobbyRequest { LobbyId = lobbyId, Password = password });
@@ -56,6 +57,19 @@ namespace MDEN.Managers
                 _pendingJoinLobbyId = null;
                 throw;
             }
+        }
+
+        public static void CancelPendingJoin(int lobbyId)
+        {
+            if (_pendingJoinLobbyId == lobbyId)
+            {
+                _pendingJoinLobbyId = null;
+            }
+        }
+
+        public static void CancelPendingJoin()
+        {
+            _pendingJoinLobbyId = null;
         }
 
         public static void MarkLobbyEntered(LobbyListEntry entry)
@@ -385,7 +399,8 @@ namespace MDEN.Managers
 
         private static void NotifyCurrentLobbyChanged()
         {
-            CurrentLobbyChanged?.Invoke(CurrentLobby);
+            var lobby = CurrentLobby;
+            MainThreadDispatcher.Enqueue(() => CurrentLobbyChanged?.Invoke(lobby));
         }
 
         private static bool IsStaleLobbySync(LobbySyncPush push)

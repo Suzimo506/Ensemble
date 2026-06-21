@@ -2,6 +2,7 @@ using System;
 using System.Collections.Concurrent;
 using System.IO;
 using System.Runtime.CompilerServices;
+using System.Threading.Tasks;
 using MelonLoader;
 
 namespace MDEN.UI.Core
@@ -23,6 +24,57 @@ namespace MDEN.UI.Core
                 ? BuildActionName(callerMemberName, callerFilePath)
                 : null;
             _executionQueue.Enqueue(new QueuedAction(action, actionName));
+        }
+
+        public static Task InvokeAsync(
+            Action action,
+            [CallerMemberName] string callerMemberName = null,
+            [CallerFilePath] string callerFilePath = null)
+        {
+            if (action == null) return Task.CompletedTask;
+
+            var source = new TaskCompletionSource<object>(TaskCreationOptions.RunContinuationsAsynchronously);
+            Enqueue(
+                () =>
+                {
+                    try
+                    {
+                        action();
+                        source.TrySetResult(null);
+                    }
+                    catch (Exception ex)
+                    {
+                        source.TrySetException(ex);
+                    }
+                },
+                callerMemberName,
+                callerFilePath);
+            return source.Task;
+        }
+
+        public static Task<T> InvokeAsync<T>(
+            Func<T> action,
+            [CallerMemberName] string callerMemberName = null,
+            [CallerFilePath] string callerFilePath = null)
+        {
+            if (action == null) return Task.FromResult(default(T));
+
+            var source = new TaskCompletionSource<T>(TaskCreationOptions.RunContinuationsAsynchronously);
+            Enqueue(
+                () =>
+                {
+                    try
+                    {
+                        source.TrySetResult(action());
+                    }
+                    catch (Exception ex)
+                    {
+                        source.TrySetException(ex);
+                    }
+                },
+                callerMemberName,
+                callerFilePath);
+            return source.Task;
         }
 
         internal static void ProcessQueue()

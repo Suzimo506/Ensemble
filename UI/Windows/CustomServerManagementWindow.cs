@@ -149,16 +149,20 @@ namespace MDEN.UI.Windows
 
         private async Task JoinServerAsync(string address, string serverDisplayName)
         {
-            using var _ = WindowStackController.LockUI("Connecting to server...");
-
+            IDisposable uiLock = null;
             try
             {
-                GameAccountManager.RefreshSnapshot();
+                await MainThreadDispatcher.InvokeAsync(() =>
+                {
+                    uiLock = WindowStackController.LockUI("Connecting to server...");
+                    GameAccountManager.RefreshSnapshot();
+                });
+
                 var response = await ConnectionManager.ConnectAndLoginAsync(address, serverDisplayName, false);
                 if (IsDisposed) return;
 
                 MDEN.Managers.ClientLogManager.Msg($"Connected to {address}, server version: {response.Version}");
-                MainThreadDispatcher.Enqueue(() =>
+                await MainThreadDispatcher.InvokeAsync(() =>
                 {
                     if (IsDisposed) return;
                     Close();
@@ -168,6 +172,10 @@ namespace MDEN.UI.Windows
             catch (Exception ex)
             {
                 MDEN.Managers.ClientLogManager.Warning($"Join server failed: {ex.Message}");
+            }
+            finally
+            {
+                await MainThreadDispatcher.InvokeAsync(() => uiLock?.Dispose());
             }
         }
 

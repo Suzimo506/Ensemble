@@ -77,7 +77,7 @@ namespace MDEN.UI.Core
 
             _busy = true;
             Refresh();
-            using var _ = WindowStackController.LockUI("Updating playlist...");
+            IDisposable uiLock = WindowStackController.LockUI("Updating playlist...");
 
             try
             {
@@ -94,6 +94,7 @@ namespace MDEN.UI.Core
             {
                 _busy = false;
                 MainThreadDispatcher.Enqueue(Refresh);
+                await MainThreadDispatcher.InvokeAsync(() => uiLock?.Dispose());
             }
         }
     }

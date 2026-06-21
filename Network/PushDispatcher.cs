@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Text.Json;
 using MDEN.Protocol;
+using MDEN.UI.Core;
 using MelonLoader;
 
 namespace MDEN.Network
@@ -18,15 +19,18 @@ namespace MDEN.Network
         {
             _handlers[opCode] = (element) =>
             {
+                T msg;
                 try
                 {
-                    var msg = element.Deserialize<T>(ProtocolJson.Options);
-                    handler(msg);
+                    msg = element.Deserialize<T>(ProtocolJson.Options);
                 }
                 catch (Exception ex)
                 {
                     MelonLogger.Error($"Failed to parse push message {opCode}: {ex}");
+                    return;
                 }
+
+                MainThreadDispatcher.Enqueue(() => handler(msg));
             };
         }
 

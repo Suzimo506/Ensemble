@@ -8,6 +8,7 @@ using MDEN.Network;
 using MDEN.Protocol;
 using MDEN.Protocol.Enums;
 using MDEN.Protocol.Messages.Player;
+using MDEN.UI.Core;
 using MelonLoader;
 
 namespace MDEN.Managers
@@ -50,7 +51,7 @@ namespace MDEN.Managers
             var uid = ResolveLocalUid();
             CurrentUid ??= uid;
             CurrentProfile = CreateLocalProfile(uid, GetLocalPlayerName(), PlayerStatus.Online);
-            ProfileChanged?.Invoke();
+            NotifyProfileChanged();
             return await Task.FromResult(CurrentProfile);
         }
 
@@ -136,36 +137,24 @@ namespace MDEN.Managers
 
         public static Task SyncCustomChartsAsync()
         {
-            var customs = new List<string>();
-            foreach (var pair in AlbumManager.LoadedAlbums)
-            {
-                var md5 = ChartManager.GetCustomChartMd5(pair.Value?.Uid);
-                if (!string.IsNullOrEmpty(md5))
-                {
-                    customs.Add(md5);
-                }
-            }
-
-            return UpdateMyProfileAsync(new UpdatePlayerRequest { Customs = customs.Distinct().ToArray() });
+            return SyncCustomChartsAsyncCore();
         }
 
         public static Task SyncHiddenChartsAsync()
         {
-            var hiddens = new List<string>();
-            var hiddenUids = GlobalDataBase.dbMusicTag?.Hide;
-            if (hiddenUids != null)
-            {
-                foreach (string hiddenUid in hiddenUids)
-                {
-                    var key = ChartManager.GetEntryKey(hiddenUid);
-                    if (!string.IsNullOrEmpty(key))
-                    {
-                        hiddens.Add(key);
-                    }
-                }
-            }
+            return SyncHiddenChartsAsyncCore();
+        }
 
-            return UpdateMyProfileAsync(new UpdatePlayerRequest { Hiddens = hiddens.Distinct().ToArray() });
+        private static async Task SyncCustomChartsAsyncCore()
+        {
+            var customs = await MainThreadDispatcher.InvokeAsync(CollectCustomChartMd5s);
+            await UpdateMyProfileAsync(new UpdatePlayerRequest { Customs = customs });
+        }
+
+        private static async Task SyncHiddenChartsAsyncCore()
+        {
+            var hiddens = await MainThreadDispatcher.InvokeAsync(CollectHiddenChartKeys);
+            await UpdateMyProfileAsync(new UpdatePlayerRequest { Hiddens = hiddens });
         }
 
         public static async Task SyncChartStateAsync()
@@ -205,7 +194,7 @@ namespace MDEN.Managers
                 ModConfigManager.SetPlayerName(request.Name);
             }
 
-            ProfileChanged?.Invoke();
+            NotifyProfileChanged();
         }
 
         public static async Task SyncLocalProfileToServerAsync()
@@ -262,7 +251,7 @@ namespace MDEN.Managers
                 ApplyLocalUpdate(CurrentProfile, CreateLocalProfileUpdateRequest());
             }
 
-            ProfileChanged?.Invoke();
+            NotifyProfileChanged();
         }
 
         private static GetPlayerResponse CreateLocalProfile(string uid, string fallbackName, PlayerStatus status)
@@ -347,6 +336,45 @@ namespace MDEN.Managers
             if (request.ElfinIndex.HasValue) profile.ElfinIndex = request.ElfinIndex.Value;
             if (request.FavGirlIndex.HasValue) profile.FavGirlIndex = request.FavGirlIndex.Value;
             if (request.FavElfinIndex.HasValue) profile.FavElfinIndex = request.FavElfinIndex.Value;
+        }
+
+        private static void NotifyProfileChanged()
+        {
+            MainThreadDispatcher.Enqueue(() => ProfileChanged?.Invoke());
+        }
+
+        private static string[] CollectCustomChartMd5s()
+        {
+            var customs = new List<string>();
+            foreach (var pair in AlbumManager.LoadedAlbums)
+            {
+                var md5 = ChartManager.GetCustomChartMd5(pair.Value?.Uid);
+                if (!string.IsNullOrEmpty(md5))
+                {
+                    customs.Add(md5);
+                }
+            }
+
+            return customs.Distinct().ToArray();
+        }
+
+        private static string[] CollectHiddenChartKeys()
+        {
+            var hiddens = new List<string>();
+            var hiddenUids = GlobalDataBase.dbMusicTag?.Hide;
+            if (hiddenUids != null)
+            {
+                foreach (string hiddenUid in hiddenUids)
+                {
+                    var key = ChartManager.GetEntryKey(hiddenUid);
+                    if (!string.IsNullOrEmpty(key))
+                    {
+                        hiddens.Add(key);
+                    }
+                }
+            }
+
+            return hiddens.Distinct().ToArray();
         }
     }
 }

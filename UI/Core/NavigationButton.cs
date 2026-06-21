@@ -464,7 +464,7 @@ namespace MDEN.UI.Core
                 return;
             }
 
-            using var _ = WindowStackController.LockUI("Starting lobby...");
+            IDisposable uiLock = WindowStackController.LockUI("Starting lobby...");
 
             try
             {
@@ -474,6 +474,10 @@ namespace MDEN.UI.Core
             {
                 MDEN.Managers.ClientLogManager.Warning($"Start lobby prepare failed: {ex.Message}");
                 MainThreadDispatcher.Enqueue(() => ShowText.ShowInfo($"开始失败：{ex.Message}"));
+            }
+            finally
+            {
+                await MainThreadDispatcher.InvokeAsync(() => uiLock?.Dispose());
             }
         }
 
@@ -541,41 +545,51 @@ namespace MDEN.UI.Core
         {
             if (image == null) return;
 
-            image.sprite = ResourceManager.GetSprite(NavigationButtonSpriteName);
+            var sprite = ResourceManager.GetSprite(NavigationButtonSpriteName);
+            if (sprite != null)
+            {
+                image.sprite = sprite;
+            }
         }
 
         private static void ApplyNavigationIcon(Image icon, string spriteName, bool mirrorParent)
         {
-        if (icon == null) return;
+            if (icon == null) return;
 
-        icon.sprite = ResourceManager.GetSprite(spriteName);
-        ApplyNativeNavigationIconStyle(icon);
-        icon.preserveAspect = false;
+            var sprite = ResourceManager.GetSprite(spriteName);
+            if (sprite != null)
+            {
+                icon.sprite = sprite;
+            }
 
-        var iconRect = icon.GetComponent<RectTransform>();
-        if (iconRect != null)
-        {
-            CenterIcon(iconRect, mirrorParent);
-        }
-    }
+            ApplyNativeNavigationIconStyle(icon);
+            icon.preserveAspect = false;
 
-    private static void ApplyNativeNavigationIconStyle(Image icon)
-    {
-        var nativeIcon = GameObject.Find("UI/Standerd/PnlNavigation/Top/BtnOption")?
-            .transform.Find("ImgIcon")?
-            .GetComponent<Image>();
-        if (nativeIcon != null)
-        {
-            icon.color = nativeIcon.color;
-            icon.material = nativeIcon.material;
-            return;
+            var iconRect = icon.GetComponent<RectTransform>();
+            if (iconRect != null)
+            {
+                CenterIcon(iconRect, mirrorParent);
+            }
         }
 
-        icon.color = Color.white;
-        icon.material = null;
-    }
+        private static void ApplyNativeNavigationIconStyle(Image icon)
+        {
+            var nativeIcon = GameObject.Find("UI/Standerd/PnlNavigation/Top/BtnOption")?
+                .transform.Find("ImgIcon")?
+                .GetComponent<Image>();
+            if (nativeIcon != null)
+            {
+                icon.color = nativeIcon.color;
+                icon.material = nativeIcon.material;
+            }
+            else
+            {
+                icon.color = Color.white;
+                icon.material = null;
+            }
+        }
 
-    private static void CenterIcon(RectTransform iconRect, bool mirrorParent)
+        private static void CenterIcon(RectTransform iconRect, bool mirrorParent)
         {
             iconRect.anchorMin = new Vector2(0.5f, 0.5f);
             iconRect.anchorMax = new Vector2(0.5f, 0.5f);

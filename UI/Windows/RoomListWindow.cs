@@ -549,18 +549,17 @@ namespace MDEN.UI.Windows
             MainThreadDispatcher.Enqueue(RebuildWindow);
 
             var joined = false;
-            using var _ = WindowStackController.LockUI("Joining lobby...");
+            IDisposable uiLock = WindowStackController.LockUI("Joining lobby...");
 
             try
             {
                 await LobbyManager.JoinLobbyAsync(lobby.Id, password);
+                await MainThreadDispatcher.InvokeAsync(() => LobbyManager.MarkLobbyEntered(lobby));
+                joined = true;
                 if (IsDisposed) return;
 
-                LobbyManager.MarkLobbyEntered(lobby);
-                joined = true;
-
                 MDEN.Managers.ClientLogManager.Msg($"Joined lobby: {lobby.Id}");
-                MainThreadDispatcher.Enqueue(() =>
+                await MainThreadDispatcher.InvokeAsync(() =>
                 {
                     if (IsDisposed) return;
                     Close();
@@ -580,15 +579,21 @@ namespace MDEN.UI.Windows
             }
             finally
             {
-                if (!joined && !IsDisposed)
+                if (!joined)
                 {
-                    _joinInProgress = false;
-                    _joiningLobbyId = null;
-                    if (_autoRefreshCts == null)
+                    LobbyManager.CancelPendingJoin(lobby.Id);
+                    if (!IsDisposed)
                     {
-                        StartAutoRefresh();
+                        _joinInProgress = false;
+                        _joiningLobbyId = null;
+                        if (_autoRefreshCts == null)
+                        {
+                            StartAutoRefresh();
+                        }
                     }
                 }
+
+                await MainThreadDispatcher.InvokeAsync(() => uiLock?.Dispose());
             }
         }
 
@@ -598,7 +603,7 @@ namespace MDEN.UI.Windows
 
             _window.OnSelectionChanged -= OnSelectionChanged;
             _window.OnInternalShow -= OnInternalShowInjectTitle;
-            _window.ForceClose();
+            ForceCloseWindowSafe();
             _window = new ForumWindow();
             _window.AutoReset = true;
             BuildList();
@@ -613,12 +618,25 @@ namespace MDEN.UI.Windows
             _lastSelectedIndex = -1;
             _joinInProgress = false;
             _joiningLobbyId = null;
+            LobbyManager.CancelPendingJoin();
             if (_window != null)
             {
-                _window.ForceClose();
+                ForceCloseWindowSafe();
                 _window = null;
             }
             StopAutoRefresh();
+        }
+
+        private void ForceCloseWindowSafe()
+        {
+            try
+            {
+                _window?.ForceClose();
+            }
+            catch (Exception ex)
+            {
+                MDEN.Managers.ClientLogManager.Warning($"Room list window close failed: {ex.Message}");
+            }
         }
     }
 }

@@ -219,13 +219,13 @@ namespace MDEN.UI.Windows
 
         private async System.Threading.Tasks.Task RunWindowActionAsync(Func<System.Threading.Tasks.Task> action, bool reopenRoom)
         {
-            using var _ = WindowStackController.LockUI("处理中...");
+            IDisposable uiLock = WindowStackController.LockUI("处理中...");
             try
             {
                 await action();
                 if (reopenRoom)
                 {
-                    MainThreadDispatcher.Enqueue(() =>
+                    await MainThreadDispatcher.InvokeAsync(() =>
                     {
                         if (IsDisposed) return;
                         Close();
@@ -237,6 +237,10 @@ namespace MDEN.UI.Windows
             {
                 MDEN.Managers.ClientLogManager.Warning($"Room player operation failed: {ex.Message}");
                 MainThreadDispatcher.Enqueue(() => ShowText.ShowInfo(ex.Message));
+            }
+            finally
+            {
+                await MainThreadDispatcher.InvokeAsync(() => uiLock?.Dispose());
             }
         }
 

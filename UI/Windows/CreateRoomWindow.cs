@@ -267,7 +267,7 @@ namespace MDEN.UI.Windows
             RebuildWindow();
 
             var keepPending = false;
-            using var _ = WindowStackController.LockUI("Creating lobby...");
+            IDisposable uiLock = WindowStackController.LockUI("Creating lobby...");
 
             try
             {
@@ -286,11 +286,11 @@ namespace MDEN.UI.Windows
                 var lobbyId = await LobbyManager.CreateLobbyAsync(request);
                 if (IsDisposed) return;
 
-                LobbyManager.MarkLobbyEntered(lobbyId, request);
+                await MainThreadDispatcher.InvokeAsync(() => LobbyManager.MarkLobbyEntered(lobbyId, request));
                 keepPending = true;
 
                 MDEN.Managers.ClientLogManager.Msg($"Created lobby: {lobbyId}");
-                MainThreadDispatcher.Enqueue(() =>
+                await MainThreadDispatcher.InvokeAsync(() =>
                 {
                     if (IsDisposed) return;
                     Close();
@@ -310,6 +310,8 @@ namespace MDEN.UI.Windows
                     _createInProgress = false;
                     MainThreadDispatcher.Enqueue(RebuildWindow);
                 }
+
+                await MainThreadDispatcher.InvokeAsync(() => uiLock?.Dispose());
             }
         }
 

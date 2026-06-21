@@ -49,7 +49,7 @@ namespace MDEN.UI.Core
 
         public static void RefreshIfVisible(BattlePlayerEntry[] players)
         {
-            if (!IsVisible) return;
+            if (!IsVisible && !ShowingResults) return;
             if (ShowingResults)
             {
                 _pendingRefreshPlayers = CloneBattleEntries(players);
@@ -57,6 +57,17 @@ namespace MDEN.UI.Core
             }
 
             if (!HasResultChanged(players)) return;
+
+            QueueRefreshWithoutAnimation(players);
+        }
+
+        public static void ShowOrRefresh(BattlePlayerEntry[] players)
+        {
+            if (IsVisible || ShowingResults)
+            {
+                RefreshIfVisible(players);
+                return;
+            }
 
             _ = ShowAsync(players);
         }
@@ -113,7 +124,7 @@ namespace MDEN.UI.Core
                     _pendingRefreshPlayers = null;
                     if (pending != null && HasResultChanged(pending))
                     {
-                        _ = ShowAsync(pending);
+                        QueueRefreshWithoutAnimation(pending);
                     }
                 }
             }
@@ -252,7 +263,12 @@ namespace MDEN.UI.Core
             button.onClick.AddListener((UnityAction)CloseWithSound);
         }
 
-        private static void AddEntry(string text, int index, int count, int generation)
+        private static void AddEntry(
+            string text,
+            int index,
+            int count,
+            int generation,
+            bool animate = true)
         {
             if (generation != _resultGeneration) return;
             if (_root == null || _entryRoot == null) return;
@@ -299,8 +315,16 @@ namespace MDEN.UI.Core
             labelText.raycastTarget = false;
             labelText.color = Color.white;
 
-            EntryAnimations.Add(new EntryAnimation(rect, group, targetPosition, generation));
-            UpdateEntryAnimations();
+            if (animate)
+            {
+                EntryAnimations.Add(new EntryAnimation(rect, group, targetPosition, generation));
+                UpdateEntryAnimations();
+            }
+            else
+            {
+                rect.anchoredPosition = targetPosition;
+                group.alpha = 1f;
+            }
         }
 
         private static void DestroyRoot()
@@ -310,6 +334,45 @@ namespace MDEN.UI.Core
             UnityEngine.Object.Destroy(_root);
             _root = null;
             _entryRoot = null;
+        }
+
+        private static void QueueRefreshWithoutAnimation(BattlePlayerEntry[] players)
+        {
+            var snapshot = CloneBattleEntries(players);
+            MainThreadDispatcher.Enqueue(() => UpdateEntriesWithoutAnimation(snapshot));
+        }
+
+        private static void UpdateEntriesWithoutAnimation(BattlePlayerEntry[] players)
+        {
+            var orderedPlayers = BattleLobbyDisplay
+                .OrderPlayers(players ?? Array.Empty<BattlePlayerEntry>())
+                .ToArray();
+            if (orderedPlayers.Length == 0 || _root == null || _entryRoot == null) return;
+
+            EntryAnimations.Clear();
+            for (var i = _entryRoot.childCount - 1; i >= 0; i--)
+            {
+                var child = _entryRoot.GetChild(i);
+                if (child != null)
+                {
+                    child.gameObject.SetActive(false);
+                    UnityEngine.Object.Destroy(child.gameObject);
+                }
+            }
+
+            var generation = _resultGeneration;
+            for (var i = 0; i < orderedPlayers.Length; i++)
+            {
+                AddEntry(
+                    BattleLobbyDisplay.FormatResultEntry(orderedPlayers[i], i + 1),
+                    i,
+                    orderedPlayers.Length,
+                    generation,
+                    false);
+            }
+
+            EntryAnimations.Clear();
+            _displayedPlayers = orderedPlayers.Select(CloneBattleEntry).ToArray();
         }
 
         private static bool HasResultChanged(BattlePlayerEntry[] players)

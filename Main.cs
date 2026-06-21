@@ -24,6 +24,7 @@ namespace MDEN
             ChartManager.Initialize();
             BattleManager.Init();
             SettlementManager.Init();
+            MainThreadWatchdog.Initialize();
             UiNotificationController.Initialize();
             BattleHudController.Initialize();
             SettlementHudController.Initialize();
@@ -33,6 +34,7 @@ namespace MDEN
 
         public override void OnSceneWasLoaded(int buildIndex, string sceneName)
         {
+            MainThreadWatchdog.SetScene(sceneName);
             if (sceneName == "UISystem_PC")
             {
                 WindowStackController.ForceUnlock();
@@ -74,20 +76,29 @@ namespace MDEN
 
         public override void OnUpdate()
         {
+            MainThreadWatchdog.Heartbeat("OnUpdate.Begin");
             PerfTrace.BeginFrame();
+            MainThreadWatchdog.Heartbeat("MainThreadDispatcher.ProcessQueue");
             MainThreadDispatcher.ProcessQueue();
 
             if (!BattleManager.IsActiveMultiplayerBattle)
             {
+                MainThreadWatchdog.Heartbeat("PlayerManager.SyncCurrentSelectionIfChanged");
                 PlayerManager.SyncCurrentSelectionIfChanged();
             }
 
+            MainThreadWatchdog.Heartbeat("BattleFlowPatch.UpdateBattleUiState");
             Patches.BattleFlowPatch.UpdateBattleUiState();
+            MainThreadWatchdog.Heartbeat("BattleResultBannerDisplay.Update");
             BattleResultBannerDisplay.Update();
+            MainThreadWatchdog.Heartbeat("SettlementResultDialog.Update");
             SettlementResultDialog.Update();
+            MainThreadWatchdog.Heartbeat("RoomHudController.Update");
             RoomHudController.Update();
 
+            MainThreadWatchdog.Heartbeat("PerfTrace.UpdateReport");
             PerfTrace.UpdateReport();
+            MainThreadWatchdog.Heartbeat("OnUpdate.End");
         }
 
         public override void OnDeinitializeMelon()
@@ -100,6 +111,7 @@ namespace MDEN
             SettlementHudController.Deinitialize();
             UiNotificationController.Deinitialize();
             RoomHudController.Deinitialize();
+            MainThreadWatchdog.Shutdown();
             ConnectionManager.Disconnect();
         }
     }

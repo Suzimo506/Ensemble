@@ -14,6 +14,8 @@ namespace MDEN.UI.Displays
 {
     public sealed class RoomReadyDisplay
     {
+        private const int OwnerInfoFontSize = 24;
+
         private GameObject _notification;
         private GameObject _imgBase;
         private GameObject _buttonMain;
@@ -105,6 +107,7 @@ namespace MDEN.UI.Displays
             ApplyGameFont(_message);
             _message.alignment = TextAnchor.UpperRight;
             _message.verticalOverflow = VerticalWrapMode.Overflow;
+            _message.supportRichText = true;
 
             Sprite sprRoundedSquare = null;
             try
@@ -248,7 +251,7 @@ namespace MDEN.UI.Displays
 
             var chartTitle = entry == null ? "等待歌曲" : entry.DisplayName;
             var recommended = RecommendedConfigManager.GetDisplayText(entry);
-            _message.text = $"<color=#F8DC51>Next:</color>\n{chartTitle}\n<color=#{Constants.ColorPink}>推荐配置:</color>\n{recommended}";
+            _message.text = BuildMessageText(lobby, chartTitle, recommended, entry);
 
             bool isReady = PlaylistManager.IsLocalPlayerReady();
             _buttonMainText.text = lobby.IsPlaying ? "游戏中" : (isReady ? $"{lobby.ReadyPlayers?.Length ?? 0} / {lobby.Players?.Length ?? 0}" : "准备");
@@ -320,8 +323,15 @@ namespace MDEN.UI.Displays
 
             try
             {
-                using var _ = WindowStackController.LockUI("Setting ready...");
+                IDisposable uiLock = WindowStackController.LockUI("Setting ready...");
+                try
+                {
                 await PlaylistManager.SetReadyAsync(!PlaylistManager.IsLocalPlayerReady());
+                }
+                finally
+                {
+                    await MainThreadDispatcher.InvokeAsync(() => uiLock?.Dispose());
+                }
             }
             catch (Exception ex)
             {
@@ -345,8 +355,15 @@ namespace MDEN.UI.Displays
 
             try
             {
-                using var _ = WindowStackController.LockUI("Applying recommended config...");
+                IDisposable uiLock = WindowStackController.LockUI("Applying recommended config...");
+                try
+                {
                 await RecommendedConfigManager.ApplyCurrentAsync();
+                }
+                finally
+                {
+                    await MainThreadDispatcher.InvokeAsync(() => uiLock?.Dispose());
+                }
             }
             catch (Exception ex)
             {
@@ -368,8 +385,15 @@ namespace MDEN.UI.Displays
 
             try
             {
-                using var _ = WindowStackController.LockUI("Stopping lobby...");
+                IDisposable uiLock = WindowStackController.LockUI("Stopping lobby...");
+                try
+                {
                 await PlaylistManager.StopLobbyAsync();
+                }
+                finally
+                {
+                    await MainThreadDispatcher.InvokeAsync(() => uiLock?.Dispose());
+                }
             }
             catch (Exception ex)
             {
@@ -439,6 +463,59 @@ namespace MDEN.UI.Displays
                 _buttonEquipText.text = recommendationEquipped ? "已选择" : "使用推荐";
                 _buttonEquipText.color = canEquip ? Color.white : new Color(0.7f, 0.7f, 0.7f, 1f);
             }
+        }
+
+        private static string BuildMessageText(LobbySyncPush lobby, string chartTitle, string recommended, PlaylistEntryViewModel entry)
+        {
+            var ownerName = string.IsNullOrWhiteSpace(entry?.OwnerName) ? "Unknown" : entry.OwnerName;
+            var ownerColor = GetOwnerColor(lobby, ownerName);
+
+            return "<color=#F8DC51>Next:</color>\n" +
+                $"{chartTitle}\n" +
+                $"<color=#{Constants.ColorPink}>推荐配置:</color>\n" +
+                $"{recommended}\n" +
+                $"<size={OwnerInfoFontSize}><color=#{Constants.ColorCyan}>选谱人:</color></size>\n" +
+                $"<size={OwnerInfoFontSize}><color=#{ownerColor}>{EscapeRichText(ownerName)}</color></size>";
+        }
+
+        private static string GetOwnerColor(LobbySyncPush lobby, string ownerName)
+        {
+            if (lobby?.PlayerDetails != null)
+            {
+                foreach (var player in lobby.PlayerDetails)
+                {
+                    if (player == null || !string.Equals(player.Name, ownerName, StringComparison.Ordinal)) continue;
+
+                    var playerColor = NormalizeHexColor(player.ChatColor);
+                    if (!string.IsNullOrEmpty(playerColor)) return playerColor;
+                }
+            }
+
+            return "ffffff";
+        }
+
+        private static string NormalizeHexColor(string color)
+        {
+            if (string.IsNullOrWhiteSpace(color)) return null;
+
+            var normalized = color.Trim().TrimStart('#');
+            if (normalized.Length != 3 && normalized.Length != 6 && normalized.Length != 8) return null;
+
+            for (var i = 0; i < normalized.Length; i++)
+            {
+                var c = normalized[i];
+                var isHex = (c >= '0' && c <= '9') ||
+                    (c >= 'a' && c <= 'f') ||
+                    (c >= 'A' && c <= 'F');
+                if (!isHex) return null;
+            }
+
+            return normalized;
+        }
+
+        private static string EscapeRichText(string value)
+        {
+            return value?.Replace("<", "＜").Replace(">", "＞") ?? string.Empty;
         }
 
         private static void ApplyGameFont(Text text)

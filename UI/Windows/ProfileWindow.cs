@@ -236,7 +236,7 @@ namespace MDEN.UI.Windows
 
         private async Task SaveProfileFieldAsync(string fieldName, string value, Func<string, Task> saveAction)
         {
-            using var _ = WindowStackController.LockUI("Saving profile...");
+            IDisposable uiLock = WindowStackController.LockUI("Saving profile...");
 
             try
             {
@@ -246,6 +246,10 @@ namespace MDEN.UI.Windows
             catch (Exception ex)
             {
                 MDEN.Managers.ClientLogManager.Warning($"Save local profile field failed: {fieldName}, {ex.Message}");
+            }
+            finally
+            {
+                await MainThreadDispatcher.InvokeAsync(() => uiLock?.Dispose());
             }
         }
 

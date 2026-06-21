@@ -193,6 +193,7 @@ namespace MDEN.Managers
         {
             IsLoggedIn = false;
             SessionToken = null;
+            LobbyManager.CancelPendingJoin();
             SetState(string.IsNullOrWhiteSpace(CurrentServerAddress)
                 ? ConnectionLifecycleState.Disconnected
                 : ConnectionLifecycleState.Reconnecting);
@@ -237,14 +238,17 @@ namespace MDEN.Managers
             if (State == state) return;
 
             State = state;
-            try
+            MainThreadDispatcher.Enqueue(() =>
             {
-                StateChanged?.Invoke(state);
-            }
-            catch (Exception ex)
-            {
-                MDEN.Managers.ClientLogManager.Warning($"Connection state listener failed: {ex.Message}");
-            }
+                try
+                {
+                    StateChanged?.Invoke(state);
+                }
+                catch (Exception ex)
+                {
+                    MDEN.Managers.ClientLogManager.Warning($"Connection state listener failed: {ex.Message}");
+                }
+            });
         }
 
         private static ServerEndpoint ParseAddress(string address)

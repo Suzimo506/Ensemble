@@ -546,15 +546,15 @@ namespace MDEN.UI.Windows
 
         private async Task UpdateLobbySettingsAsync(LobbySettingsRequest request)
         {
-            using var _ = WindowStackController.LockUI("处理中...");
+            IDisposable uiLock = WindowStackController.LockUI("处理中...");
 
             try
             {
                 await LobbyManager.SetLobbySettingsAsync(request);
-                ApplyLocalLobbySettings(request);
+                await MainThreadDispatcher.InvokeAsync(() => ApplyLocalLobbySettings(request));
                 if (IsDisposed) return;
 
-                MainThreadDispatcher.Enqueue(() =>
+                await MainThreadDispatcher.InvokeAsync(() =>
                 {
                     if (IsDisposed) return;
                     RebuildWindow();
@@ -564,6 +564,10 @@ namespace MDEN.UI.Windows
             {
                 MDEN.Managers.ClientLogManager.Warning($"Update lobby settings failed: {ex.Message}");
                 MainThreadDispatcher.Enqueue(RebuildWindow);
+            }
+            finally
+            {
+                await MainThreadDispatcher.InvokeAsync(() => uiLock?.Dispose());
             }
         }
 
@@ -596,14 +600,14 @@ namespace MDEN.UI.Windows
 
         private async System.Threading.Tasks.Task LeaveLobbyAsync()
         {
-            using var _ = WindowStackController.LockUI("Leaving lobby...");
+            IDisposable uiLock = WindowStackController.LockUI("Leaving lobby...");
 
             try
             {
                 await LobbyManager.LeaveLobbyAsync();
                 if (IsDisposed) return;
 
-                MainThreadDispatcher.Enqueue(() =>
+                await MainThreadDispatcher.InvokeAsync(() =>
                 {
                     if (IsDisposed) return;
                     Close();
@@ -615,6 +619,10 @@ namespace MDEN.UI.Windows
             {
                 MDEN.Managers.ClientLogManager.Warning($"Leave lobby failed: {ex.Message}");
                 MainThreadDispatcher.Enqueue(() => Il2CppAssets.Scripts.UI.Controls.ShowText.ShowInfo(ex.Message));
+            }
+            finally
+            {
+                await MainThreadDispatcher.InvokeAsync(() => uiLock?.Dispose());
             }
         }
 

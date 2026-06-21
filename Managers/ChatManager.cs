@@ -4,6 +4,7 @@ using MDEN.Network;
 using MDEN.Protocol;
 using MDEN.Protocol.Messages.Chat;
 using MDEN.Protocol.Messages.Mdt;
+using MDEN.UI.Core;
 
 namespace MDEN.Managers
 {
@@ -52,7 +53,7 @@ namespace MDEN.Managers
 
         private static void OnChatPush(ChatPushMsg message)
         {
-            MessageReceived?.Invoke(message);
+            MainThreadDispatcher.Enqueue(() => MessageReceived?.Invoke(message));
         }
     }
 }

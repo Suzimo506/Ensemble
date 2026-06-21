@@ -222,7 +222,7 @@ namespace MDEN.UI.Displays
             _textList.Clear();
             if (clearMessages)
             {
-                _messages.Clear();
+                ClearMessages();
             }
             _inputField = null;
             _clearButton = null;
@@ -291,6 +291,17 @@ namespace MDEN.UI.Displays
 
             UpdateInputVisualState(_inputField, _clearButton, _inputField.isFocused);
             UpdateBackgroundFocusState(_inputField.isFocused);
+        }
+
+        private void ClearMessages()
+        {
+            foreach (var text in _textList.Values)
+            {
+                DestroyComponentObject(text);
+            }
+
+            _messages.Clear();
+            _textList.Clear();
         }
 
         private bool CreateNativeInputField(Transform parent)
@@ -614,7 +625,9 @@ namespace MDEN.UI.Displays
 
             try
             {
-                using var _ = WindowStackController.LockUI("Sending message...");
+                IDisposable uiLock = WindowStackController.LockUI("Sending message...");
+                try
+                {
                 var mdtReply = ParseMdtReply(message);
                 if (IsMdtCommand(message) && mdtReply == null)
                 {
@@ -632,6 +645,11 @@ namespace MDEN.UI.Displays
                 }
 
                 MainThreadDispatcher.Enqueue(ClearSubmittedInput);
+                }
+                finally
+                {
+                    await MainThreadDispatcher.InvokeAsync(() => uiLock?.Dispose());
+                }
             }
             catch (Exception ex)
             {

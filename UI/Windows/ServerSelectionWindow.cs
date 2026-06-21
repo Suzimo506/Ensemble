@@ -130,7 +130,7 @@ namespace MDEN.UI.Windows
             }
 
             _isRefreshingNodes = true;
-            using var _ = WindowStackController.LockUI("Fetching server nodes...");
+            IDisposable uiLock = WindowStackController.LockUI("Fetching server nodes...");
             CloudSyncIndicator.Start("正在获取节点...");
 
             try
@@ -183,7 +183,7 @@ namespace MDEN.UI.Windows
                 _officialNodeDisplayData = displayData;
                 _officialNodePlainNames = plainNames;
                 _customServerStatusDescriptions = customStatusDescriptions;
-                CloudSyncIndicator.Finish(true);
+                MainThreadDispatcher.Enqueue(() => CloudSyncIndicator.Finish(true));
 
             }
             catch (Exception e)
@@ -193,11 +193,12 @@ namespace MDEN.UI.Windows
                 _officialNodeDisplayData = new List<Tuple<string, string>>();
                 _officialNodePlainNames = new List<string>();
                 _customServerStatusDescriptions = new Dictionary<string, string>();
-                CloudSyncIndicator.Finish(false);
+                MainThreadDispatcher.Enqueue(() => CloudSyncIndicator.Finish(false));
             }
             finally
             {
                 _isRefreshingNodes = false;
+                await MainThreadDispatcher.InvokeAsync(() => uiLock?.Dispose());
             }
         }
 
@@ -479,16 +480,20 @@ namespace MDEN.UI.Windows
 
         private async Task JoinServerAsync(string address, string serverDisplayName = null, bool isOfficialServer = false)
         {
-            using var _ = WindowStackController.LockUI("Connecting to server...");
-
+            IDisposable uiLock = null;
             try
             {
-                GameAccountManager.RefreshSnapshot();
+                await MainThreadDispatcher.InvokeAsync(() =>
+                {
+                    uiLock = WindowStackController.LockUI("Connecting to server...");
+                    GameAccountManager.RefreshSnapshot();
+                });
+
                 var response = await ConnectionManager.ConnectAndLoginAsync(address, serverDisplayName, isOfficialServer);
                 if (IsDisposed) return;
 
                 MDEN.Managers.ClientLogManager.Msg($"Connected to {address}, server version: {response.Version}");
-                MainThreadDispatcher.Enqueue(() =>
+                await MainThreadDispatcher.InvokeAsync(() =>
                 {
                     if (IsDisposed) return;
                     Close();
@@ -498,6 +503,10 @@ namespace MDEN.UI.Windows
             catch (Exception ex)
             {
                 MDEN.Managers.ClientLogManager.Warning($"Join server failed: {ex.Message}");
+            }
+            finally
+            {
+                await MainThreadDispatcher.InvokeAsync(() => uiLock?.Dispose());
             }
         }
 

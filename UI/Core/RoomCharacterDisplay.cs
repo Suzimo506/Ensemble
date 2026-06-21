@@ -328,7 +328,6 @@ namespace MDEN.UI.Core
             var prefabTransform = slot.PrefabTransform;
             if (prefabTransform == null)
             {
-                WarnOnce($"prefab-transform-missing-{slot.DebugName}", $"Character prefab transform is missing. slot={slot.DebugName}, children={DescribeChildren(slot.Root)}");
                 return false;
             }
             prefabTransform.gameObject.SetActive(true);
@@ -342,11 +341,9 @@ namespace MDEN.UI.Core
             }
 
             ClearCharacterPrefab(slot.Root);
-            var sourceKind = "role-panel";
-            var newShow = InstantiateRolePanelCharacter(prefabTransform, charInfo, girlIndex, slot.SortingOrder, assetName);
+            var newShow = InstantiateRolePanelCharacter(prefabTransform, charInfo, girlIndex, slot.SortingOrder);
             if (newShow == null)
             {
-                sourceKind = "resource";
                 var sourcePrefab = LoadCharacterPrefab(assetName);
                 if (sourcePrefab == null)
                 {
@@ -355,7 +352,7 @@ namespace MDEN.UI.Core
                 }
 
                 ClearCharacterPrefab(slot.Root);
-                newShow = InstantiateCharacterPrefab(sourcePrefab, prefabTransform, girlIndex, slot.SortingOrder, assetName, sourceKind);
+                newShow = InstantiateCharacterPrefab(sourcePrefab, prefabTransform, girlIndex, slot.SortingOrder);
             }
 
             if (newShow == null)
@@ -379,22 +376,19 @@ namespace MDEN.UI.Core
             Transform prefabTransform,
             Il2CppAssets.Scripts.Database.CharacterInfo charInfo,
             int girlIndex,
-            int sortingOrder,
-            string assetName)
+            int sortingOrder)
         {
             var sourcePrefab = LoadCharacterApplyPrefab(girlIndex, charInfo);
             return sourcePrefab == null
                 ? null
-                : InstantiateCharacterPrefab(sourcePrefab, prefabTransform, girlIndex, sortingOrder, assetName, "role-panel");
+                : InstantiateCharacterPrefab(sourcePrefab, prefabTransform, girlIndex, sortingOrder);
         }
 
         private static GameObject InstantiateCharacterPrefab(
             GameObject sourcePrefab,
             Transform prefabTransform,
             int girlIndex,
-            int sortingOrder,
-            string assetName,
-            string sourceKind)
+            int sortingOrder)
         {
             if (sourcePrefab == null || prefabTransform == null) return null;
 
@@ -407,9 +401,6 @@ namespace MDEN.UI.Core
                 NormalizeCharacterPrefab(newShow, girlIndex, sortingOrder);
                 if (!HasVisibleCharacterContent(newShow))
                 {
-                    WarnOnce(
-                        $"visible-content-missing-{sourceKind}-{girlIndex}",
-                        $"Character has no visible content after load. source={sourceKind}, girlIndex={girlIndex}, asset={assetName}, children={DescribeChildren(newShow)}");
                     DestroyObject(newShow);
                     return null;
                 }
@@ -946,9 +937,9 @@ namespace MDEN.UI.Core
             {
                 expression.SetMuseShow(museComponent);
             }
-            catch (Exception ex)
+            catch
             {
-                WarnOnce($"character-expression-bind-{museShow.name}", $"Failed to bind character expression. target={museShow.name}, error={ex.Message}");
+                // 原生交互组件在克隆角色上可能缺少内部引用；忽略即可，避免刷无害 warning。
             }
         }
 

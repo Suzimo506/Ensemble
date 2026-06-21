@@ -110,7 +110,7 @@ namespace MDEN.UI.Windows
 
         private async Task SendFriendRequestAsync()
         {
-            using var _ = WindowStackController.LockUI("处理中...");
+            IDisposable uiLock = WindowStackController.LockUI("处理中...");
             try
             {
                 var response = await SocialManager.SendFriendRequestAsync(_player.Uid);
@@ -121,6 +121,10 @@ namespace MDEN.UI.Windows
             {
                 MDEN.Managers.ClientLogManager.Warning($"Friend action failed: {_player.Uid}, {ex.Message}");
                 MainThreadDispatcher.Enqueue(() => Il2CppAssets.Scripts.UI.Controls.ShowText.ShowInfo(ex.Message));
+            }
+            finally
+            {
+                await MainThreadDispatcher.InvokeAsync(() => uiLock?.Dispose());
             }
         }
 

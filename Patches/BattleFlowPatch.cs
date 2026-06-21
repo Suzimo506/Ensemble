@@ -122,6 +122,8 @@ namespace MDEN.Patches
                     return;
                 }
 
+                if (BattleResultFlowManager.IsBattleResultFlowPending) return;
+
                 SetVictoryButtons(false);
                 ChartPreviewController.HoldPreviewUntilResultPanelCloses();
                 _ = FinishBattleAndShowResultsAsync(true);
@@ -135,6 +137,7 @@ namespace MDEN.Patches
             private static void Postfix()
             {
                 if (!LobbyManager.IsInLobby) return;
+                if (BattleResultFlowManager.IsBattleResultFlowPending) return;
 
                 SetVictoryButtons(false);
                 ChartPreviewController.HoldPreviewUntilResultPanelCloses();
@@ -213,8 +216,7 @@ namespace MDEN.Patches
             if (BattleResultFlowManager.GetLastBattleResultSnapshot().Length == 0) return;
             if (!Input.GetKeyDown(KeyCode.R)) return;
 
-            BattleResultBannerDisplay.ClearAll();
-            _ = BattleResultBannerDisplay.ShowAsync(GetBattleResultSnapshot());
+            BattleResultBannerDisplay.ShowOrRefresh(GetBattleResultSnapshot());
         }
 
         private static bool HidePauseButton()
@@ -277,7 +279,7 @@ namespace MDEN.Patches
             {
                 await BattleManager.ReportBattleFinishedAsync(alive);
                 BattleResultFlowManager.SetLastBattleResultSnapshot(BattleManager.GetBattleDataSnapshot());
-                _ = BattleResultBannerDisplay.ShowAsync(GetBattleResultSnapshot());
+                BattleResultBannerDisplay.ShowOrRefresh(GetBattleResultSnapshot());
 
                 await WaitForLobbyBattleEndAsync(alive);
                 BattleResultFlowManager.SetLastBattleResultSnapshot(BattleManager.GetBattleDataSnapshot());
@@ -351,8 +353,7 @@ namespace MDEN.Patches
                     btnReset.onClick = new Button.ButtonClickedEvent();
                     btnReset.onClick.AddListener((UnityAction)(() =>
                     {
-                        BattleResultBannerDisplay.ClearAll();
-                        _ = BattleResultBannerDisplay.ShowAsync(GetBattleResultSnapshot());
+                        BattleResultBannerDisplay.ShowOrRefresh(GetBattleResultSnapshot());
                     }));
                 }
             }

@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using MDEN.Protocol;
 using MDEN.Protocol.Envelopes;
 using MDEN.Protocol.Messages.System;
+using MDEN.UI.Core;
 using MelonLoader;
 
 namespace MDEN.Network
@@ -83,7 +84,7 @@ namespace MDEN.Network
 
             if (notifyDisconnected)
             {
-                OnDisconnected?.Invoke();
+                MainThreadDispatcher.Enqueue(() => OnDisconnected?.Invoke());
             }
         }
 
@@ -96,6 +97,7 @@ namespace MDEN.Network
 
             var reqId = unchecked(++_nextReqId);
             if (reqId == 0) reqId = unchecked(++_nextReqId);
+            var connectionId = _connectionId;
 
             var pending = new PendingRequest(typeof(TResp));
             if (!_pendingRequests.TryAdd(reqId, pending))
@@ -109,6 +111,8 @@ namespace MDEN.Network
                 if (_pendingRequests.TryRemove(reqId, out var removed))
                 {
                     removed.TrySetException(new TimeoutException("Request timed out."));
+                    MDEN.Managers.ClientLogManager.Warning($"Request timed out. OpCode={opCode}, ReqId={reqId}. Disconnecting stale connection.");
+                    DisconnectIfCurrent(connectionId, true);
                 }
             });
 

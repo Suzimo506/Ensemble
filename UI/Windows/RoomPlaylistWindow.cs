@@ -165,13 +165,13 @@ namespace MDEN.UI.Windows
         {
             if (item == null || IsDisposed) return;
 
-            using var _ = WindowStackController.LockUI("Removing playlist entry...");
+            IDisposable uiLock = WindowStackController.LockUI("Removing playlist entry...");
             try
             {
                 await PlaylistManager.RemoveAsync(item.Entry);
                 if (IsDisposed) return;
 
-                MainThreadDispatcher.Enqueue(() =>
+                await MainThreadDispatcher.InvokeAsync(() =>
                 {
                     if (IsDisposed) return;
                     ShowText.ShowInfo("成功移除歌曲列表");
@@ -182,6 +182,10 @@ namespace MDEN.UI.Windows
             {
                 MDEN.Managers.ClientLogManager.Warning($"Remove playlist entry failed: {ex.Message}");
                 MainThreadDispatcher.Enqueue(() => ShowText.ShowInfo(ex.Message));
+            }
+            finally
+            {
+                await MainThreadDispatcher.InvokeAsync(() => uiLock?.Dispose());
             }
         }
 
