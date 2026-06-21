@@ -7,6 +7,9 @@ namespace MDEN.Protocol.Messages.Mdt
     {
         public string Uid { get; set; }
         public string ClientName { get; set; }
+        public long TimestampUnixMs { get; set; }
+        public string Nonce { get; set; }
+        public string Signature { get; set; }
     }
 
     public class MdtObserveResponse
