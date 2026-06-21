@@ -366,9 +366,9 @@ namespace MDEN.Managers
             IgnoredLobbySyncIds.Remove(push.Id);
             CurrentLobby = push;
             RememberLobbySyncRevision(push);
-            MDEN.Managers.ClientLogManager.Msg($"Lobby sync received: {push.Id}, players: {push.Players?.Length ?? 0}/{push.MaxPlayers}");
             if (pingOnlySync) return;
 
+            MDEN.Managers.ClientLogManager.Msg($"Lobby sync received: {push.Id}, players: {push.Players?.Length ?? 0}/{push.MaxPlayers}");
             NotifyCurrentLobbyChanged();
         }
 

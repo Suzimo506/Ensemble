@@ -134,7 +134,7 @@ namespace MDEN.Managers
                 var saveType = assembly?.GetType("FavGirl.FavSave");
                 var property = saveType?.GetProperty(propertyName, BindingFlags.Public | BindingFlags.Static);
                 var value = property?.GetValue(null);
-                return value is int intValue ? intValue : fallback;
+                return value == null ? fallback : Convert.ToInt32(value);
             }
             catch (Exception ex)
             {

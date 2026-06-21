@@ -30,6 +30,7 @@ namespace MDEN.UI.Core
         private const float PlayerStateWidth = 82f;
         private const int MaxVisiblePlayerRows = 8;
         private const int MaxLockedVisiblePlayerRows = 4;
+        private const float ScrollWheelDeadZone = 0.01f;
         private const int InfoTitleFontSize = 20;
         private const int InfoMetaFontSize = 17;
         private const int PlayerNameFontSize = 17;
@@ -58,6 +59,13 @@ namespace MDEN.UI.Core
         private static Text _roomTitle;
         private static Text _roomMeta;
         private static Sprite _roundedSprite;
+        private static int _playerScrollOffset;
+        private static int _lastLobbyId = -1;
+        private static bool _lastLobbyLocked;
+        private static int _lastPlayerCount;
+        private static bool _isDraggingPlayerList;
+        private static float _dragStartMouseY;
+        private static int _dragStartScrollOffset;
         private static readonly List<PlayerRowView> PlayerRows = new List<PlayerRowView>();
 
         public static bool IsCreated => _frame != null;
@@ -138,6 +146,7 @@ namespace MDEN.UI.Core
                 }
 
                 EnsureOverlayOrder();
+                HandlePlayerListPointerInput(lobby);
                 UpdateRoomInfo(lobby);
             }
         }
@@ -192,6 +201,8 @@ namespace MDEN.UI.Core
             scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
             scaler.matchWidthOrHeight = 0.5f;
 
+            _frame.AddComponent<GraphicRaycaster>();
+
             CreateRoomInfoPanel();
         }
 
@@ -202,6 +213,13 @@ namespace MDEN.UI.Core
             _roomInfoPanelRect = null;
             _roomTitle = null;
             _roomMeta = null;
+            _playerScrollOffset = 0;
+            _lastLobbyId = -1;
+            _lastLobbyLocked = false;
+            _lastPlayerCount = 0;
+            _isDraggingPlayerList = false;
+            _dragStartMouseY = 0f;
+            _dragStartScrollOffset = 0;
             PlayerRows.Clear();
         }
 
@@ -263,7 +281,7 @@ namespace MDEN.UI.Core
             background.sprite = GetRoundedSprite();
             background.type = background.sprite != null ? Image.Type.Sliced : Image.Type.Simple;
             background.color = new Color(0f, 0f, 0f, 0.38f);
-            background.raycastTarget = false;
+            background.raycastTarget = true;
 
             _roomTitle = CreatePanelText("RoomTitle", InfoPanelPadding, InfoTitleTop, InfoPanelWidth - InfoPanelPadding * 2f, InfoTitleHeight, InfoTitleFontSize, TextAnchor.UpperLeft);
             _roomMeta = CreatePanelText("RoomMeta", InfoPanelPadding, InfoMetaTop, InfoPanelWidth - InfoPanelPadding * 2f, InfoMetaHeight, InfoMetaFontSize, TextAnchor.UpperLeft);
@@ -450,8 +468,9 @@ namespace MDEN.UI.Core
 
             var players = GetRoomInfoPlayers(lobby);
             var maxVisibleRows = GetMaxVisiblePlayerRows(lobby);
-            var hasOverflow = players.Length > maxVisibleRows;
-            var visiblePlayerCount = hasOverflow ? maxVisibleRows - 1 : players.Length;
+            ResetScrollIfRoomShapeChanged(lobby, players.Length);
+            ClampPlayerScrollOffset(players.Length, maxVisibleRows);
+            var visiblePlayerCount = Math.Min(players.Length, maxVisibleRows);
             var playerRows = players.Length == 0 ? 1 : Math.Min(players.Length, maxVisibleRows);
             var playerListHeight = playerRows * PlayerLineHeight + Math.Max(0, playerRows - 1) * PlayerRowGap;
             var panelHeight = PlayerListTop + playerListHeight + InfoPanelPadding;
@@ -476,7 +495,7 @@ namespace MDEN.UI.Core
             EnsurePlayerRowCount(playerRows);
             for (var i = 0; i < visiblePlayerCount; i++)
             {
-                var player = players[i];
+                var player = players[_playerScrollOffset + i];
                 var state = GetPlayerState(lobby, player.Uid);
                 var y = PlayerListTop + i * (PlayerLineHeight + PlayerRowGap);
                 PlayerRows[i].Set(
@@ -487,19 +506,98 @@ namespace MDEN.UI.Core
                     state.Color);
             }
 
-            if (hasOverflow)
+            HidePlayerRowsFrom(playerRows);
+        }
+
+        private static void HandlePlayerListPointerInput(LobbySyncPush lobby)
+        {
+            if (lobby == null || _roomInfoPanelRect == null) return;
+
+            var pointerOverPanel = IsPointerOverRoomInfoPanel();
+            if (Input.GetMouseButtonDown(0))
             {
-                var hiddenCount = players.Length - visiblePlayerCount;
-                var y = PlayerListTop + visiblePlayerCount * (PlayerLineHeight + PlayerRowGap);
-                PlayerRows[visiblePlayerCount].Set(
-                    y,
-                    $"还有 {hiddenCount} 人",
-                    "ffffffff",
-                    "更多",
-                    Constants.ColorCyan);
+                if (pointerOverPanel)
+                {
+                    _isDraggingPlayerList = true;
+                    _dragStartMouseY = Input.mousePosition.y;
+                    _dragStartScrollOffset = _playerScrollOffset;
+                }
+                else
+                {
+                    _isDraggingPlayerList = false;
+                }
             }
 
-            HidePlayerRowsFrom(playerRows);
+            if (_isDraggingPlayerList)
+            {
+                if (Input.GetMouseButton(0))
+                {
+                    UpdatePlayerListDrag(lobby);
+                }
+                else
+                {
+                    _isDraggingPlayerList = false;
+                }
+            }
+
+            var delta = Input.mouseScrollDelta.y;
+            if (Math.Abs(delta) <= ScrollWheelDeadZone) return;
+            if (!pointerOverPanel) return;
+
+            var players = GetRoomInfoPlayers(lobby);
+            var maxVisibleRows = GetMaxVisiblePlayerRows(lobby);
+            if (players.Length <= maxVisibleRows)
+            {
+                _playerScrollOffset = 0;
+                return;
+            }
+
+            _playerScrollOffset += delta < 0f ? 1 : -1;
+            ClampPlayerScrollOffset(players.Length, maxVisibleRows);
+        }
+
+        private static void UpdatePlayerListDrag(LobbySyncPush lobby)
+        {
+            var players = GetRoomInfoPlayers(lobby);
+            var maxVisibleRows = GetMaxVisiblePlayerRows(lobby);
+            if (players.Length <= maxVisibleRows)
+            {
+                _playerScrollOffset = 0;
+                return;
+            }
+
+            var rowStride = PlayerLineHeight + PlayerRowGap;
+            var rowDelta = Mathf.RoundToInt((Input.mousePosition.y - _dragStartMouseY) / rowStride);
+            _playerScrollOffset = _dragStartScrollOffset + rowDelta;
+            ClampPlayerScrollOffset(players.Length, maxVisibleRows);
+        }
+
+        private static bool IsPointerOverRoomInfoPanel()
+        {
+            return _roomInfoPanelRect != null &&
+                   RectTransformUtility.RectangleContainsScreenPoint(_roomInfoPanelRect, Input.mousePosition, null);
+        }
+
+        private static void ResetScrollIfRoomShapeChanged(LobbySyncPush lobby, int playerCount)
+        {
+            if (lobby == null) return;
+            if (_lastLobbyId == lobby.Id &&
+                _lastLobbyLocked == lobby.Locked &&
+                _lastPlayerCount == playerCount)
+            {
+                return;
+            }
+
+            _lastLobbyId = lobby.Id;
+            _lastLobbyLocked = lobby.Locked;
+            _lastPlayerCount = playerCount;
+            _playerScrollOffset = 0;
+        }
+
+        private static void ClampPlayerScrollOffset(int playerCount, int maxVisibleRows)
+        {
+            var maxOffset = Math.Max(0, playerCount - maxVisibleRows);
+            _playerScrollOffset = Mathf.Clamp(_playerScrollOffset, 0, maxOffset);
         }
 
         private static int GetMaxVisiblePlayerRows(LobbySyncPush lobby)

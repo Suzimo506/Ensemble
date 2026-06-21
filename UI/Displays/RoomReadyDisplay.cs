@@ -75,7 +75,7 @@ namespace MDEN.UI.Displays
             baseRect.anchorMin = new Vector2(1f, 0.5f);
             baseRect.anchorMax = new Vector2(1f, 0.5f);
             baseRect.pivot = new Vector2(1f, 0.5f);
-            baseRect.anchoredPosition3D = new Vector3(-30f, 150f, 0f);
+            baseRect.anchoredPosition3D = new Vector3(-30f, 35f, 0f);
             baseRect.sizeDelta = new Vector2(350f, 370f);
             baseRect.localScale = Vector3.one;
 

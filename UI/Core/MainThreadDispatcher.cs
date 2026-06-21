@@ -17,22 +17,30 @@ namespace MDEN.UI.Core
             [CallerMemberName] string callerMemberName = null,
             [CallerFilePath] string callerFilePath = null)
         {
-            if (action != null)
-                _executionQueue.Enqueue(new QueuedAction(
-                    action,
-                    BuildActionName(callerMemberName, callerFilePath)));
+            if (action == null) return;
+
+            var actionName = PerfTrace.Enabled
+                ? BuildActionName(callerMemberName, callerFilePath)
+                : null;
+            _executionQueue.Enqueue(new QueuedAction(action, actionName));
         }
 
         internal static void ProcessQueue()
         {
-            var count = _executionQueue.Count;
             var processed = 0;
             var startedAt = System.Diagnostics.Stopwatch.GetTimestamp();
-            for (var i = 0; i < count && _executionQueue.TryDequeue(out var queued); i++)
+            while (_executionQueue.TryDequeue(out var queued))
             {
                 try
                 {
-                    using (PerfTrace.Measure(queued.Name))
+                    if (PerfTrace.Enabled && !string.IsNullOrEmpty(queued.Name))
+                    {
+                        using (PerfTrace.Measure(queued.Name))
+                        {
+                            queued.Action();
+                        }
+                    }
+                    else
                     {
                         queued.Action();
                     }

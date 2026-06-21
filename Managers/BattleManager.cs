@@ -46,9 +46,7 @@ namespace MDEN.Managers
         {
             lock (BattleDataLock)
             {
-                var result = new BattlePlayerEntry[PlayerBattleData.Count];
-                PlayerBattleData.Values.CopyTo(result, 0);
-                return result;
+                return CreateBattleDataSnapshotUnsafe();
             }
         }
 
@@ -306,8 +304,26 @@ namespace MDEN.Managers
                 var uid = PlayerManager.CurrentUid;
                 if (string.IsNullOrWhiteSpace(uid)) return;
 
+                BattlePlayerEntry[] snapshot;
                 lock (BattleDataLock)
                 {
+                    if (PlayerBattleData.TryGetValue(uid, out var entry) &&
+                        IsSameEntry(
+                            entry,
+                            notify.Score,
+                            notify.Accuracy,
+                            notify.Perfects,
+                            notify.Greats,
+                            notify.Earlies,
+                            notify.Lates,
+                            notify.Misses,
+                            notify.FC,
+                            notify.Alive,
+                            0))
+                    {
+                        return;
+                    }
+
                     PlayerBattleData[uid] = new BattlePlayerEntry
                     {
                         Uid = uid,
@@ -322,9 +338,10 @@ namespace MDEN.Managers
                         Alive = notify.Alive,
                         PingMS = 0
                     };
+                    snapshot = CreateBattleDataSnapshotUnsafe();
                 }
 
-                NotifyBattleDataChanged(GetBattleDataSnapshot());
+                NotifyBattleDataChanged(snapshot);
             }
         }
 
@@ -410,16 +427,31 @@ namespace MDEN.Managers
             }
 
             var players = push?.Players ?? Array.Empty<BattlePlayerEntry>();
+            var changed = false;
+            BattlePlayerEntry[] snapshot;
             lock (BattleDataLock)
             {
                 foreach (var player in players)
                 {
                     if (player == null || string.IsNullOrWhiteSpace(player.Uid)) continue;
+                    if (!PlayerBattleData.TryGetValue(player.Uid, out var entry))
+                    {
+                        PlayerBattleData[player.Uid] = player;
+                        changed = true;
+                        continue;
+                    }
+
+                    if (SameBattleEntry(entry, player)) continue;
+
                     PlayerBattleData[player.Uid] = player;
+                    changed = true;
                 }
+
+                if (!changed) return;
+                snapshot = CreateBattleDataSnapshotUnsafe();
             }
 
-            NotifyBattleDataChanged(GetBattleDataSnapshot());
+            NotifyBattleDataChanged(snapshot);
         }
 
         private static void NotifyBattleDataChanged(BattlePlayerEntry[] players)
@@ -490,5 +522,56 @@ namespace MDEN.Managers
 
             return _activeBattleId;
         }
+
+        private static BattlePlayerEntry[] CreateBattleDataSnapshotUnsafe()
+        {
+            var result = new BattlePlayerEntry[PlayerBattleData.Count];
+            PlayerBattleData.Values.CopyTo(result, 0);
+            return result;
+        }
+
+        private static bool SameBattleEntry(BattlePlayerEntry left, BattlePlayerEntry right)
+        {
+            if (left == null || right == null) return left == right;
+
+            return IsSameEntry(
+                left,
+                right.Score,
+                right.Accuracy,
+                right.Perfects,
+                right.Greats,
+                right.Earlies,
+                right.Lates,
+                right.Misses,
+                right.FC,
+                right.Alive,
+                right.PingMS);
+        }
+
+        private static bool IsSameEntry(
+            BattlePlayerEntry entry,
+            uint score,
+            float accuracy,
+            ushort perfects,
+            ushort greats,
+            ushort earlies,
+            ushort lates,
+            ushort misses,
+            bool fc,
+            bool alive,
+            ushort pingMs)
+        {
+            return entry.Score == score &&
+                   Math.Abs(entry.Accuracy - accuracy) < 0.0001f &&
+                   entry.Perfects == perfects &&
+                   entry.Greats == greats &&
+                   entry.Earlies == earlies &&
+                   entry.Lates == lates &&
+                   entry.Misses == misses &&
+                   entry.FC == fc &&
+                   entry.Alive == alive &&
+                   entry.PingMS == pingMs;
+        }
+
     }
 }

@@ -4,8 +4,9 @@ using MDEN.Network;
 using MDEN.UI.Core;
 using System;
 
-[assembly: MelonInfo(typeof(MDEN.Main), "Ensemble", "0.3.3", "MDENTeam")]
+[assembly: MelonInfo(typeof(MDEN.Main), "Ensemble", "0.3.4", "MDENTeam")]
 [assembly: MelonGame("PeroPeroGames", "MuseDash")]
+[assembly: MelonOptionalDependencies("FavGirl")]
 
 namespace MDEN
 {
@@ -37,6 +38,7 @@ namespace MDEN
                 WindowStackController.ForceUnlock();
                 NativeInputBlocker.ClearAll();
                 BattleResultBannerDisplay.ClearAll();
+                BattleHealthBarController.Reset();
                 Patches.BattleFlowPatch.ResetBattleSceneState();
                 RoomHudController.SetBattleSceneActive(false);
                 PerfTrace.SetGameMain(false);
@@ -59,6 +61,7 @@ namespace MDEN
                 CustomAlbumsWindowGuard.CloseIfOpen("GameMain scene load");
                 NativeInputBlocker.ClearAll();
                 BattleResultBannerDisplay.ClearAll();
+                BattleHealthBarController.Reset();
                 RoomHudController.SetBattleSceneActive(true);
                 PerfTrace.SetGameMain(true);
                 Patches.BattleFlowPatch.SceneLoaded();
@@ -72,41 +75,17 @@ namespace MDEN
         public override void OnUpdate()
         {
             PerfTrace.BeginFrame();
-            using (PerfTrace.Measure("MDEN.Main.OnUpdate"))
+            MainThreadDispatcher.ProcessQueue();
+
+            if (!BattleManager.IsActiveMultiplayerBattle)
             {
-                using (PerfTrace.Measure("MDEN.MainThreadDispatcher.ProcessQueue"))
-                {
-                    MainThreadDispatcher.ProcessQueue();
-                }
-
-                if (!BattleManager.IsActiveMultiplayerBattle)
-                {
-                    using (PerfTrace.Measure("MDEN.PlayerManager.SyncSelection"))
-                    {
-                        PlayerManager.SyncCurrentSelectionIfChanged();
-                    }
-                }
-
-                using (PerfTrace.Measure("MDEN.BattleFlow.UpdateUiState"))
-                {
-                    Patches.BattleFlowPatch.UpdateBattleUiState();
-                }
-
-                using (PerfTrace.Measure("MDEN.BattleResultBanner.Update"))
-                {
-                    BattleResultBannerDisplay.Update();
-                }
-
-                using (PerfTrace.Measure("MDEN.SettlementResultDialog.Update"))
-                {
-                    SettlementResultDialog.Update();
-                }
-
-                using (PerfTrace.Measure("MDEN.RoomHud.Update"))
-                {
-                    RoomHudController.Update();
-                }
+                PlayerManager.SyncCurrentSelectionIfChanged();
             }
+
+            Patches.BattleFlowPatch.UpdateBattleUiState();
+            BattleResultBannerDisplay.Update();
+            SettlementResultDialog.Update();
+            RoomHudController.Update();
 
             PerfTrace.UpdateReport();
         }

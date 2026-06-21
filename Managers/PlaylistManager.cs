@@ -26,6 +26,12 @@ namespace MDEN.Managers
         private const int LockNotSynced = 5;
         private const int LockUnsupported = 6;
         private const string UnsupportedChartMessage = "该谱面暂不支持联机";
+        private static int _cachedEntryLobbyId;
+        private static string _cachedEntryBattleId;
+        private static int _cachedEntryIndex = -1;
+        private static string _cachedEntryText;
+        private static PlaylistEntryViewModel _cachedEntry;
+        private static MusicInfo _cachedMusicInfo;
 
         public static bool CanChangePlaylist
         {
@@ -76,22 +82,33 @@ namespace MDEN.Managers
         public static PlaylistEntryViewModel GetCurrentPlaylistEntry()
         {
             var lobby = LobbyManager.CurrentLobby;
-            if (!string.IsNullOrWhiteSpace(lobby?.CurrentBattleEntry))
+            if (lobby == null) return null;
+
+            var entryText = GetCurrentPlaylistEntryText(lobby, out var playlistIndex);
+            if (string.IsNullOrWhiteSpace(entryText)) return null;
+
+            if (_cachedEntryLobbyId == lobby.Id &&
+                _cachedEntryBattleId == lobby.CurrentBattleId &&
+                _cachedEntryIndex == playlistIndex &&
+                _cachedEntryText == entryText)
             {
-                return ChartManager.ParseEntry(lobby.CurrentBattleEntry);
+                return _cachedEntry;
             }
 
-            var playlist = lobby?.Playlist;
-            if (playlist == null || playlist.Length == 0) return null;
-
-            var index = lobby.CurrentPlaylistEntry < playlist.Length ? lobby.CurrentPlaylistEntry : 0;
-            return ChartManager.ParseEntry(playlist[index]);
+            _cachedEntryLobbyId = lobby.Id;
+            _cachedEntryBattleId = lobby.CurrentBattleId;
+            _cachedEntryIndex = playlistIndex;
+            _cachedEntryText = entryText;
+            _cachedEntry = ChartManager.ParseEntry(entryText);
+            _cachedMusicInfo = null;
+            return _cachedEntry;
         }
 
         public static MusicInfo GetCurrentPlaylistMusicInfo()
         {
             var entry = GetCurrentPlaylistEntry();
-            return entry == null ? null : ChartManager.GetMusicInfo(entry.ChartKey);
+            if (entry == null) return null;
+            return _cachedMusicInfo ??= ChartManager.GetMusicInfo(entry.ChartKey);
         }
 
         public static bool IsPlaylistBattleActive()
@@ -243,6 +260,21 @@ namespace MDEN.Managers
         {
             var playlist = LobbyManager.CurrentLobby?.Playlist;
             return playlist?.FirstOrDefault(item => ChartManager.IsSameChart(item, entry));
+        }
+
+        private static string GetCurrentPlaylistEntryText(LobbySyncPush lobby, out int playlistIndex)
+        {
+            playlistIndex = -1;
+            if (!string.IsNullOrWhiteSpace(lobby.CurrentBattleEntry))
+            {
+                return lobby.CurrentBattleEntry;
+            }
+
+            var playlist = lobby.Playlist;
+            if (playlist == null || playlist.Length == 0) return null;
+
+            playlistIndex = lobby.CurrentPlaylistEntry < playlist.Length ? lobby.CurrentPlaylistEntry : 0;
+            return playlist[playlistIndex];
         }
 
         private static void EnsureEntrySupported(string entry)

@@ -14,6 +14,7 @@ namespace MDEN.Managers
         private static readonly HashSet<float> SpecialValues = new() { 0.6f, 0.7f, 0.8f, 0.9f, 1f };
         private static readonly HashSet<short> PlayedNoteIds = new();
         private static readonly HashSet<short> MissedNoteIds = new();
+        private static readonly HashSet<short> PendingMulMissNoteIds = new();
 
         private static int _totalMusic;
         private static int _totalEnergy;
@@ -204,6 +205,7 @@ namespace MDEN.Managers
         {
             PlayedNoteIds.Clear();
             MissedNoteIds.Clear();
+            PendingMulMissNoteIds.Clear();
 
             _totalMusic = 0;
             _totalEnergy = 0;
@@ -289,6 +291,7 @@ namespace MDEN.Managers
                     }
                     break;
                 case CountNoteAction.Mul:
+                    PendingMulMissNoteIds.Remove(oid);
                     if (PlayedNoteIds.Add(oid) && MissedNoteIds.Remove(oid))
                     {
                         _missMul--;
@@ -335,10 +338,12 @@ namespace MDEN.Managers
         private static void QueueMulMiss(short oid, float time)
         {
             if (_stageBattleComponent == null) return;
+            if (PlayedNoteIds.Contains(oid) || MissedNoteIds.Contains(oid) || !PendingMulMissNoteIds.Add(oid)) return;
 
             var currentTick = _stageBattleComponent.realTimeTick;
             MelonCoroutines.Start(DelayAction(() =>
             {
+                if (!PendingMulMissNoteIds.Remove(oid)) return;
                 if (_stageBattleComponent == null || _stageBattleComponent.realTimeTick <= currentTick)
                 {
                     return;

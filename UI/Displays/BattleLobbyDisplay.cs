@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
-using System.Linq;
 using Il2CppDG.Tweening;
 using MDEN.Managers;
 using MDEN.Protocol.Enums;
@@ -23,18 +22,27 @@ namespace MDEN.UI.Displays
         private const string ColorPurple = "9b55ffff";
         private const string ColorRed = "ff5555ff";
         private const string ColorWhite = "ffffffff";
+        private const int MaxMissPopupsPerRefresh = 1;
+        private const int MissPopupCooldownFrames = 60;
+        private const int StatePopupCooldownFrames = 15;
         private static readonly object ColorLock = new object();
         private static readonly Dictionary<string, string> PlayerColorCache = new Dictionary<string, string>();
         private static readonly HashSet<string> PendingColorRequests = new HashSet<string>();
+        private static int ColorGeneration;
         private static GameObject _infoPlusLabel;
         private static int? _infoPlusInstanceId;
         private static bool? _infoPlusWasActive;
 
         private readonly Dictionary<string, Text> _entries = new Dictionary<string, Text>();
         private readonly Dictionary<string, BattleEntryState> _previousEntries = new Dictionary<string, BattleEntryState>();
+        private readonly Dictionary<string, int> _lastPopupFrameByKey = new Dictionary<string, int>();
         private readonly List<string> _entryOrder = new List<string>();
+        private readonly List<string> _uidsToRemove = new List<string>();
         private GameObject _frame;
         private Canvas _canvas;
+        private int _lastRefreshHash;
+        private int _lastRefreshPlayerCount = -1;
+        private int _missPopupsThisRefresh;
 
         public bool IsCreated => _frame != null;
 
@@ -44,6 +52,7 @@ namespace MDEN.UI.Displays
             {
                 PlayerColorCache.Clear();
                 PendingColorRequests.Clear();
+                unchecked { ColorGeneration++; }
             }
         }
 
@@ -101,6 +110,15 @@ namespace MDEN.UI.Displays
             EnsureOverlayOrder();
 
             var orderedPlayers = OrderPlayers(WithLobbyDefaults(players ?? Array.Empty<BattlePlayerEntry>()));
+            var refreshHash = BuildRefreshHash(orderedPlayers);
+            if (_lastRefreshPlayerCount == orderedPlayers.Length &&
+                _lastRefreshHash == refreshHash &&
+                HasAllEntries(orderedPlayers))
+            {
+                return;
+            }
+
+            _missPopupsThisRefresh = 0;
             PrimePlayerColors(orderedPlayers);
             for (var i = 0; i < orderedPlayers.Length; i++)
             {
@@ -110,10 +128,11 @@ namespace MDEN.UI.Displays
                 _previousEntries[player.Uid] = BattleEntryState.From(player);
             }
 
-            var activeUids = orderedPlayers.Select(player => player.Uid).ToArray();
-            RemoveMissingEntries(activeUids);
-            SyncEntryOrder(activeUids);
+            RemoveMissingEntries(orderedPlayers);
+            SyncEntryOrder(orderedPlayers);
             PositionEntries();
+            _lastRefreshHash = refreshHash;
+            _lastRefreshPlayerCount = orderedPlayers.Length;
         }
 
         public void Clear()
@@ -125,7 +144,12 @@ namespace MDEN.UI.Displays
 
             _entries.Clear();
             _previousEntries.Clear();
+            _lastPopupFrameByKey.Clear();
             _entryOrder.Clear();
+            _uidsToRemove.Clear();
+            _lastRefreshHash = 0;
+            _lastRefreshPlayerCount = -1;
+            _missPopupsThisRefresh = 0;
         }
 
         private void SetEntry(string uid, string value)
@@ -179,33 +203,67 @@ namespace MDEN.UI.Displays
             var lobby = LobbyManager.CurrentLobby;
             var playerOrder = lobby?.Players ?? Array.Empty<string>();
             var goal = (LobbyGoal)(lobby?.Goal ?? (byte)LobbyGoal.Accuracy);
-            var validPlayers = players
-                .Where(player => player != null && !string.IsNullOrEmpty(player.Uid))
-                .ToArray();
-
-            if (goal == LobbyGoal.Score)
+            var validPlayers = new List<BattlePlayerEntry>(players?.Length ?? 0);
+            if (players != null)
             {
-                return validPlayers
-                    .OrderByDescending(player => player.Alive)
-                    .ThenByDescending(player => player.Score)
-                    .ThenByDescending(player => player.Accuracy)
-                    .ThenBy(player => GetPlayerSortIndex(player.Uid, playerOrder))
-                    .ToArray();
+                for (var i = 0; i < players.Length; i++)
+                {
+                    var player = players[i];
+                    if (player != null && !string.IsNullOrEmpty(player.Uid))
+                    {
+                        validPlayers.Add(player);
+                    }
+                }
             }
 
-            return validPlayers
-                .OrderByDescending(player => player.Alive)
-                .ThenByDescending(player => player.Accuracy)
-                .ThenBy(player => IsAp(player) ? GetEarlyLateCount(player) : int.MaxValue)
-                .ThenByDescending(player => player.Score)
-                .ThenBy(player => GetPlayerSortIndex(player.Uid, playerOrder))
-                .ToArray();
+            validPlayers.Sort((left, right) => ComparePlayers(left, right, goal, playerOrder));
+            return validPlayers.ToArray();
         }
 
         private static int GetPlayerSortIndex(string uid, string[] playerOrder)
         {
             var index = Array.IndexOf(playerOrder, uid);
             return index < 0 ? int.MaxValue : index;
+        }
+
+        private static int ComparePlayers(
+            BattlePlayerEntry left,
+            BattlePlayerEntry right,
+            LobbyGoal goal,
+            string[] playerOrder)
+        {
+            var result = CompareBoolDescending(left.Alive, right.Alive);
+            if (result != 0) return result;
+
+            if (goal == LobbyGoal.Score)
+            {
+                result = right.Score.CompareTo(left.Score);
+                if (result != 0) return result;
+
+                result = right.Accuracy.CompareTo(left.Accuracy);
+                if (result != 0) return result;
+            }
+            else
+            {
+                result = right.Accuracy.CompareTo(left.Accuracy);
+                if (result != 0) return result;
+
+                result = (IsAp(left) ? GetEarlyLateCount(left) : int.MaxValue)
+                    .CompareTo(IsAp(right) ? GetEarlyLateCount(right) : int.MaxValue);
+                if (result != 0) return result;
+
+                result = right.Score.CompareTo(left.Score);
+                if (result != 0) return result;
+            }
+
+            return GetPlayerSortIndex(left.Uid, playerOrder)
+                .CompareTo(GetPlayerSortIndex(right.Uid, playerOrder));
+        }
+
+        private static int CompareBoolDescending(bool left, bool right)
+        {
+            if (left == right) return 0;
+            return left ? -1 : 1;
         }
 
         private string FormatEntry(BattlePlayerEntry player, int rank)
@@ -241,7 +299,9 @@ namespace MDEN.UI.Displays
                 byUid[uid] = CreateDefaultBattleEntry(uid);
             }
 
-            return byUid.Values.ToArray();
+            var result = new BattlePlayerEntry[byUid.Count];
+            byUid.Values.CopyTo(result, 0);
+            return result;
         }
 
         private static string FormatBattleInfo(BattlePlayerEntry player, bool forceAccuracy)
@@ -303,25 +363,46 @@ namespace MDEN.UI.Displays
 
             if (previous.FC && !player.FC)
             {
-                Popup(ColorText("失去FC!", Constants.ColorBlue), player.Uid);
+                TryPopup(ColorText("失去FC!", Constants.ColorBlue), player.Uid, "fc", StatePopupCooldownFrames, false);
             }
             else if (previous.AP && !IsAp(player))
             {
-                Popup(ColorText("失去AP!", ColorGold), player.Uid);
+                TryPopup(ColorText("失去AP!", ColorGold), player.Uid, "ap", StatePopupCooldownFrames, false);
             }
             else if (previous.Alive && !player.Alive)
             {
-                Popup(ColorText("Down", ColorRed), player.Uid);
+                TryPopup(ColorText("Down", ColorRed), player.Uid, "down", StatePopupCooldownFrames, false);
             }
             else if (player.Misses > previous.Misses)
             {
-                Popup("Missed!", player.Uid);
+                TryPopup("Missed!", player.Uid, "miss", MissPopupCooldownFrames, true);
             }
         }
 
-        private void Popup(string value, string uid)
+        private void TryPopup(string value, string uid, string kind, int cooldownFrames, bool isMissPopup)
         {
-            if (_frame == null || !_entries.TryGetValue(uid, out var owner) || owner == null) return;
+            if (isMissPopup && _missPopupsThisRefresh >= MaxMissPopupsPerRefresh) return;
+
+            var key = uid + ":" + kind;
+            var frame = Time.frameCount;
+            if (_lastPopupFrameByKey.TryGetValue(key, out var lastFrame) &&
+                frame - lastFrame < cooldownFrames)
+            {
+                return;
+            }
+
+            if (!Popup(value, uid)) return;
+
+            _lastPopupFrameByKey[key] = frame;
+            if (isMissPopup)
+            {
+                _missPopupsThisRefresh++;
+            }
+        }
+
+        private bool Popup(string value, string uid)
+        {
+            if (_frame == null || !_entries.TryGetValue(uid, out var owner) || owner == null) return false;
 
             var popup = UnityEngine.Object.Instantiate(owner.gameObject, _frame.transform);
             popup.name = "Popup_" + uid;
@@ -331,11 +412,12 @@ namespace MDEN.UI.Displays
 
             var rect = popup.GetComponent<RectTransform>();
             var ownerRect = owner.GetComponent<RectTransform>();
-            rect.anchoredPosition = ownerRect.anchoredPosition + new Vector2(owner.preferredWidth + 10f, 0f);
+            rect.anchoredPosition = ownerRect.anchoredPosition + new Vector2(EntryWidth + 10f, 0f);
             rect.DOMoveX(50f, 1.5f).SetRelative().SetEase(Ease.OutSine).OnComplete((Action)(() =>
             {
                 if (popup != null) UnityEngine.Object.Destroy(popup);
             }));
+            return true;
         }
 
         private static bool IsAp(BattlePlayerEntry player)
@@ -438,7 +520,7 @@ namespace MDEN.UI.Displays
             return result;
         }
 
-        private static void PrimePlayerColors(IEnumerable<BattlePlayerEntry> players)
+        private static void PrimePlayerColors(BattlePlayerEntry[] players)
         {
             foreach (var player in players)
             {
@@ -471,6 +553,7 @@ namespace MDEN.UI.Displays
             {
                 PlayerColorCache[uid] = resolvedColor;
                 PendingColorRequests.Remove(uid);
+                unchecked { ColorGeneration++; }
             }
         }
 
@@ -487,13 +570,18 @@ namespace MDEN.UI.Displays
             return $"<color=#{color}>{value}</color>";
         }
 
-        private void RemoveMissingEntries(IEnumerable<string> activeUids)
+        private void RemoveMissingEntries(BattlePlayerEntry[] activePlayers)
         {
-            var active = new HashSet<string>(activeUids);
-            foreach (var uid in _entries.Keys.ToArray())
+            _uidsToRemove.Clear();
+            foreach (var uid in _entries.Keys)
             {
-                if (active.Contains(uid)) continue;
+                if (ContainsUid(activePlayers, uid)) continue;
+                _uidsToRemove.Add(uid);
+            }
 
+            for (var i = 0; i < _uidsToRemove.Count; i++)
+            {
+                var uid = _uidsToRemove[i];
                 if (_entries.TryGetValue(uid, out var text) && text != null)
                 {
                     DestroyComponentObject(text);
@@ -503,18 +591,99 @@ namespace MDEN.UI.Displays
                 _entryOrder.Remove(uid);
                 _previousEntries.Remove(uid);
             }
+
+            _uidsToRemove.Clear();
         }
 
-        private void SyncEntryOrder(IEnumerable<string> orderedUids)
+        private void SyncEntryOrder(BattlePlayerEntry[] orderedPlayers)
         {
             _entryOrder.Clear();
-            foreach (var uid in orderedUids)
+            foreach (var player in orderedPlayers)
             {
+                var uid = player?.Uid;
                 if (!string.IsNullOrEmpty(uid) && _entries.ContainsKey(uid))
                 {
                     _entryOrder.Add(uid);
                 }
             }
+        }
+
+        private bool HasAllEntries(BattlePlayerEntry[] players)
+        {
+            if (_entries.Count != players.Length) return false;
+
+            for (var i = 0; i < players.Length; i++)
+            {
+                var uid = players[i]?.Uid;
+                if (string.IsNullOrEmpty(uid) || !_entries.ContainsKey(uid)) return false;
+            }
+
+            return true;
+        }
+
+        private static bool ContainsUid(BattlePlayerEntry[] players, string uid)
+        {
+            if (string.IsNullOrEmpty(uid)) return false;
+
+            for (var i = 0; i < players.Length; i++)
+            {
+                if (players[i]?.Uid == uid) return true;
+            }
+
+            return false;
+        }
+
+        private static int BuildRefreshHash(BattlePlayerEntry[] players)
+        {
+            unchecked
+            {
+                var lobby = LobbyManager.CurrentLobby;
+                var hash = 17;
+                hash = hash * 31 + (lobby?.Goal ?? 0);
+                hash = hash * 31 + ColorGeneration;
+                hash = hash * 31 + BuildPlayerDetailsHash(lobby?.PlayerDetails);
+                for (var i = 0; i < players.Length; i++)
+                {
+                    var player = players[i];
+                    hash = hash * 31 + GetStringHash(player?.Uid);
+                    hash = hash * 31 + (int)(player?.Score ?? 0);
+                    hash = hash * 31 + Mathf.RoundToInt((player?.Accuracy ?? 0f) * 1000f);
+                    hash = hash * 31 + (player?.Perfects ?? 0);
+                    hash = hash * 31 + (player?.Greats ?? 0);
+                    hash = hash * 31 + (player?.Earlies ?? 0);
+                    hash = hash * 31 + (player?.Lates ?? 0);
+                    hash = hash * 31 + (player?.Misses ?? 0);
+                    hash = hash * 31 + ((player?.FC ?? false) ? 1 : 0);
+                    hash = hash * 31 + ((player?.Alive ?? false) ? 1 : 0);
+                }
+
+                return hash;
+            }
+        }
+
+        private static int BuildPlayerDetailsHash(PlayerSyncEntry[] details)
+        {
+            if (details == null || details.Length == 0) return 0;
+
+            unchecked
+            {
+                var hash = 17;
+                for (var i = 0; i < details.Length; i++)
+                {
+                    var player = details[i];
+                    hash = hash * 31 + GetStringHash(player?.Uid);
+                    hash = hash * 31 + GetStringHash(player?.Name);
+                    hash = hash * 31 + GetStringHash(player?.ChatColor);
+                    hash = hash * 31 + (player?.Status ?? 0);
+                }
+
+                return hash;
+            }
+        }
+
+        private static int GetStringHash(string value)
+        {
+            return string.IsNullOrEmpty(value) ? 0 : StringComparer.Ordinal.GetHashCode(value);
         }
 
         private void PositionEntries()

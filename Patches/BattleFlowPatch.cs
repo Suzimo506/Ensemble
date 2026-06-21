@@ -23,6 +23,8 @@ namespace MDEN.Patches
         private const int BattleEndPollIntervalMs = 500;
         private const int VictoryBattleEndWaitTimeoutMs = 90000;
         private const int FailedBattleEndWaitTimeoutMs = 180000;
+        private const int PauseButtonHideIntervalFrames = 30;
+        private const int PauseButtonLookupRetryFrames = 120;
         private static int _nextPauseButtonHideFrame;
         private static GameObject _pauseButton;
         private static int _nextVictoryPanelLookupFrame;
@@ -55,8 +57,10 @@ namespace MDEN.Patches
             if (!IsMultiplayerBattleContext) return;
             if (Time.frameCount < _nextPauseButtonHideFrame) return;
 
-            HidePauseButton();
-            _nextPauseButtonHideFrame = Time.frameCount + 30;
+            var foundPauseButton = HidePauseButton();
+            _nextPauseButtonHideFrame = Time.frameCount + (foundPauseButton
+                ? PauseButtonHideIntervalFrames
+                : PauseButtonLookupRetryFrames);
         }
 
         public static void SceneLoaded()
@@ -213,7 +217,7 @@ namespace MDEN.Patches
             _ = BattleResultBannerDisplay.ShowAsync(GetBattleResultSnapshot());
         }
 
-        private static void HidePauseButton()
+        private static bool HidePauseButton()
         {
             if (_pauseButton == null)
             {
@@ -222,8 +226,15 @@ namespace MDEN.Patches
 
             if (_pauseButton != null)
             {
-                _pauseButton.SetActive(false);
+                if (_pauseButton.activeSelf)
+                {
+                    _pauseButton.SetActive(false);
+                }
+
+                return true;
             }
+
+            return false;
         }
 
         private static void HideBattleControls()
