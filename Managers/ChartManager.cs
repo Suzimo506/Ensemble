@@ -1,8 +1,10 @@
 using CustomAlbums.Data;
 using CustomAlbums.Managers;
 using Il2CppAssets.Scripts.Database;
+using MDEN.UI.Core;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 
 namespace MDEN.Managers
 {
@@ -21,6 +23,7 @@ namespace MDEN.Managers
     public static class ChartManager
     {
         private static bool _initialized;
+        private static int _albumLoadedRefreshQueued;
         private static readonly Dictionary<string, Album> CustomAlbumsByMd5 = new Dictionary<string, Album>();
 
         public static int CurrentDifficulty
@@ -314,24 +317,22 @@ namespace MDEN.Managers
 
         private static void OnAlbumLoaded(object sender, CustomAlbums.ModExtensions.AlbumEventArgs e)
         {
-            if (e?.Album == null) return;
+            QueueAlbumLoadedRefresh();
+        }
 
-            var oldKeys = CustomAlbumsByMd5
-                .Where(pair => pair.Value != null && pair.Value.AlbumName == e.Album.AlbumName)
-                .Select(pair => pair.Key)
-                .ToArray();
-            foreach (var key in oldKeys)
+        private static void QueueAlbumLoadedRefresh()
+        {
+            if (Interlocked.Exchange(ref _albumLoadedRefreshQueued, 1) == 1)
             {
-                CustomAlbumsByMd5.Remove(key);
+                return;
             }
 
-            var sheet = GetPreferredSheet(e.Album);
-            if (sheet != null)
+            MainThreadDispatcher.Enqueue(() =>
             {
-                CustomAlbumsByMd5[sheet.Md5] = e.Album;
-            }
-
-            PlayerManager.SyncChartStateFireAndForget();
+                Interlocked.Exchange(ref _albumLoadedRefreshQueued, 0);
+                RebuildCustomAlbumIndex();
+                PlayerManager.SyncChartStateFireAndForget();
+            });
         }
 
         private static void RebuildCustomAlbumIndex()
