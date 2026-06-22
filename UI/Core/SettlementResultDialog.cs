@@ -94,6 +94,8 @@ namespace MDEN.UI.Core
 
             _closing = true;
             UiSoundManager.Play(UiSound.Yes, CloseSoundVolume);
+            BattleResultFlowManager.SetCanExitBattleResult(true);
+            BattleResultFlowManager.SetBattleResultFlowPending(false);
             Destroy();
         }
 

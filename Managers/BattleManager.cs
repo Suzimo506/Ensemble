@@ -16,6 +16,7 @@ namespace MDEN.Managers
     public static class BattleManager
     {
         private const int BattleUpdateIntervalMs = 500;
+        private const int BattleReturnedRetryIntervalMs = 5000;
         private static readonly object BattleDataLock = new();
         private static readonly object BattleDataDispatchLock = new();
         private static readonly Dictionary<string, BattlePlayerEntry> PlayerBattleData = new();
@@ -27,6 +28,7 @@ namespace MDEN.Managers
         private static BattleRoleAttributeComponent _battleRoleAttributeComponent;
         private static bool _synchronizing;
         private static bool _finishReported;
+        private static DateTime _lastBattleReturnedAttemptUtc;
         private static bool _forcedDead;
         private static bool _accuracyInitialized;
         private static bool _multiplayerBattleActive;
@@ -55,6 +57,7 @@ namespace MDEN.Managers
             MarkMultiplayerBattleStarting();
             _battleStartedUtc = DateTime.UtcNow;
             _activeBattleId = LobbyManager.CurrentLobby?.CurrentBattleId;
+            _lastBattleReturnedAttemptUtc = default;
 
             lock (BattleDataLock)
             {
@@ -100,9 +103,19 @@ namespace MDEN.Managers
 
         public static async Task ReportBattleFinishedAsync(bool alive)
         {
-            if (_finishReported) return;
+            if (_finishReported)
+            {
+                return;
+            }
 
-            _finishReported = true;
+            var now = DateTime.UtcNow;
+            if (_lastBattleReturnedAttemptUtc != default &&
+                now - _lastBattleReturnedAttemptUtc < TimeSpan.FromMilliseconds(BattleReturnedRetryIntervalMs))
+            {
+                return;
+            }
+
+            _lastBattleReturnedAttemptUtc = now;
             _forcedDead = !alive;
             StopSyncLoop();
 
@@ -121,6 +134,7 @@ namespace MDEN.Managers
                         PlayedSeconds = playedSeconds,
                         FinalPlayer = GetLocalBattleEntry()
                     });
+                _finishReported = true;
             }
             catch (Exception ex)
             {
@@ -215,6 +229,7 @@ namespace MDEN.Managers
             StopSyncLoop();
             MarkMultiplayerBattleEnded();
             _finishReported = false;
+            _lastBattleReturnedAttemptUtc = default;
             _forcedDead = false;
             _activeBattleId = null;
             _taskStageTarget = null;

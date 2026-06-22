@@ -21,14 +21,16 @@ namespace MDEN.Patches
     internal static class BattleFlowPatch
     {
         private const int BattleEndPollIntervalMs = 500;
-        private const int VictoryBattleEndWaitTimeoutMs = 90000;
-        private const int FailedBattleEndWaitTimeoutMs = 180000;
+        private const int VictoryBattleEndWaitTimeoutMs = 180000;
+        private const int FailedBattleEndWaitTimeoutMs = 3720000;
         private const int PauseButtonHideIntervalFrames = 30;
         private const int PauseButtonLookupRetryFrames = 120;
+        private static readonly System.TimeSpan WaitingHintCooldown = System.TimeSpan.FromSeconds(2.5);
         private static int _nextPauseButtonHideFrame;
         private static GameObject _pauseButton;
         private static int _nextVictoryPanelLookupFrame;
         private static PnlVictory _pnlVictory;
+        private static System.DateTime _lastWaitingHintUtc;
 
         private static bool IsMultiplayerBattleContext => BattleManager.IsActiveMultiplayerBattle;
 
@@ -39,6 +41,7 @@ namespace MDEN.Patches
             _nextVictoryPanelLookupFrame = 0;
             _pauseButton = null;
             _pnlVictory = null;
+            _lastWaitingHintUtc = default;
         }
 
         internal static void ResetBattleSceneState()
@@ -49,6 +52,7 @@ namespace MDEN.Patches
             _nextVictoryPanelLookupFrame = 0;
             _pauseButton = null;
             _pnlVictory = null;
+            _lastWaitingHintUtc = default;
         }
 
         internal static void UpdateBattleUiState()
@@ -196,7 +200,13 @@ namespace MDEN.Patches
         {
             private static bool Prefix()
             {
-                return !IsMultiplayerBattleContext || BattleResultFlowManager.CanExitBattleResult;
+                if (!IsMultiplayerBattleContext || BattleResultFlowManager.CanExitBattleResult)
+                {
+                    return true;
+                }
+
+                ShowWaitingForOthersHint();
+                return false;
             }
 
             private static void Postfix()
@@ -279,11 +289,18 @@ namespace MDEN.Patches
             {
                 await BattleManager.ReportBattleFinishedAsync(alive);
                 BattleResultFlowManager.SetLastBattleResultSnapshot(BattleManager.GetBattleDataSnapshot());
-                BattleResultBannerDisplay.ShowOrRefresh(GetBattleResultSnapshot());
+                if (alive)
+                {
+                    BattleResultBannerDisplay.ShowOrRefresh(GetBattleResultSnapshot());
+                }
+                else
+                {
+                    ShowWaitingForOthersHint();
+                }
 
                 await WaitForLobbyBattleEndAsync(alive);
                 BattleResultFlowManager.SetLastBattleResultSnapshot(BattleManager.GetBattleDataSnapshot());
-                BattleResultBannerDisplay.RefreshIfVisible(GetBattleResultSnapshot());
+                BattleResultBannerDisplay.ShowOrRefresh(GetBattleResultSnapshot());
 
                 if (LobbyManager.IsInLobby)
                 {
@@ -316,9 +333,26 @@ namespace MDEN.Patches
 
                 MainThreadDispatcher.Enqueue(() => SetVictoryButtons(false));
                 BattleResultBannerDisplay.SuppressNativeMessages();
+                await BattleManager.ReportBattleFinishedAsync(alive);
                 await Task.Delay(BattleEndPollIntervalMs);
                 waitedMs += BattleEndPollIntervalMs;
             }
+        }
+
+        private static void ShowWaitingForOthersHint()
+        {
+            var now = System.DateTime.UtcNow;
+            if (_lastWaitingHintUtc != default && now - _lastWaitingHintUtc < WaitingHintCooldown)
+            {
+                return;
+            }
+
+            _lastWaitingHintUtc = now;
+            MainThreadDispatcher.Enqueue(() =>
+            {
+                BattleResultBannerDisplay.AllowNativeMessagesBriefly();
+                Il2CppAssets.Scripts.UI.Controls.ShowText.ShowInfo("等待其他人完成游戏中...");
+            });
         }
 
         private static void SetVictoryButtons(bool canContinue)
@@ -329,7 +363,7 @@ namespace MDEN.Patches
             var btnContinue = pnlVictory.m_CurControls.btnContinue;
             if (btnContinue != null)
             {
-                btnContinue.interactable = canContinue;
+                btnContinue.interactable = true;
 
                 var txtContinue = btnContinue.transform.Find("TxtContinue")?.GetComponent<Text>();
                 if (txtContinue != null)

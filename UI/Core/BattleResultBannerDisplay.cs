@@ -32,6 +32,7 @@ namespace MDEN.UI.Core
         private static int _nextNativeMessageDirectLookupFrame;
         private static int _nextNativeMessagePanelLookupFrame;
         private static int _nextNativeMessageSuppressFrame;
+        private static int _allowNativeMessagesUntilFrame;
         private static GameObject _root;
         private static RectTransform _entryRoot;
         private static readonly List<EntryAnimation> EntryAnimations = new();
@@ -171,8 +172,14 @@ namespace MDEN.UI.Core
             _nextNativeMessageSuppressFrame = 0;
             ShowingResults = false;
             _enterWasDown = false;
+            _allowNativeMessagesUntilFrame = 0;
             SetKeyboardBlocked(false);
             MainThreadDispatcher.Enqueue(ClearAllOnMainThread);
+        }
+
+        public static void AllowNativeMessagesBriefly()
+        {
+            _allowNativeMessagesUntilFrame = Math.Max(_allowNativeMessagesUntilFrame, Time.frameCount + 90);
         }
 
         public static void SuppressNativeMessages()
@@ -183,6 +190,7 @@ namespace MDEN.UI.Core
         internal static bool ShouldSuppressNativeMessageObject(GameObject obj)
         {
             return IsSuppressingNativeMessages &&
+                   Time.frameCount > _allowNativeMessagesUntilFrame &&
                    obj != null &&
                    obj.name == "PnlMessage" &&
                    obj.GetComponent<PnlMessage>() != null;
@@ -445,6 +453,8 @@ namespace MDEN.UI.Core
 
         private static void SuppressNativeMessagesNow()
         {
+            if (Time.frameCount <= _allowNativeMessagesUntilFrame) return;
+
             SuppressNativeMessagePanel(GetPnlMessage());
 
             foreach (var pnlMessage in FindNativeMessagePanelsFallback())
