@@ -46,6 +46,11 @@ namespace MDEN.UI.Core
 
         private static void HandleBattleDataChanged(BattlePlayerEntry[] players)
         {
+            if (_battleActive && !BattleResultFlowManager.IsBattleResultFlowPending)
+            {
+                BattleResultBannerDisplay.RefreshIfVisible(players);
+            }
+
             if (!_battleActive || !LobbyManager.IsInLobby)
             {
                 if (Display.IsCreated)

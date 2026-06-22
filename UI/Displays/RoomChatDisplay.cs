@@ -478,19 +478,12 @@ namespace MDEN.UI.Displays
             if (string.IsNullOrWhiteSpace(copyName) && string.IsNullOrWhiteSpace(previewChartName)) return;
 
             text.raycastTarget = true;
-            var shadow = text.gameObject.GetComponent<Shadow>() ?? text.gameObject.AddComponent<Shadow>();
-            shadow.effectColor = new Color(0f, 0f, 0f, 0.75f);
-            shadow.effectDistance = new Vector2(2f, -2f);
-            shadow.enabled = false;
-
             var button = text.gameObject.GetComponent<Button>() ?? text.gameObject.AddComponent<Button>();
             button.transition = Selectable.Transition.None;
             button.targetGraphic = text;
             button.onClick.RemoveAllListeners();
             button.onClick.AddListener((UnityAction)(() =>
             {
-                shadow.enabled = false;
-
                 if (!string.IsNullOrWhiteSpace(copyName))
                 {
                     GUIUtility.systemCopyBuffer = copyName;
@@ -590,12 +583,15 @@ namespace MDEN.UI.Displays
 
         private bool IsScrolledToBottom()
         {
-            return _scrollRect == null || _scrollRect.verticalNormalizedPosition <= BottomSnapThreshold;
+            if (_scrollRect == null) return true;
+            if (!IsContentScrollable()) return true;
+            return _scrollRect.verticalNormalizedPosition <= BottomSnapThreshold;
         }
 
         private void HandleManualScrollWheel()
         {
             if (_scrollRect == null || _scrollFrame == null) return;
+            if (!IsContentScrollable()) return;
 
             var delta = Input.mouseScrollDelta.y;
             if (Math.Abs(delta) <= 0.01f) return;
@@ -609,6 +605,15 @@ namespace MDEN.UI.Displays
 
             _scrollRect.verticalNormalizedPosition = Mathf.Clamp01(
                 _scrollRect.verticalNormalizedPosition + delta * ManualScrollStep);
+        }
+
+        private bool IsContentScrollable()
+        {
+            var content = _scrollRect?.content;
+            var viewport = _scrollRect?.viewport;
+            if (content == null || viewport == null) return false;
+
+            return content.rect.height > viewport.rect.height + 1f;
         }
 
         private async void OnInputSubmit(string text)
