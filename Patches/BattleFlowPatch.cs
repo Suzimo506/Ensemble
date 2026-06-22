@@ -289,12 +289,13 @@ namespace MDEN.Patches
             BattleResultBannerDisplay.ClearAll();
             BattleManager.MarkLocalBattleFinished(alive);
             MainThreadDispatcher.Enqueue(() => SetVictoryButtons(false));
-            BattleResultFlowManager.SetLastBattleResultSnapshot(BattleManager.GetBattleDataSnapshot());
+            RememberBattleResultSnapshot(BattleManager.GetBattleDataSnapshot());
+            var finishingBattleId = LobbyManager.CurrentLobby?.CurrentBattleId;
 
             try
             {
                 await BattleManager.ReportBattleFinishedAsync(alive);
-                BattleResultFlowManager.SetLastBattleResultSnapshot(BattleManager.GetBattleDataSnapshot());
+                RememberBattleResultSnapshot(BattleManager.GetBattleDataSnapshot());
                 if (alive)
                 {
                     BattleResultBannerDisplay.ShowOrRefresh(GetBattleResultSnapshot());
@@ -304,8 +305,8 @@ namespace MDEN.Patches
                     ShowWaitingForOthersHint();
                 }
 
-                await WaitForLobbyBattleEndAsync(alive);
-                BattleResultFlowManager.SetLastBattleResultSnapshot(BattleManager.GetBattleDataSnapshot());
+                await WaitForLobbyBattleEndAsync(alive, finishingBattleId);
+                RememberBattleResultSnapshot(BattleManager.GetBattleDataSnapshot());
                 BattleResultBannerDisplay.ShowOrRefresh(GetBattleResultSnapshot());
 
                 if (LobbyManager.IsInLobby)
@@ -325,12 +326,21 @@ namespace MDEN.Patches
             }
         }
 
-        private static async Task WaitForLobbyBattleEndAsync(bool alive)
+        private static async Task WaitForLobbyBattleEndAsync(bool alive, string battleId)
         {
             var timeoutMs = alive ? VictoryBattleEndWaitTimeoutMs : FailedBattleEndWaitTimeoutMs;
             var waitedMs = 0;
             while (LobbyManager.IsInLobby && LobbyManager.CurrentLobby?.IsPlaying == true)
             {
+                var currentBattleId = LobbyManager.CurrentLobby?.CurrentBattleId;
+                if (!string.IsNullOrWhiteSpace(battleId) &&
+                    !string.IsNullOrWhiteSpace(currentBattleId) &&
+                    currentBattleId != battleId)
+                {
+                    MDEN.Managers.ClientLogManager.Warning($"Lobby battle id changed while waiting for result. old={battleId}, current={currentBattleId}, alive={alive}");
+                    return;
+                }
+
                 if (waitedMs >= timeoutMs)
                 {
                     MDEN.Managers.ClientLogManager.Warning($"Timed out waiting for lobby battle end. waitedMs={waitedMs}, alive={alive}");
@@ -343,6 +353,12 @@ namespace MDEN.Patches
                 await Task.Delay(BattleEndPollIntervalMs);
                 waitedMs += BattleEndPollIntervalMs;
             }
+        }
+
+        private static void RememberBattleResultSnapshot(BattlePlayerEntry[] snapshot)
+        {
+            if (snapshot == null || snapshot.Length == 0) return;
+            BattleResultFlowManager.SetLastBattleResultSnapshot(snapshot);
         }
 
         private static void ShowWaitingForOthersHint()
@@ -421,10 +437,18 @@ namespace MDEN.Patches
 
         private static BattlePlayerEntry[] GetBattleResultSnapshot()
         {
+            if (BattleResultFlowManager.IsBattleResultFlowPending ||
+                BattleResultBannerDisplay.IsVisible ||
+                BattleResultBannerDisplay.ShowingResults)
+            {
+                var lastSnapshot = BattleResultFlowManager.GetLastBattleResultSnapshot();
+                if (lastSnapshot.Length > 0) return lastSnapshot;
+            }
+
             var current = BattleManager.GetBattleDataSnapshot();
             if (current != null && current.Length > 0)
             {
-                BattleResultFlowManager.SetLastBattleResultSnapshot(current);
+                RememberBattleResultSnapshot(current);
                 return current;
             }
 

@@ -525,8 +525,12 @@ namespace MDEN.Managers
             var lobby = LobbyManager.CurrentLobby;
             if (lobby == null || !lobby.IsPlaying)
             {
-                _activeBattleId = null;
-                return null;
+                return _activeBattleId;
+            }
+
+            if (!string.IsNullOrWhiteSpace(_activeBattleId))
+            {
+                return _activeBattleId;
             }
 
             var currentBattleId = lobby.CurrentBattleId;

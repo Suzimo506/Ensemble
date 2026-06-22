@@ -483,22 +483,11 @@ namespace MDEN.UI.Displays
             shadow.effectDistance = new Vector2(2f, -2f);
             shadow.enabled = false;
 
-            var trigger = text.gameObject.GetComponent<UnityEngine.EventSystems.EventTrigger>()
-                ?? text.gameObject.AddComponent<UnityEngine.EventSystems.EventTrigger>();
-
-            AddMessageTrigger(trigger, UnityEngine.EventSystems.EventTriggerType.PointerDown, _ =>
-            {
-                shadow.enabled = true;
-            });
-            AddMessageTrigger(trigger, UnityEngine.EventSystems.EventTriggerType.PointerUp, _ =>
-            {
-                shadow.enabled = false;
-            });
-            AddMessageTrigger(trigger, UnityEngine.EventSystems.EventTriggerType.PointerExit, _ =>
-            {
-                shadow.enabled = false;
-            });
-            AddMessageTrigger(trigger, UnityEngine.EventSystems.EventTriggerType.PointerClick, _ =>
+            var button = text.gameObject.GetComponent<Button>() ?? text.gameObject.AddComponent<Button>();
+            button.transition = Selectable.Transition.None;
+            button.targetGraphic = text;
+            button.onClick.RemoveAllListeners();
+            button.onClick.AddListener((UnityAction)(() =>
             {
                 shadow.enabled = false;
 
@@ -510,20 +499,7 @@ namespace MDEN.UI.Displays
                 }
 
                 JumpToPlaylistChartPreview(previewChartName);
-            });
-        }
-
-        private static void AddMessageTrigger(
-            UnityEngine.EventSystems.EventTrigger trigger,
-            UnityEngine.EventSystems.EventTriggerType eventType,
-            Action<UnityEngine.EventSystems.BaseEventData> action)
-        {
-            var entry = new UnityEngine.EventSystems.EventTrigger.Entry
-            {
-                eventID = eventType
-            };
-            entry.callback.AddListener((UnityAction<UnityEngine.EventSystems.BaseEventData>)new Action<UnityEngine.EventSystems.BaseEventData>(action));
-            trigger.triggers.Add(entry);
+            }));
         }
 
         private void UpdateLayout()
