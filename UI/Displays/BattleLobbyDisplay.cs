@@ -677,7 +677,6 @@ namespace MDEN.UI.Displays
                     hash = hash * 31 + GetStringHash(player?.Uid);
                     hash = hash * 31 + GetStringHash(player?.Name);
                     hash = hash * 31 + GetStringHash(player?.ChatColor);
-                    hash = hash * 31 + (player?.Status ?? 0);
                 }
 
                 return hash;
