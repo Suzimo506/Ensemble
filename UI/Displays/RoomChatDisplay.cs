@@ -60,6 +60,8 @@ namespace MDEN.UI.Displays
         private const float InputLeftPadding = 10f;
         private const float InputRightPadding = 42f;
         private const float InputVerticalPadding = 2f;
+        private const float ManualScrollStep = 0.14f;
+        private const float BottomSnapThreshold = 0.02f;
         private const int MaxMessages = 50;
         private static readonly Color BackgroundDefaultColor = new Color(0f, 0f, 0f, 0.15f);
         private static readonly Color BackgroundFocusedColor = new Color(0f, 0f, 0f, 0.32f);
@@ -248,13 +250,17 @@ namespace MDEN.UI.Displays
             if (!updateSceneObjects) return;
             if (_frame == null || _scrollRect == null) return;
 
+            var shouldKeepAtBottom = IsScrolledToBottom();
             var text = AddTextToContent(message, _scrollRect.content);
             text.text = FormatMessage(message);
 
             Canvas.ForceUpdateCanvases();
             ResizeMessageText(text);
             UpdateLayout();
-            ScrollToBottom();
+            if (shouldKeepAtBottom)
+            {
+                ScrollToBottom();
+            }
         }
 
         private void TrimExcessMessages()
@@ -291,6 +297,7 @@ namespace MDEN.UI.Displays
 
             UpdateInputVisualState(_inputField, _clearButton, _inputField.isFocused);
             UpdateBackgroundFocusState(_inputField.isFocused);
+            HandleManualScrollWheel();
         }
 
         private void ClearMessages()
@@ -605,6 +612,29 @@ namespace MDEN.UI.Displays
             }
         }
 
+        private bool IsScrolledToBottom()
+        {
+            return _scrollRect == null || _scrollRect.verticalNormalizedPosition <= BottomSnapThreshold;
+        }
+
+        private void HandleManualScrollWheel()
+        {
+            if (_scrollRect == null || _scrollFrame == null) return;
+
+            var delta = Input.mouseScrollDelta.y;
+            if (Math.Abs(delta) <= 0.01f) return;
+
+            var frameRect = _scrollFrame.GetComponent<RectTransform>();
+            if (frameRect == null ||
+                !RectTransformUtility.RectangleContainsScreenPoint(frameRect, Input.mousePosition, null))
+            {
+                return;
+            }
+
+            _scrollRect.verticalNormalizedPosition = Mathf.Clamp01(
+                _scrollRect.verticalNormalizedPosition + delta * ManualScrollStep);
+        }
+
         private async void OnInputSubmit(string text)
         {
             var submittedByEnter = Input.GetKey(KeyCode.Return) || Input.GetKey(KeyCode.KeypadEnter);
@@ -625,9 +655,6 @@ namespace MDEN.UI.Displays
 
             try
             {
-                IDisposable uiLock = WindowStackController.LockUI("Sending message...");
-                try
-                {
                 var mdtReply = ParseMdtReply(message);
                 if (IsMdtCommand(message) && mdtReply == null)
                 {
@@ -645,11 +672,6 @@ namespace MDEN.UI.Displays
                 }
 
                 MainThreadDispatcher.Enqueue(ClearSubmittedInput);
-                }
-                finally
-                {
-                    await MainThreadDispatcher.InvokeAsync(() => uiLock?.Dispose());
-                }
             }
             catch (Exception ex)
             {
