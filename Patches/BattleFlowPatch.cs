@@ -226,6 +226,12 @@ namespace MDEN.Patches
             if (BattleResultFlowManager.GetLastBattleResultSnapshot().Length == 0) return;
             if (!Input.GetKeyDown(KeyCode.R)) return;
 
+            if (BattleResultFlowManager.IsBattleResultFlowPending)
+            {
+                ShowWaitingForOthersHint();
+                return;
+            }
+
             BattleResultBannerDisplay.ShowOrRefresh(GetBattleResultSnapshot());
         }
 
