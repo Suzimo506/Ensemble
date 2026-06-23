@@ -23,10 +23,12 @@ namespace MDEN.UI.Core
         private const float InfoMetaTop = 38f;
         private const float InfoMetaHeight = 22f;
         private const float PlayerListTop = 68f;
-        private const float PlayerLineHeight = 27f;
-        private const float PlayerRowGap = 5f;
+        private const float PlayerLineHeight = 32f;
+        private const float PlayerRowGap = 6f;
         private const float PlayerRowInset = 10f;
-        private const float PlayerNameWidth = 270f;
+        private const float PlayerAvatarSize = 28f;
+        private const float PlayerAvatarGap = 8f;
+        private const float PlayerNameWidth = 236f;
         private const float PlayerStateWidth = 82f;
         private const int MaxVisiblePlayerRows = 8;
         private const int MaxLockedVisiblePlayerRows = 4;
@@ -353,9 +355,29 @@ namespace MDEN.UI.Core
             image.color = new Color(0f, 0f, 0f, 0.24f);
             image.raycastTarget = false;
 
-            var nameText = CreateRowText(rootRect, "PlayerName", PlayerRowInset, PlayerNameWidth, TextAnchor.MiddleLeft, PlayerNameFontSize);
+            var avatar = CreateRowAvatar(rootRect);
+            var nameX = PlayerRowInset + PlayerAvatarSize + PlayerAvatarGap;
+            var nameText = CreateRowText(rootRect, "PlayerName", nameX, PlayerNameWidth, TextAnchor.MiddleLeft, PlayerNameFontSize);
             var stateText = CreateRowText(rootRect, "PlayerState", InfoPanelWidth - InfoPanelPadding * 2f - PlayerRowInset - PlayerStateWidth, PlayerStateWidth, TextAnchor.MiddleRight, PlayerStateFontSize);
-            return new PlayerRowView(root, rootRect, nameText, stateText);
+            return new PlayerRowView(root, rootRect, avatar, nameText, stateText);
+        }
+
+        private static Image CreateRowAvatar(RectTransform parent)
+        {
+            var obj = new GameObject("PlayerAvatar");
+            var rect = obj.AddComponent<RectTransform>();
+            rect.SetParent(parent, false);
+            rect.localScale = Vector3.one;
+            rect.anchorMin = new Vector2(0f, 0.5f);
+            rect.anchorMax = new Vector2(0f, 0.5f);
+            rect.pivot = new Vector2(0f, 0.5f);
+            rect.anchoredPosition = new Vector2(PlayerRowInset, 0f);
+            rect.sizeDelta = new Vector2(PlayerAvatarSize, PlayerAvatarSize);
+
+            var image = obj.AddComponent<Image>();
+            image.preserveAspect = true;
+            image.raycastTarget = false;
+            return image;
         }
 
         private static Text CreateRowText(RectTransform parent, string name, float x, float width, TextAnchor anchor, int fontSize)
@@ -487,7 +509,7 @@ namespace MDEN.UI.Core
             if (players.Length == 0)
             {
                 EnsurePlayerRowCount(1);
-                PlayerRows[0].Set(PlayerListTop, "暂无玩家", "ffffffff", string.Empty, "ffffffff");
+                PlayerRows[0].Set(PlayerListTop, null, null, null, "暂无玩家", "ffffffff", string.Empty, "ffffffff");
                 HidePlayerRowsFrom(1);
                 return;
             }
@@ -500,6 +522,9 @@ namespace MDEN.UI.Core
                 var y = PlayerListTop + i * (PlayerLineHeight + PlayerRowGap);
                 PlayerRows[i].Set(
                     y,
+                    player.Uid,
+                    player.AvatarName,
+                    player.AvatarData,
                     Truncate(EscapeRichText(player.Name), 16),
                     GetPlayerColor(player.Uid),
                     state.Text,
@@ -635,7 +660,11 @@ namespace MDEN.UI.Core
                 {
                     if (string.IsNullOrEmpty(player?.Uid)) continue;
                     if (!seenUids.Add(player.Uid)) continue;
-                    players.Add(new RoomInfoPlayer(player.Uid, string.IsNullOrEmpty(player.Name) ? player.Uid : player.Name));
+                    players.Add(new RoomInfoPlayer(
+                        player.Uid,
+                        string.IsNullOrEmpty(player.Name) ? player.Uid : player.Name,
+                        player.AvatarName,
+                        player.AvatarData));
                 }
             }
             else if (lobby.Players != null)
@@ -648,7 +677,9 @@ namespace MDEN.UI.Core
                         uid,
                         uid == PlayerManager.CurrentUid && !string.IsNullOrEmpty(PlayerManager.CurrentProfile?.Name)
                             ? PlayerManager.CurrentProfile.Name
-                            : uid));
+                            : uid,
+                        uid == PlayerManager.CurrentUid ? PlayerManager.CurrentProfile?.AvatarName : null,
+                        uid == PlayerManager.CurrentUid ? PlayerManager.CurrentProfile?.AvatarData : null));
                 }
             }
 
@@ -819,37 +850,52 @@ namespace MDEN.UI.Core
 
         private sealed class RoomInfoPlayer
         {
-            public RoomInfoPlayer(string uid, string name)
+            public RoomInfoPlayer(string uid, string name, string avatarName, string avatarData)
             {
                 Uid = uid;
                 Name = string.IsNullOrWhiteSpace(name) ? uid : name;
+                AvatarName = avatarName;
+                AvatarData = avatarData;
             }
 
             public string Uid { get; }
             public string Name { get; }
+            public string AvatarName { get; }
+            public string AvatarData { get; }
         }
 
         private sealed class PlayerRowView
         {
             private readonly GameObject _root;
             private readonly RectTransform _rect;
+            private readonly Image _avatar;
             private readonly Text _name;
             private readonly Text _state;
 
-            public PlayerRowView(GameObject root, RectTransform rect, Text name, Text state)
+            public PlayerRowView(GameObject root, RectTransform rect, Image avatar, Text name, Text state)
             {
                 _root = root;
                 _rect = rect;
+                _avatar = avatar;
                 _name = name;
                 _state = state;
             }
 
             public bool IsAlive => _root != null &&
                                    _rect != null &&
+                                   _avatar != null &&
                                    _name != null &&
                                    _state != null;
 
-            public void Set(float y, string playerName, string playerColor, string stateText, string stateColor)
+            public void Set(
+                float y,
+                string uid,
+                string avatarName,
+                string avatarData,
+                string playerName,
+                string playerColor,
+                string stateText,
+                string stateColor)
             {
                 if (_root != null && !_root.activeSelf)
                 {
@@ -859,6 +905,12 @@ namespace MDEN.UI.Core
                 if (_rect != null)
                 {
                     _rect.anchoredPosition = new Vector2(InfoPanelPadding, -y);
+                }
+
+                if (_avatar != null)
+                {
+                    _avatar.sprite = AvatarManager.GetAvatarSprite(uid, avatarName, avatarData);
+                    _avatar.enabled = _avatar.sprite != null;
                 }
 
                 if (_name != null)

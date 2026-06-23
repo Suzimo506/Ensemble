@@ -100,6 +100,8 @@ namespace MDEN.UI.Displays
                         Bio = player.Bio,
                         Title = GetDisplayTitle(player),
                         ChatColor = GetDisplayColor(player),
+                        AvatarName = player.AvatarName,
+                        AvatarData = player.AvatarData,
                         PingMS = player.PingMS,
                         Status = player.Status
                     };
@@ -121,7 +123,9 @@ namespace MDEN.UI.Displays
                         : uid,
                     Bio = uid == PlayerManager.CurrentUid ? PlayerManager.CurrentProfile?.Bio : null,
                     Title = uid == PlayerManager.CurrentUid ? PlayerManager.CurrentProfile?.Title : null,
-                    ChatColor = uid == PlayerManager.CurrentUid ? PlayerManager.CurrentProfile?.ChatColor : null
+                    ChatColor = uid == PlayerManager.CurrentUid ? PlayerManager.CurrentProfile?.ChatColor : null,
+                    AvatarName = uid == PlayerManager.CurrentUid ? PlayerManager.CurrentProfile?.AvatarName : null,
+                    AvatarData = uid == PlayerManager.CurrentUid ? PlayerManager.CurrentProfile?.AvatarData : null
                 };
             }
         }

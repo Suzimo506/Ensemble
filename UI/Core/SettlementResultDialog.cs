@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
-using System.Reflection;
 using MDEN.Managers;
 using MDEN.Protocol.Messages.Battle;
 using MelonLoader;
@@ -22,6 +21,9 @@ namespace MDEN.UI.Core
         private const float SidePadding = 54f;
         private const float AwardCardWidth = 242f;
         private const float AwardCardHeight = 154f;
+        private const float AwardAvatarSize = 30f;
+        private const float AwardNameRowHeight = 34f;
+        private const float AwardNamesViewportHeight = 78f;
         private const float ChartViewportHeight = 290f;
         private const float CloseSoundVolume = 1.35f;
 
@@ -335,16 +337,16 @@ namespace MDEN.UI.Core
 
             var gap = 14f;
             var x = 0f;
-            CreateAwardCard(areaRect, x, "龙币", FormatNames(result?.DragonCoinUids, result), "ffd700ff");
+            CreateAwardCard(areaRect, x, "龙币", result?.DragonCoinUids, result, "ffd700ff");
             x += AwardCardWidth + gap;
-            CreateAwardCard(areaRect, x, "最能连之人", FormatNames(result?.ComboUids, result), Constants.ColorBlue);
+            CreateAwardCard(areaRect, x, "最能连之人", result?.ComboUids, result, Constants.ColorBlue);
             x += AwardCardWidth + gap;
-            CreateAwardCard(areaRect, x, "P佬", FormatNames(result?.PerfectUids, result), Constants.ColorPink);
+            CreateAwardCard(areaRect, x, "P佬", result?.PerfectUids, result, Constants.ColorPink);
             x += AwardCardWidth + gap;
-            CreateAwardCard(areaRect, x, "真·梦游少女", FormatNames(result?.SleepwalkUids, result), "ff9f1aff");
+            CreateAwardCard(areaRect, x, "真·梦游少女", result?.SleepwalkUids, result, "ff9f1aff");
         }
 
-        private static void CreateAwardCard(RectTransform parent, float x, string titleText, string namesText, string accentColor)
+        private static void CreateAwardCard(RectTransform parent, float x, string titleText, string[] uids, SettlementResultPush result, string accentColor)
         {
             var card = CreateImage(parent, titleText, new Color(0.68f, 0.25f, 0.78f, 0.24f), true);
             card.anchorMin = new Vector2(0f, 1f);
@@ -369,14 +371,105 @@ namespace MDEN.UI.Core
             titleRect.offsetMin = new Vector2(20f, -52f);
             titleRect.offsetMax = new Vector2(-20f, -18f);
 
-            var names = CreateText(card, "Names", namesText, 21, TextAnchor.UpperLeft);
-            names.color = new Color(1f, 0.96f, 1f, 0.96f);
-            names.lineSpacing = 1.08f;
-            var namesRect = names.rectTransform;
-            namesRect.anchorMin = new Vector2(0f, 0f);
-            namesRect.anchorMax = new Vector2(1f, 1f);
-            namesRect.offsetMin = new Vector2(20f, 18f);
-            namesRect.offsetMax = new Vector2(-20f, -66f);
+            CreateAwardNameRows(card, uids, result);
+        }
+
+        private static void CreateAwardNameRows(RectTransform parent, string[] uids, SettlementResultPush result)
+        {
+            var uniqueUids = (uids ?? Array.Empty<string>())
+                .Where(uid => !string.IsNullOrWhiteSpace(uid))
+                .Distinct()
+                .ToArray();
+
+            var contentRect = CreateAwardNameViewport(parent, uniqueUids.Length);
+
+            if (uniqueUids.Length == 0)
+            {
+                var empty = CreateText(contentRect, "NamesEmpty", "暂无", 21, TextAnchor.MiddleLeft);
+                empty.color = new Color(1f, 0.96f, 1f, 0.78f);
+                var emptyRect = empty.rectTransform;
+                emptyRect.anchorMin = Vector2.zero;
+                emptyRect.anchorMax = Vector2.one;
+                emptyRect.offsetMin = Vector2.zero;
+                emptyRect.offsetMax = Vector2.zero;
+                return;
+            }
+
+            for (var i = 0; i < uniqueUids.Length; i++)
+            {
+                CreateAwardNameRow(contentRect, uniqueUids[i], result, i);
+            }
+        }
+
+        private static RectTransform CreateAwardNameViewport(RectTransform parent, int rowCount)
+        {
+            var viewport = new GameObject("NamesViewport");
+            viewport.transform.SetParent(parent, false);
+            var viewportRect = viewport.AddComponent<RectTransform>();
+            viewportRect.anchorMin = new Vector2(0f, 0f);
+            viewportRect.anchorMax = new Vector2(1f, 1f);
+            viewportRect.offsetMin = new Vector2(16f, 14f);
+            viewportRect.offsetMax = new Vector2(-16f, -62f);
+
+            var viewportImage = viewport.AddComponent<Image>();
+            viewportImage.color = new Color(1f, 1f, 1f, 0f);
+            viewportImage.raycastTarget = rowCount * AwardNameRowHeight > AwardNamesViewportHeight;
+
+            var mask = viewport.AddComponent<Mask>();
+            mask.showMaskGraphic = false;
+
+            var content = new GameObject("NamesContent");
+            content.transform.SetParent(viewportRect, false);
+            var contentRect = content.AddComponent<RectTransform>();
+            contentRect.anchorMin = new Vector2(0f, 1f);
+            contentRect.anchorMax = new Vector2(1f, 1f);
+            contentRect.pivot = new Vector2(0.5f, 1f);
+            contentRect.offsetMin = Vector2.zero;
+            contentRect.offsetMax = Vector2.zero;
+            contentRect.sizeDelta = new Vector2(0f, Mathf.Max(AwardNamesViewportHeight, Math.Max(1, rowCount) * AwardNameRowHeight));
+
+            var scroll = viewport.AddComponent<ScrollRect>();
+            scroll.content = contentRect;
+            scroll.viewport = viewportRect;
+            scroll.horizontal = false;
+            scroll.vertical = true;
+            scroll.movementType = ScrollRect.MovementType.Clamped;
+            scroll.scrollSensitivity = 18f;
+            return contentRect;
+        }
+
+        private static void CreateAwardNameRow(RectTransform parent, string uid, SettlementResultPush result, int index)
+        {
+            var row = new GameObject("NameRow_" + index);
+            row.transform.SetParent(parent, false);
+            var rowRect = row.AddComponent<RectTransform>();
+            rowRect.anchorMin = new Vector2(0f, 1f);
+            rowRect.anchorMax = new Vector2(1f, 1f);
+            rowRect.pivot = new Vector2(0f, 1f);
+            rowRect.offsetMin = new Vector2(0f, -AwardNameRowHeight * (index + 1));
+            rowRect.offsetMax = new Vector2(0f, -AwardNameRowHeight * index);
+
+            var avatar = new GameObject("Avatar");
+            avatar.transform.SetParent(rowRect, false);
+            var avatarRect = avatar.AddComponent<RectTransform>();
+            avatarRect.anchorMin = new Vector2(0f, 0.5f);
+            avatarRect.anchorMax = new Vector2(0f, 0.5f);
+            avatarRect.pivot = new Vector2(0f, 0.5f);
+            avatarRect.anchoredPosition = Vector2.zero;
+            avatarRect.sizeDelta = new Vector2(AwardAvatarSize, AwardAvatarSize);
+
+            var avatarImage = avatar.AddComponent<Image>();
+            avatarImage.sprite = GetPlayerAvatarSprite(uid, result);
+            avatarImage.preserveAspect = true;
+            avatarImage.raycastTarget = false;
+
+            var name = CreateText(rowRect, "Name", EscapeRichText(GetPlayerName(uid, result)), 20, TextAnchor.MiddleLeft);
+            name.color = new Color(1f, 0.96f, 1f, 0.96f);
+            var nameRect = name.rectTransform;
+            nameRect.anchorMin = Vector2.zero;
+            nameRect.anchorMax = Vector2.one;
+            nameRect.offsetMin = new Vector2(AwardAvatarSize + 8f, 0f);
+            nameRect.offsetMax = Vector2.zero;
         }
 
         private static void CreatePlayedCharts(RectTransform parent, SettlementResultPush result)
@@ -638,203 +731,7 @@ namespace MDEN.UI.Core
         {
             if (chart == null) return null;
             if (chart.DurationSeconds > 0f) return chart.DurationSeconds;
-            if (string.IsNullOrWhiteSpace(chart.ChartKey)) return null;
-
-            object musicInfo = null;
-            try
-            {
-                musicInfo = ChartManager.GetMusicInfo(chart.ChartKey);
-            }
-            catch
-            {
-                return null;
-            }
-
-            if (musicInfo == null) return null;
-
-            var value = TryReadDurationValue(musicInfo);
-            if (!value.HasValue || value <= 0f) return null;
-
-            return NormalizeDurationSeconds(value.Value);
-        }
-
-        private static float? TryReadDurationValue(object source)
-        {
-            var names = new[]
-            {
-                "duration", "Duration", "durationSec", "DurationSec",
-                "durationSeconds", "DurationSeconds", "musicDuration", "MusicDuration",
-                "musicDurationSec", "MusicDurationSec", "musicDurationSeconds", "MusicDurationSeconds",
-                "musicLength", "MusicLength", "musicTime", "MusicTime",
-                "musicTimeLength", "MusicTimeLength", "timeLength", "TimeLength",
-                "songDuration", "SongDuration", "songDurationSec", "SongDurationSec",
-                "songDurationSeconds", "SongDurationSeconds",
-                "songLength", "SongLength", "songTime", "SongTime",
-                "length", "Length", "time", "Time"
-            };
-
-            var type = source.GetType();
-            foreach (var name in names)
-            {
-                try
-                {
-                    var property = type.GetProperty(name, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
-                    if (property != null &&
-                        property.GetIndexParameters().Length == 0 &&
-                        TryConvertDuration(property.GetValue(source), out var seconds))
-                    {
-                        return seconds;
-                    }
-
-                    var field = type.GetField(name, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
-                    if (TryConvertDuration(field?.GetValue(source), out seconds)) return seconds;
-                }
-                catch
-                {
-                    // Some Il2Cpp-backed members throw when reflected during scene transitions.
-                }
-            }
-
-            var methodNames = new[]
-            {
-                "GetDuration", "GetMusicDuration", "GetSongDuration",
-                "GetLength", "GetMusicLength", "GetSongLength",
-                "GetTime", "GetMusicTime", "GetSongTime"
-            };
-            foreach (var name in methodNames)
-            {
-                try
-                {
-                    var method = type.GetMethod(name, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance, null, Type.EmptyTypes, null);
-                    if (TryConvertDuration(method?.Invoke(source, null), out var seconds)) return seconds;
-                }
-                catch
-                {
-                    // Some Il2Cpp-backed methods throw when reflected during scene transitions.
-                }
-            }
-
-            var fallback = TryReadDurationLikeMember(source, type);
-            if (fallback.HasValue) return fallback;
-
             return null;
-        }
-
-        private static float? TryReadDurationLikeMember(object source, Type type)
-        {
-            foreach (var property in type.GetProperties(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance))
-            {
-                if (!IsDurationLikeName(property.Name) || property.GetIndexParameters().Length != 0) continue;
-
-                try
-                {
-                    if (TryConvertDuration(property.GetValue(source), out var seconds)) return seconds;
-                }
-                catch
-                {
-                    // Some Il2Cpp-backed members throw when reflected during scene transitions.
-                }
-            }
-
-            foreach (var field in type.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance))
-            {
-                if (!IsDurationLikeName(field.Name)) continue;
-
-                try
-                {
-                    if (TryConvertDuration(field.GetValue(source), out var seconds)) return seconds;
-                }
-                catch
-                {
-                    // Some Il2Cpp-backed members throw when reflected during scene transitions.
-                }
-            }
-
-            return null;
-        }
-
-        private static bool IsDurationLikeName(string name)
-        {
-            if (string.IsNullOrWhiteSpace(name)) return false;
-
-            var normalized = name.ToLowerInvariant();
-            if (normalized.Contains("preview") ||
-                normalized.Contains("offset") ||
-                normalized.Contains("start") ||
-                normalized.Contains("end"))
-            {
-                return false;
-            }
-
-            return normalized.Contains("duration") ||
-                   normalized.Contains("timelength") ||
-                   normalized.Contains("musiclength") ||
-                   normalized.Contains("songlength") ||
-                   normalized.Contains("audiolength");
-        }
-
-        private static bool TryConvertDuration(object value, out float seconds)
-        {
-            seconds = 0f;
-            if (value == null) return false;
-
-            if (value is TimeSpan span)
-            {
-                seconds = (float)span.TotalSeconds;
-                return seconds > 0f;
-            }
-
-            if (value is string text)
-            {
-                return TryParseDurationText(text, out seconds);
-            }
-
-            try
-            {
-                seconds = Convert.ToSingle(value, CultureInfo.InvariantCulture);
-                return seconds > 0f;
-            }
-            catch
-            {
-                return false;
-            }
-        }
-
-        private static bool TryParseDurationText(string value, out float seconds)
-        {
-            seconds = 0f;
-            if (string.IsNullOrWhiteSpace(value)) return false;
-
-            var text = value.Trim();
-            if (float.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out seconds))
-            {
-                return seconds > 0f;
-            }
-
-            var parts = text.Split(':');
-            if (parts.Length < 2 || parts.Length > 3) return false;
-
-            var total = 0f;
-            foreach (var part in parts)
-            {
-                if (!float.TryParse(part, NumberStyles.Float, CultureInfo.InvariantCulture, out var segment) || segment < 0f)
-                {
-                    seconds = 0f;
-                    return false;
-                }
-
-                total = total * 60f + segment;
-            }
-
-            seconds = total;
-            return seconds > 0f;
-        }
-
-        private static float NormalizeDurationSeconds(float value)
-        {
-            if (value > 10000000f) return value / 10000000f;
-            if (value > 10000f) return value / 1000f;
-            return value;
         }
 
         private static string FormatDuration(float seconds)
@@ -919,6 +816,40 @@ namespace MDEN.UI.Core
             }
 
             return uid ?? "Unknown";
+        }
+
+        private static Sprite GetPlayerAvatarSprite(string uid, SettlementResultPush result)
+        {
+            if (string.IsNullOrWhiteSpace(uid))
+            {
+                return AvatarManager.GetAvatarSprite(null, null, null);
+            }
+
+            if (result?.PlayerNames != null)
+            {
+                foreach (var player in result.PlayerNames)
+                {
+                    if (player?.Uid != uid) continue;
+                    return AvatarManager.GetAvatarSprite(uid, player.AvatarName, player.AvatarData);
+                }
+            }
+
+            var lobby = LobbyManager.CurrentLobby;
+            if (lobby?.PlayerDetails != null)
+            {
+                foreach (var player in lobby.PlayerDetails)
+                {
+                    if (player?.Uid != uid) continue;
+                    return AvatarManager.GetAvatarSprite(uid, player.AvatarName, player.AvatarData);
+                }
+            }
+
+            if (uid == PlayerManager.CurrentUid)
+            {
+                return AvatarManager.GetCurrentAvatarSprite();
+            }
+
+            return AvatarManager.GetAvatarSprite(uid, null, null);
         }
 
         private static string EscapeRichText(string value)

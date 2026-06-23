@@ -280,9 +280,19 @@ namespace MDEN.UI.Displays
 
         internal static string FormatResultEntry(BattlePlayerEntry player, int rank)
         {
+            return $"{FormatResultRank(player, rank)} {FormatResultNameAndInfo(player)}";
+        }
+
+        internal static string FormatResultRank(BattlePlayerEntry player, int rank)
+        {
+            return FormatRank(player, rank);
+        }
+
+        internal static string FormatResultNameAndInfo(BattlePlayerEntry player)
+        {
             var playerName = EscapeRichText(GetPlayerName(player.Uid));
             var nameColor = GetPlayerColor(player.Uid);
-            return $"{FormatRank(player, rank)} {ColorText(playerName, nameColor)} — {FormatBattleInfo(player, false)}";
+            return $"{ColorText(playerName, nameColor)} — {FormatBattleInfo(player, false)}";
         }
 
         internal static BattlePlayerEntry[] WithLobbyDefaults(BattlePlayerEntry[] players)
@@ -415,7 +425,7 @@ namespace MDEN.UI.Displays
 
             var rect = popup.GetComponent<RectTransform>();
             var ownerRect = owner.GetComponent<RectTransform>();
-            rect.anchoredPosition = ownerRect.anchoredPosition + new Vector2(EntryWidth + 10f, 0f);
+            rect.anchoredPosition = ownerRect.anchoredPosition + new Vector2(owner.preferredWidth + 10f, 0f);
             rect.DOMoveX(50f, 1.5f).SetRelative().SetEase(Ease.OutSine).OnComplete((Action)(() =>
             {
                 if (popup != null) UnityEngine.Object.Destroy(popup);
@@ -677,6 +687,7 @@ namespace MDEN.UI.Displays
                     hash = hash * 31 + GetStringHash(player?.Uid);
                     hash = hash * 31 + GetStringHash(player?.Name);
                     hash = hash * 31 + GetStringHash(player?.ChatColor);
+                    hash = hash * 31 + GetStringHash(player?.AvatarName);
                 }
 
                 return hash;

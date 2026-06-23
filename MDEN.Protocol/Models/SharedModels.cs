@@ -10,6 +10,8 @@ namespace MDEN.Protocol.Models
         public string Bio { get; set; }
         public string Title { get; set; }
         public string ChatColor { get; set; }
+        public string AvatarName { get; set; }
+        public string AvatarData { get; set; }
         public ushort PingMS { get; set; }
         public byte Status { get; set; }
     }

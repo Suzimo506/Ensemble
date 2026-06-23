@@ -80,7 +80,7 @@ namespace MDEN.UI.Windows
         private ForumObject AddButton(string title, string description)
         {
             var button = new ForumObject(new LocalString(title), new LocalString(description));
-            button.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("PlayerCard.png")?.texture;
+            button.Texture = GetPlayerAvatarTexture();
             _window.ForumObjects.Add(button);
             return button;
         }
@@ -236,6 +236,16 @@ namespace MDEN.UI.Windows
         {
             var color = _profile?.ChatColor?.Trim().TrimStart('#');
             return string.IsNullOrWhiteSpace(color) ? "ffffff" : color;
+        }
+
+        private Texture2D GetPlayerAvatarTexture()
+        {
+            if (_profile != null)
+            {
+                return AvatarManager.GetAvatarTexture(_profile.Uid, _profile.AvatarName, _profile.AvatarData);
+            }
+
+            return AvatarManager.GetAvatarTexture(_player?.Uid, _player?.AvatarName, _player?.AvatarData);
         }
 
         private static string GetStatusText(byte status)

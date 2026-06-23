@@ -262,11 +262,13 @@ namespace MDEN.UI.Windows
                         Bio = player.Bio,
                         Title = player.Title,
                         ChatColor = player.ChatColor,
+                        AvatarName = player.AvatarName,
+                        AvatarData = player.AvatarData,
                         PingMS = player.PingMS,
                         Status = player.Status
                     };
                     var item = new ForumObject(new LocalString(name), new LocalString(BuildPlayerDescription(entry)));
-                    item.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("PlayerCard.png")?.texture;
+                    item.Texture = AvatarManager.GetAvatarTexture(entry.Uid, entry.AvatarName, entry.AvatarData);
                     _window.ForumObjects.Add(item);
                     _playerItems[item] = entry;
                     RequestRatingLevel(entry.Uid);
@@ -286,10 +288,12 @@ namespace MDEN.UI.Windows
                         Name = displayName,
                         Bio = uid == PlayerManager.CurrentUid ? PlayerManager.CurrentProfile?.Bio : null,
                         Title = uid == PlayerManager.CurrentUid ? PlayerManager.CurrentProfile?.Title : null,
-                        ChatColor = uid == PlayerManager.CurrentUid ? PlayerManager.CurrentProfile?.ChatColor : null
+                        ChatColor = uid == PlayerManager.CurrentUid ? PlayerManager.CurrentProfile?.ChatColor : null,
+                        AvatarName = uid == PlayerManager.CurrentUid ? PlayerManager.CurrentProfile?.AvatarName : null,
+                        AvatarData = uid == PlayerManager.CurrentUid ? PlayerManager.CurrentProfile?.AvatarData : null
                     };
                     var item = new ForumObject(new LocalString(name), new LocalString(BuildPlayerDescription(entry)));
-                    item.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("PlayerCard.png")?.texture;
+                    item.Texture = AvatarManager.GetAvatarTexture(entry.Uid, entry.AvatarName, entry.AvatarData);
                     _window.ForumObjects.Add(item);
                     _playerItems[item] = entry;
                     RequestRatingLevel(entry.Uid);

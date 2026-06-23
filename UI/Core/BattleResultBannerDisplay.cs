@@ -23,14 +23,17 @@ namespace MDEN.UI.Core
         private const float EntryWidth = 1180f;
         private const float EntryHeight = 58f;
         private const float EntrySpacing = 68f;
+        private const float EntryAvatarSize = 46f;
+        private const float EntryGroupMaxWidth = 980f;
+        private const float EntryRankMinWidth = 64f;
+        private const float EntryAvatarGap = 14f;
+        private const float EntryNameGap = 12f;
         private const float EntrySlideOffset = 180f;
         private const float EntrySlideDuration = 0.42f;
         private const float ClickSoundVolumeScale = 2.4f;
         private static readonly TimeSpan CellDelay = TimeSpan.FromMilliseconds(145);
         private static PnlMessage _pnlMessage;
-        private static PnlMessage[] _nativeMessagePanels = Array.Empty<PnlMessage>();
         private static int _nextNativeMessageDirectLookupFrame;
-        private static int _nextNativeMessagePanelLookupFrame;
         private static int _nextNativeMessageSuppressFrame;
         private static int _allowNativeMessagesUntilFrame;
         private static GameObject _root;
@@ -89,33 +92,43 @@ namespace MDEN.UI.Core
         {
             if (!LobbyManager.IsInLobby) return;
 
-            var orderedPlayers = BattleLobbyDisplay
-                .OrderPlayers(players ?? Array.Empty<BattlePlayerEntry>())
-                .ToArray();
-            if (orderedPlayers.Length == 0)
-            {
-                MDEN.Managers.ClientLogManager.Warning("Battle result skipped: no player snapshot.");
-                return;
-            }
-
-            var generation = ++_resultGeneration;
-            ShowingResults = true;
-            MainThreadDispatcher.Enqueue(() =>
-            {
-                if (generation != _resultGeneration) return;
-                DestroyRoot();
-                CreateRoot();
-                UpdateEntryAnimations();
-                StartNativeMessageSuppression();
-            });
-
+            var generation = 0;
             try
             {
+                var orderedPlayers = BattleLobbyDisplay
+                    .OrderPlayers(players ?? Array.Empty<BattlePlayerEntry>())
+                    .ToArray();
+                if (orderedPlayers.Length == 0)
+                {
+                    MDEN.Managers.ClientLogManager.Warning("Battle result skipped: no player snapshot.");
+                    return;
+                }
+
+                generation = ++_resultGeneration;
+                ShowingResults = true;
+                await MainThreadDispatcher.InvokeAsync(() =>
+                {
+                    if (generation != _resultGeneration) return;
+                    DestroyRoot();
+                    CreateRoot();
+                    UpdateEntryAnimations();
+                    StartNativeMessageSuppression();
+                });
+
+                EntryLayout layout = null;
+                await MainThreadDispatcher.InvokeAsync(() =>
+                {
+                    if (generation == _resultGeneration)
+                    {
+                        layout = MeasureEntryLayout(orderedPlayers);
+                    }
+                });
+                if (layout == null) return;
+
                 for (var i = 0; i < orderedPlayers.Length; i++)
                 {
                     var player = orderedPlayers[i];
-                    var text = BattleLobbyDisplay.FormatResultEntry(player, i + 1);
-                    await AddOneAsync(text, i, orderedPlayers.Length, generation);
+                    await AddOneAsync(player, i + 1, i, orderedPlayers.Length, generation, layout);
                 }
 
                 if (generation == _resultGeneration)
@@ -129,18 +142,27 @@ namespace MDEN.UI.Core
                     }
                 }
             }
+            catch (Exception ex)
+            {
+                MDEN.Managers.ClientLogManager.Warning($"Battle result display failed: {ex.Message}");
+                if (generation == 0 || generation == _resultGeneration)
+                {
+                    ClearAll();
+                }
+            }
             finally
             {
-                if (generation == _resultGeneration)
+                if (generation == 0 || generation == _resultGeneration)
                 {
                     ShowingResults = false;
+                    UpdateKeyboardBlock();
                 }
             }
         }
 
         public static void CloseWithSound()
         {
-            if (!IsVisible) return;
+            if (!IsVisible && !ShowingResults) return;
 
             UiSoundManager.Play(UiSound.Yes, ClickSoundVolumeScale);
             ClearAll();
@@ -164,11 +186,9 @@ namespace MDEN.UI.Core
         {
             _resultGeneration++;
             _suppressNativeMessagesUntilFrame = 0;
-            _nativeMessagePanels = Array.Empty<PnlMessage>();
             _displayedPlayers = Array.Empty<BattlePlayerEntry>();
             _pendingRefreshPlayers = null;
             _nextNativeMessageDirectLookupFrame = 0;
-            _nextNativeMessagePanelLookupFrame = 0;
             _nextNativeMessageSuppressFrame = 0;
             ShowingResults = false;
             _enterWasDown = false;
@@ -203,13 +223,13 @@ namespace MDEN.UI.Core
             UpdateKeyboardBlock();
         }
 
-        private static async Task AddOneAsync(string text, int index, int count, int generation)
+        private static async Task AddOneAsync(BattlePlayerEntry player, int rank, int index, int count, int generation, EntryLayout layout)
         {
-            MainThreadDispatcher.Enqueue(() =>
+            await MainThreadDispatcher.InvokeAsync(() =>
             {
                 if (EnsureRootReady(generation))
                 {
-                    AddEntry(text, index, count, generation);
+                    AddEntry(player, rank, index, count, generation, layout);
                 }
             });
             await Task.Delay(CellDelay);
@@ -272,14 +292,16 @@ namespace MDEN.UI.Core
         }
 
         private static void AddEntry(
-            string text,
+            BattlePlayerEntry player,
+            int rank,
             int index,
             int count,
             int generation,
+            EntryLayout layout,
             bool animate = true)
         {
             if (generation != _resultGeneration) return;
-            if (_root == null || _entryRoot == null) return;
+            if (_root == null || _entryRoot == null || layout == null) return;
 
             var obj = new GameObject($"{ResultEntryName}_{index + 1}");
             obj.transform.SetParent(_entryRoot, false);
@@ -304,19 +326,63 @@ namespace MDEN.UI.Core
             outline.effectColor = new Color(1f, 0.34f, 0.92f, 0.28f);
             outline.effectDistance = new Vector2(0f, -2f);
 
-            var label = new GameObject("Text");
-            label.transform.SetParent(obj.transform, false);
+            var groupRoot = new GameObject("Content");
+            groupRoot.transform.SetParent(obj.transform, false);
+            var groupRect = groupRoot.AddComponent<RectTransform>();
+            groupRect.anchorMin = new Vector2(0.5f, 0.5f);
+            groupRect.anchorMax = new Vector2(0.5f, 0.5f);
+            groupRect.pivot = new Vector2(0f, 0.5f);
+            groupRect.anchoredPosition = new Vector2(-layout.ContentWidth * 0.5f, 0f);
+            groupRect.sizeDelta = new Vector2(layout.ContentWidth, EntryHeight);
+
+            var rankLabel = new GameObject("Rank");
+            rankLabel.transform.SetParent(groupRoot.transform, false);
+            var rankRect = rankLabel.AddComponent<RectTransform>();
+            rankRect.anchorMin = new Vector2(0f, 0.5f);
+            rankRect.anchorMax = new Vector2(0f, 0.5f);
+            rankRect.pivot = new Vector2(0f, 0.5f);
+            rankRect.anchoredPosition = Vector2.zero;
+            rankRect.sizeDelta = new Vector2(layout.RankWidth, EntryHeight);
+
+            var rankText = rankLabel.AddComponent<Text>();
+            ApplyGameFont(rankText);
+            rankText.text = BattleLobbyDisplay.FormatResultRank(player, rank);
+            rankText.fontSize = 30;
+            rankText.alignment = TextAnchor.MiddleRight;
+            rankText.horizontalOverflow = HorizontalWrapMode.Overflow;
+            rankText.verticalOverflow = VerticalWrapMode.Overflow;
+            rankText.supportRichText = true;
+            rankText.raycastTarget = false;
+            rankText.color = Color.white;
+
+            var avatar = new GameObject("Avatar");
+            avatar.transform.SetParent(groupRoot.transform, false);
+            var avatarRect = avatar.AddComponent<RectTransform>();
+            avatarRect.anchorMin = new Vector2(0f, 0.5f);
+            avatarRect.anchorMax = new Vector2(0f, 0.5f);
+            avatarRect.pivot = new Vector2(0f, 0.5f);
+            avatarRect.anchoredPosition = new Vector2(layout.AvatarX, 0f);
+            avatarRect.sizeDelta = new Vector2(EntryAvatarSize, EntryAvatarSize);
+
+            var avatarImage = avatar.AddComponent<Image>();
+            avatarImage.sprite = GetPlayerAvatarSprite(player?.Uid);
+            avatarImage.preserveAspect = true;
+            avatarImage.raycastTarget = false;
+
+            var label = new GameObject("Details");
+            label.transform.SetParent(groupRoot.transform, false);
             var labelRect = label.AddComponent<RectTransform>();
-            labelRect.anchorMin = Vector2.zero;
-            labelRect.anchorMax = Vector2.one;
-            labelRect.offsetMin = new Vector2(28f, 0f);
-            labelRect.offsetMax = new Vector2(-28f, 0f);
+            labelRect.anchorMin = new Vector2(0f, 0.5f);
+            labelRect.anchorMax = new Vector2(0f, 0.5f);
+            labelRect.pivot = new Vector2(0f, 0.5f);
+            labelRect.anchoredPosition = new Vector2(layout.LabelX, 0f);
+            labelRect.sizeDelta = new Vector2(layout.LabelWidth, EntryHeight);
 
             var labelText = label.AddComponent<Text>();
             ApplyGameFont(labelText);
-            labelText.text = text;
+            labelText.text = BattleLobbyDisplay.FormatResultNameAndInfo(player);
             labelText.fontSize = 30;
-            labelText.alignment = TextAnchor.MiddleCenter;
+            labelText.alignment = TextAnchor.MiddleLeft;
             labelText.horizontalOverflow = HorizontalWrapMode.Overflow;
             labelText.verticalOverflow = VerticalWrapMode.Overflow;
             labelText.supportRichText = true;
@@ -333,6 +399,51 @@ namespace MDEN.UI.Core
                 rect.anchoredPosition = targetPosition;
                 group.alpha = 1f;
             }
+        }
+
+        private static EntryLayout MeasureEntryLayout(BattlePlayerEntry[] orderedPlayers)
+        {
+            if (_entryRoot == null) return null;
+
+            var measureObj = new GameObject("MeasureText");
+            measureObj.transform.SetParent(_entryRoot, false);
+            var measureText = measureObj.AddComponent<Text>();
+            ApplyGameFont(measureText);
+            measureText.fontSize = 30;
+            measureText.alignment = TextAnchor.MiddleLeft;
+            measureText.horizontalOverflow = HorizontalWrapMode.Overflow;
+            measureText.verticalOverflow = VerticalWrapMode.Overflow;
+            measureText.supportRichText = true;
+            measureText.raycastTarget = false;
+            measureText.color = new Color(1f, 1f, 1f, 0f);
+
+            var rankWidth = EntryRankMinWidth;
+            var labelWidth = 0f;
+            try
+            {
+                for (var i = 0; i < orderedPlayers.Length; i++)
+                {
+                    var player = orderedPlayers[i];
+                    measureText.text = BattleLobbyDisplay.FormatResultRank(player, i + 1);
+                    Canvas.ForceUpdateCanvases();
+                    rankWidth = Mathf.Max(rankWidth, measureText.preferredWidth);
+
+                    measureText.text = BattleLobbyDisplay.FormatResultNameAndInfo(player);
+                    Canvas.ForceUpdateCanvases();
+                    labelWidth = Mathf.Max(labelWidth, measureText.preferredWidth);
+                }
+            }
+            finally
+            {
+                UnityEngine.Object.Destroy(measureObj);
+            }
+
+            var avatarX = rankWidth + EntryAvatarGap;
+            var labelX = avatarX + EntryAvatarSize + EntryNameGap;
+            labelWidth = Mathf.Min(EntryGroupMaxWidth - labelX, labelWidth);
+            labelWidth = Mathf.Max(0f, labelWidth);
+
+            return new EntryLayout(rankWidth, avatarX, labelX, labelWidth);
         }
 
         private static void DestroyRoot()
@@ -369,13 +480,18 @@ namespace MDEN.UI.Core
             }
 
             var generation = _resultGeneration;
+            var layout = MeasureEntryLayout(orderedPlayers);
+            if (layout == null) return;
+
             for (var i = 0; i < orderedPlayers.Length; i++)
             {
                 AddEntry(
-                    BattleLobbyDisplay.FormatResultEntry(orderedPlayers[i], i + 1),
+                    orderedPlayers[i],
+                    i + 1,
                     i,
                     orderedPlayers.Length,
                     generation,
+                    layout,
                     false);
             }
 
@@ -456,12 +572,6 @@ namespace MDEN.UI.Core
             if (Time.frameCount <= _allowNativeMessagesUntilFrame) return;
 
             SuppressNativeMessagePanel(GetPnlMessage());
-
-            foreach (var pnlMessage in FindNativeMessagePanelsFallback())
-            {
-                if (pnlMessage == _pnlMessage) continue;
-                SuppressNativeMessagePanel(pnlMessage);
-            }
         }
 
         private static bool SuppressNativeMessagePanel(PnlMessage pnlMessage)
@@ -479,70 +589,6 @@ namespace MDEN.UI.Core
             }
 
             return true;
-        }
-
-        private static PnlMessage[] FindNativeMessagePanelsFallback()
-        {
-            if (_nativeMessagePanels.Length > 0)
-            {
-                var validCount = 0;
-                for (var i = 0; i < _nativeMessagePanels.Length; i++)
-                {
-                    if (IsScenePnlMessage(_nativeMessagePanels[i]))
-                    {
-                        validCount++;
-                    }
-                }
-
-                if (validCount == _nativeMessagePanels.Length) return _nativeMessagePanels;
-                if (validCount > 0)
-                {
-                    var validPanels = new PnlMessage[validCount];
-                    var index = 0;
-                    for (var i = 0; i < _nativeMessagePanels.Length; i++)
-                    {
-                        var panel = _nativeMessagePanels[i];
-                        if (IsScenePnlMessage(panel))
-                        {
-                            validPanels[index++] = panel;
-                        }
-                    }
-
-                    _nativeMessagePanels = validPanels;
-                    return _nativeMessagePanels;
-                }
-
-                _nativeMessagePanels = Array.Empty<PnlMessage>();
-            }
-
-            if (Time.frameCount < _nextNativeMessagePanelLookupFrame)
-            {
-                return Array.Empty<PnlMessage>();
-            }
-
-            _nextNativeMessagePanelLookupFrame = Time.frameCount + NativeMessagePanelLookupIntervalFrames;
-            using (PerfTrace.Measure("MDEN.BattleResult.FindNativeMessagePanels"))
-            {
-                var panels = Resources.FindObjectsOfTypeAll<PnlMessage>();
-                if (panels == null || panels.Length == 0)
-                {
-                    return Array.Empty<PnlMessage>();
-                }
-
-                var validPanels = new List<PnlMessage>();
-                foreach (var panel in panels)
-                {
-                    if (IsScenePnlMessage(panel))
-                    {
-                        validPanels.Add(panel);
-                    }
-                }
-
-                _nativeMessagePanels = validPanels.Count == 0
-                    ? Array.Empty<PnlMessage>()
-                    : validPanels.ToArray();
-                return _nativeMessagePanels;
-            }
         }
 
         private static bool IsScenePnlMessage(PnlMessage pnlMessage)
@@ -594,6 +640,26 @@ namespace MDEN.UI.Core
         private static void ApplyGameFont(Text text)
         {
             NativeFontCache.ApplyTo(text);
+        }
+
+        private static Sprite GetPlayerAvatarSprite(string uid)
+        {
+            var details = LobbyManager.CurrentLobby?.PlayerDetails;
+            if (!string.IsNullOrWhiteSpace(uid) && details != null)
+            {
+                foreach (var player in details)
+                {
+                    if (player?.Uid != uid) continue;
+                    return AvatarManager.GetAvatarSprite(uid, player.AvatarName, player.AvatarData);
+                }
+            }
+
+            if (uid == PlayerManager.CurrentUid)
+            {
+                return AvatarManager.GetCurrentAvatarSprite();
+            }
+
+            return AvatarManager.GetAvatarSprite(uid, null, null);
         }
 
         private static bool EnsureRootReady(int generation)
@@ -703,6 +769,24 @@ namespace MDEN.UI.Core
             public readonly Vector2 StartPosition;
             public readonly int Generation;
             public float Elapsed;
+        }
+
+        private sealed class EntryLayout
+        {
+            public EntryLayout(float rankWidth, float avatarX, float labelX, float labelWidth)
+            {
+                RankWidth = rankWidth;
+                AvatarX = avatarX;
+                LabelX = labelX;
+                LabelWidth = labelWidth;
+                ContentWidth = labelX + labelWidth;
+            }
+
+            public float RankWidth { get; }
+            public float AvatarX { get; }
+            public float LabelX { get; }
+            public float LabelWidth { get; }
+            public float ContentWidth { get; }
         }
     }
 }

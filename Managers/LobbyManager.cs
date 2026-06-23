@@ -120,6 +120,8 @@ namespace MDEN.Managers
                             Bio = PlayerManager.CurrentProfile?.Bio,
                             Title = PlayerManager.CurrentProfile?.Title,
                             ChatColor = PlayerManager.CurrentProfile?.ChatColor,
+                            AvatarName = PlayerManager.CurrentProfile?.AvatarName,
+                            AvatarData = PlayerManager.CurrentProfile?.AvatarData,
                             PingMS = 0,
                             Status = (byte)PlayerStatus.InLobby
                         }
@@ -329,6 +331,8 @@ namespace MDEN.Managers
                             Bio = PlayerManager.CurrentProfile?.Bio,
                             Title = PlayerManager.CurrentProfile?.Title,
                             ChatColor = PlayerManager.CurrentProfile?.ChatColor,
+                            AvatarName = PlayerManager.CurrentProfile?.AvatarName,
+                            AvatarData = PlayerManager.CurrentProfile?.AvatarData,
                             PingMS = 0,
                             Status = (byte)PlayerStatus.InLobby
                         }
@@ -508,6 +512,8 @@ namespace MDEN.Managers
                     a.Bio != b.Bio ||
                     a.Title != b.Title ||
                     a.ChatColor != b.ChatColor ||
+                    a.AvatarName != b.AvatarName ||
+                    a.AvatarData != b.AvatarData ||
                     a.Status != b.Status)
                 {
                     return false;

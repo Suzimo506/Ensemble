@@ -22,6 +22,7 @@ namespace MDEN.UI.Windows
         private ForumObject _btnBio;
         private ForumObject _btnEntranceMessage;
         private ForumObject _btnTitle;
+        private ForumObject _btnAvatar;
         private int _lastSelectedIndex = -1;
 
         public override async void Show()
@@ -37,12 +38,7 @@ namespace MDEN.UI.Windows
 
             RegisterEventCleanup(() =>
             {
-                if (_window != null)
-                {
-                    _window.OnSelectionChanged -= OnSelectionChanged;
-                    _window.OnInternalShow -= OnInternalShowInjectTitle;
-                }
-
+                UnbindWindowEvents();
                 RemoveInjectedTitle();
             });
 
@@ -112,47 +108,68 @@ namespace MDEN.UI.Windows
                 : $"名字: {profile.Name}\n颜色: {SanitizeColor(profile.ChatColor)}\n介绍: {profile.Bio ?? ""}\n入场提示: {profile.EntranceMessage ?? ""}\n头衔: {profile.Title ?? ""}";
 
             _btnBack = new ForumObject(new LocalString("- 返回 -"), new LocalString("回到主菜单"));
-            _btnBack.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("OptionsPanel.png")?.texture;
+            _btnBack.Texture = GetProfileBannerTexture("HomePanel.png");
             _window.ForumObjects.Add(_btnBack);
 
             _btnRefresh = new ForumObject(new LocalString("本地资料"), new LocalString(summary));
-            _btnRefresh.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("PlayerCard.png")?.texture;
+            _btnRefresh.Texture = GetProfileBannerTexture("PlayerCard.png");
             _window.ForumObjects.Add(_btnRefresh);
+
+            _btnAvatar = new ForumObject(
+                new LocalString("修改头像"),
+                new LocalString(BuildAvatarGuideText()));
+            _btnAvatar.Texture = GetProfileBannerTexture("OptionsPanel.png");
+            _window.ForumObjects.Add(_btnAvatar);
 
             _btnName = new ForumObject(
                 new LocalString("修改名字"),
                 new LocalString(WithCurrentSetting("修改自己的名字，16字上限", profile?.Name)));
-            _btnName.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("PlayerCard.png")?.texture;
+            _btnName.Texture = GetProfileBannerTexture("PlayerCard.png");
             _window.ForumObjects.Add(_btnName);
 
             _btnNameColor = new ForumObject(
                 new LocalString("修改名字颜色"),
                 new LocalString(WithCurrentSetting("输入十六进制颜色，不要带#，例如 ff00ff", SanitizeColor(profile?.ChatColor))));
-            _btnNameColor.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("OptionsPanel.png")?.texture;
+            _btnNameColor.Texture = GetProfileBannerTexture("OptionsPanel.png");
             _window.ForumObjects.Add(_btnNameColor);
 
             _btnBio = new ForumObject(
                 new LocalString("修改个人介绍"),
                 new LocalString(WithCurrentSetting("别人在房间点击你的卡片时显示的介绍，30字上限", profile?.Bio)));
-            _btnBio.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("HomePanel.png")?.texture;
+            _btnBio.Texture = GetProfileBannerTexture("SocialNetwork.png");
             _window.ForumObjects.Add(_btnBio);
 
             _btnEntranceMessage = new ForumObject(
                 new LocalString("修改入场提示语"),
                 new LocalString(WithCurrentSetting("进入房间时显示的提示语，12字上限", profile?.EntranceMessage)));
-            _btnEntranceMessage.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("RoomList.png")?.texture;
+            _btnEntranceMessage.Texture = GetProfileBannerTexture("HomePanel.png");
             _window.ForumObjects.Add(_btnEntranceMessage);
 
             _btnTitle = new ForumObject(
                 new LocalString("修改头衔"),
                 new LocalString(WithCurrentSetting("显示在个人信息中的头衔，12字上限", profile?.Title)));
-            _btnTitle.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("SocialNetwork.png")?.texture;
+            _btnTitle.Texture = GetProfileBannerTexture("PlayerCard.png");
             _window.ForumObjects.Add(_btnTitle);
+        }
+
+        private static Texture2D GetProfileBannerTexture(string fallbackSpriteName)
+        {
+            return ResourceManager.GetRandomBannerTexture() ??
+                   ResourceManager.GetSprite(fallbackSpriteName)?.texture;
         }
 
         private static string WithCurrentSetting(string description, string value)
         {
             return $"{description}\n当前设置：<color={Constants.ColorYellow}>{EscapeRichText(GetDisplayValue(value))}</color>";
+        }
+
+        private static string BuildAvatarGuideText()
+        {
+            return $"<color={Constants.ColorGreen}>添加头像教程：\n" +
+                   $"1. 将 png、jpg 或 jpeg 图片放入头像文件夹\n" +
+                   $"2. 再次点击左侧“修改头像”进入头像列表\n" +
+                   $"3. 选择图片后会自动裁成圆形并长期保存\n" +
+                   $"当前头像文件夹：{EscapeRichText(AvatarManager.GetAvatarLibraryFolder())}</color>";
         }
 
         private static string GetDisplayValue(string value)
@@ -190,6 +207,11 @@ namespace MDEN.UI.Windows
             else if (button == _btnRefresh)
             {
                 await TryRefreshProfileAsync();
+            }
+            else if (button == _btnAvatar)
+            {
+                Close();
+                WindowStackController.OpenWindow(new AvatarPickerWindow());
             }
             else if (button == _btnName)
             {
@@ -241,6 +263,7 @@ namespace MDEN.UI.Windows
             try
             {
                 await saveAction.Invoke(value);
+                await TrySyncLocalProfileToServerAsync();
                 MDEN.Managers.ClientLogManager.Msg($"Local profile field saved: {fieldName}");
             }
             catch (Exception ex)
@@ -250,6 +273,23 @@ namespace MDEN.UI.Windows
             finally
             {
                 await MainThreadDispatcher.InvokeAsync(() => uiLock?.Dispose());
+            }
+        }
+
+        private static async Task TrySyncLocalProfileToServerAsync()
+        {
+            if (!ConnectionManager.CanSendRequests) return;
+
+            try
+            {
+                await PlayerManager.SyncLocalProfileToServerAsync();
+            }
+            catch (Exception ex)
+            {
+                if (ConnectionManager.CanSendRequests)
+                {
+                    MDEN.Managers.ClientLogManager.Warning($"Sync local profile after save failed: {ex.Message}");
+                }
             }
         }
 
@@ -276,8 +316,7 @@ namespace MDEN.UI.Windows
         {
             if (_window == null) return;
 
-            _window.OnSelectionChanged -= OnSelectionChanged;
-            _window.OnInternalShow -= OnInternalShowInjectTitle;
+            UnbindWindowEvents();
             _window.ForceClose();
             _window = new ForumWindow();
             _window.AutoReset = true;
@@ -293,9 +332,18 @@ namespace MDEN.UI.Windows
             _lastSelectedIndex = -1;
             if (_window != null)
             {
+                UnbindWindowEvents();
                 _window.ForceClose();
                 _window = null;
             }
+        }
+
+        private void UnbindWindowEvents()
+        {
+            if (_window == null) return;
+
+            _window.OnSelectionChanged -= OnSelectionChanged;
+            _window.OnInternalShow -= OnInternalShowInjectTitle;
         }
     }
 }

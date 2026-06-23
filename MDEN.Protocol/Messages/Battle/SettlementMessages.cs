@@ -14,6 +14,8 @@ namespace MDEN.Protocol.Messages.Battle
     {
         public string Uid { get; set; }
         public string Name { get; set; }
+        public string AvatarName { get; set; }
+        public string AvatarData { get; set; }
     }
 
     public class SettlementChartEntry

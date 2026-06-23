@@ -22,6 +22,7 @@ namespace MDEN.Managers
         public string PlayerEntranceMessage { get; set; }
         public string PlayerTitle { get; set; }
         public string PlayerAvatarName { get; set; }
+        public string PlayerAvatarLibraryPath { get; set; }
         public bool EnableFavGirlDisplayForOthers { get; set; }
         public bool HideBattleHealthBar { get; set; }
         public bool EnableVerboseLogs { get; set; }
@@ -40,6 +41,7 @@ namespace MDEN.Managers
         public static string PlayerEntranceMessage { get; private set; }
         public static string PlayerTitle { get; private set; }
         public static string PlayerAvatarName { get; private set; }
+        public static string PlayerAvatarLibraryPath { get; private set; }
         public static bool EnableFavGirlDisplayForOthers { get; private set; }
         public static bool HideBattleHealthBar { get; private set; }
         public static bool EnableVerboseLogs { get; private set; }
@@ -77,6 +79,7 @@ namespace MDEN.Managers
                     PlayerEntranceMessage = PlayerEntranceMessage,
                     PlayerTitle = PlayerTitle,
                     PlayerAvatarName = PlayerAvatarName,
+                    PlayerAvatarLibraryPath = PlayerAvatarLibraryPath,
                     EnableFavGirlDisplayForOthers = EnableFavGirlDisplayForOthers,
                     HideBattleHealthBar = HideBattleHealthBar,
                     EnableVerboseLogs = EnableVerboseLogs
@@ -151,6 +154,22 @@ namespace MDEN.Managers
             SaveConfig();
         }
 
+        public static void SetPlayerAvatarName(string avatarName)
+        {
+            PlayerAvatarName = string.IsNullOrWhiteSpace(avatarName)
+                ? AvatarManager.DefaultAvatarName
+                : AvatarManager.NormalizeAvatarName(avatarName);
+            SaveConfig();
+        }
+
+        public static void SetPlayerAvatarLibraryPath(string folderPath)
+        {
+            PlayerAvatarLibraryPath = string.IsNullOrWhiteSpace(folderPath)
+                ? AvatarManager.GetDefaultAvatarLibraryFolder()
+                : folderPath.Trim().Trim('"');
+            SaveConfig();
+        }
+
         public static void SetEnableFavGirlDisplayForOthers(bool enabled)
         {
             EnableFavGirlDisplayForOthers = enabled;
@@ -192,6 +211,7 @@ namespace MDEN.Managers
             PlayerEntranceMessage = data?.PlayerEntranceMessage;
             PlayerTitle = data?.PlayerTitle;
             PlayerAvatarName = data?.PlayerAvatarName;
+            PlayerAvatarLibraryPath = data?.PlayerAvatarLibraryPath;
             EnableFavGirlDisplayForOthers = data?.EnableFavGirlDisplayForOthers ?? false;
             HideBattleHealthBar = data?.HideBattleHealthBar ?? false;
             EnableVerboseLogs = data?.EnableVerboseLogs ?? false;
@@ -216,6 +236,12 @@ namespace MDEN.Managers
             if (string.IsNullOrWhiteSpace(PlayerAvatarName))
             {
                 PlayerAvatarName = "head_0";
+                changed = true;
+            }
+
+            if (string.IsNullOrWhiteSpace(PlayerAvatarLibraryPath))
+            {
+                PlayerAvatarLibraryPath = AvatarManager.GetDefaultAvatarLibraryFolder();
                 changed = true;
             }
 

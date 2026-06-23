@@ -201,9 +201,14 @@ namespace MDEN.Managers
         {
             EnsureReady();
 
+            var request = CreateLocalProfileUpdateRequest();
             await NetworkClient.Instance.SendRequestAsync<UpdatePlayerRequest, UpdatePlayerResponse>(
                 OpCodes.UpdatePlayerReq,
-                CreateLocalProfileUpdateRequest());
+                request);
+
+            CurrentProfile ??= CreateLocalProfile(CurrentUid, GetLocalPlayerName(), PlayerStatus.Online);
+            ApplyLocalUpdate(CurrentProfile, request);
+            NotifyProfileChanged();
         }
 
         public static Task UpdateNameAsync(string name)
@@ -265,7 +270,8 @@ namespace MDEN.Managers
                 ChatColor = ModConfigManager.PlayerChatColor,
                 EntranceMessage = ModConfigManager.PlayerEntranceMessage,
                 Title = ModConfigManager.PlayerTitle,
-                AvatarName = ModConfigManager.PlayerAvatarName
+                AvatarName = ModConfigManager.PlayerAvatarName,
+                AvatarData = AvatarManager.GetLocalAvatarData()
             };
         }
 
@@ -278,8 +284,16 @@ namespace MDEN.Managers
                 ChatColor = ModConfigManager.PlayerChatColor ?? "ffffff",
                 EntranceMessage = ModConfigManager.PlayerEntranceMessage ?? string.Empty,
                 Title = ModConfigManager.PlayerTitle ?? string.Empty,
-                AvatarName = ModConfigManager.PlayerAvatarName ?? "head_0"
+                AvatarName = ModConfigManager.PlayerAvatarName ?? AvatarManager.DefaultAvatarName,
+                AvatarData = AvatarManager.GetLocalAvatarData()
             };
+        }
+
+        public static Task UpdateAvatarAsync(string avatarName)
+        {
+            ModConfigManager.SetPlayerAvatarName(avatarName);
+            ApplyLocalProfileConfig();
+            return Task.CompletedTask;
         }
 
         private static string GetLocalPlayerName(string fallbackName = null)
@@ -332,6 +346,8 @@ namespace MDEN.Managers
             if (request.ChatColor != null) profile.ChatColor = request.ChatColor;
             if (request.EntranceMessage != null) profile.EntranceMessage = request.EntranceMessage;
             if (request.Title != null) profile.Title = request.Title;
+            if (request.AvatarName != null) profile.AvatarName = request.AvatarName;
+            if (request.AvatarData != null) profile.AvatarData = request.AvatarData;
             if (request.GirlIndex.HasValue) profile.GirlIndex = request.GirlIndex.Value;
             if (request.ElfinIndex.HasValue) profile.ElfinIndex = request.ElfinIndex.Value;
             if (request.FavGirlIndex.HasValue) profile.FavGirlIndex = request.FavGirlIndex.Value;

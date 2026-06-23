@@ -24,6 +24,9 @@ namespace MDEN.Protocol.Messages.Player
         public string AvatarName { get; set; }
 
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public string AvatarData { get; set; }
+
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public int? Level { get; set; }
 
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -64,6 +67,7 @@ namespace MDEN.Protocol.Messages.Player
         public string EntranceMessage { get; set; }
         public string Title { get; set; }
         public string AvatarName { get; set; }
+        public string AvatarData { get; set; }
         public int Level { get; set; }
         public ushort ELO { get; set; }
         public bool Banned { get; set; }
