@@ -16,6 +16,8 @@ namespace MDEN.UI.Core
         private static string _startedBattleEntry;
         private static string _navigatedBattleId;
         private static int _startGeneration;
+        private static readonly System.Collections.Generic.HashSet<string> BattleStartSyncs = new System.Collections.Generic.HashSet<string>();
+        private static readonly System.Collections.Generic.HashSet<string> MissingChartSyncs = new System.Collections.Generic.HashSet<string>();
 
         public static void OnLobbyChanged()
         {
@@ -55,6 +57,8 @@ namespace MDEN.UI.Core
             _startedBattleId = null;
             _startedBattleEntry = null;
             _navigatedBattleId = null;
+            BattleStartSyncs.Clear();
+            MissingChartSyncs.Clear();
         }
 
         private static void ScheduleStartCurrentPlaylistEntry(int lobbyId, string battleId, string entryText)
@@ -126,6 +130,17 @@ namespace MDEN.UI.Core
             var musicInfo = Managers.ChartManager.GetMusicInfo(entry.ChartKey);
             if (musicInfo == null)
             {
+                var missingSyncKey = $"{battleId}:{entry.ChartKey}";
+                if (MissingChartSyncs.Add(missingSyncKey))
+                {
+                    _ = SyncMissingChartThenReportAsync(
+                        Managers.LobbyManager.CurrentLobby?.Id ?? 0,
+                        Managers.LobbyManager.CurrentLobby?.CurrentBattleId,
+                        entryText,
+                        entry.ChartKey);
+                    return true;
+                }
+
                 ReportStartFailure(
                     Managers.LobbyManager.CurrentLobby?.Id ?? 0,
                     Managers.LobbyManager.CurrentLobby?.CurrentBattleId,
@@ -133,6 +148,13 @@ namespace MDEN.UI.Core
                     "ChartMissing",
                     $"本地缺少谱面 {entry.ChartKey}，未能进入联机游戏。");
                 return true;
+            }
+
+            var syncKey = $"{battleId}:{entry.ChartKey}";
+            if (BattleStartSyncs.Add(syncKey))
+            {
+                Managers.PlayerManager.SyncChartStateFireAndForget();
+                return false;
             }
 
             if (ShouldNavigateToBattleChart(battleId, retriesRemaining))
@@ -198,6 +220,32 @@ namespace MDEN.UI.Core
             MDEN.Managers.ClientLogManager.Warning($"Cannot start multiplayer battle: {reasonCode}, {reason}");
             ShowText.ShowInfo(reason);
             Managers.BattleManager.ReportBattleStartFailed(lobbyId, battleId, entryText, reasonCode, reason);
+        }
+
+        private static async System.Threading.Tasks.Task SyncMissingChartThenReportAsync(
+            int lobbyId,
+            string battleId,
+            string entryText,
+            string chartKey)
+        {
+            try
+            {
+                await Managers.PlayerManager.SyncChartStateAsync();
+            }
+            catch (System.Exception ex)
+            {
+                MDEN.Managers.ClientLogManager.Warning($"Sync chart state before missing-chart report failed: {ex.Message}");
+            }
+
+            MainThreadDispatcher.Enqueue(() =>
+            {
+                ReportStartFailure(
+                    lobbyId,
+                    battleId,
+                    entryText,
+                    "ChartMissing",
+                    $"本地缺少谱面 {chartKey}，未能进入联机游戏。");
+            });
         }
     }
 }

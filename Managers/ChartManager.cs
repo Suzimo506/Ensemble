@@ -3,8 +3,11 @@ using CustomAlbums.Managers;
 using Il2CppAssets.Scripts.Database;
 using MDEN.Protocol.Rules;
 using MDEN.UI.Core;
+using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Threading;
 
 namespace MDEN.Managers
@@ -61,6 +64,7 @@ namespace MDEN.Managers
 
             RebuildCustomAlbumIndex();
             CustomAlbums.ModExtensions.Events.OnAlbumLoaded += OnAlbumLoaded;
+            TrySubscribeOptionalAlbumEvent("OnAlbumRemoved", new CustomAlbums.ModExtensions.Events.LoadAlbumEvent(OnAlbumRemoved));
         }
 
         public static string GetCurrentEntry()
@@ -72,7 +76,10 @@ namespace MDEN.Managers
 
         public static string GetEntry(MusicInfo musicInfo, int difficulty)
         {
-            return $"{GetEntryKey(musicInfo)}#{difficulty}#{GetLocalPlayerName()}#{GetNiceChartName(musicInfo, difficulty)}";
+            var entryKey = GetEntryKey(musicInfo);
+            if (string.IsNullOrWhiteSpace(entryKey)) return null;
+
+            return $"{entryKey}#{difficulty}#{EncodeEntryPart(GetLocalPlayerName())}#{EncodeEntryPart(GetNiceChartName(musicInfo, difficulty))}";
         }
 
         public static string GetHiddenCheckUid(MusicInfo musicInfo)
@@ -90,7 +97,7 @@ namespace MDEN.Managers
             var md5 = GetMd5(musicInfo.uid);
             if (!string.IsNullOrEmpty(md5) &&
                 CustomAlbumsByMd5.TryGetValue(md5, out var album) &&
-                album != null)
+                IsAlbumAvailable(album))
             {
                 return album.Uid;
             }
@@ -103,7 +110,7 @@ namespace MDEN.Managers
         {
             if (string.IsNullOrWhiteSpace(entry)) return null;
 
-            var parts = entry.Split('#');
+            var parts = SplitEntry(entry);
             if (parts.Length < 2 || !int.TryParse(parts[1], out var difficulty))
             {
                 return new PlaylistEntryViewModel
@@ -116,13 +123,13 @@ namespace MDEN.Managers
                 };
             }
 
-            var chartName = parts.Length > 3 ? string.Join("#", parts, 3, parts.Length - 3) : null;
+            var chartName = parts.Length > 3 ? DecodeEntryPart(parts[3]) : null;
             var parsed = new PlaylistEntryViewModel
             {
                 Entry = entry,
                 ChartKey = parts[0],
                 Difficulty = difficulty,
-                OwnerName = parts.Length > 2 && !string.IsNullOrWhiteSpace(parts[2]) ? parts[2] : "Unknown",
+                OwnerName = parts.Length > 2 && !string.IsNullOrWhiteSpace(parts[2]) ? DecodeEntryPart(parts[2]) : "Unknown",
                 ChartName = !string.IsNullOrWhiteSpace(chartName)
                     ? chartName
                     : $"Unknown Chart {difficulty}"
@@ -160,7 +167,7 @@ namespace MDEN.Managers
             {
                 if (CustomAlbumsByMd5.TryGetValue(chartKey, out var cachedAlbum))
                 {
-                    if (AlbumManager.GetByUid(cachedAlbum.Uid) != null)
+                    if (IsAlbumAvailable(cachedAlbum) && AlbumManager.GetByUid(cachedAlbum.Uid) != null)
                     {
                         return GlobalDataBase.dbMusicTag.GetMusicInfoFromAll(cachedAlbum.Uid);
                     }
@@ -171,6 +178,8 @@ namespace MDEN.Managers
                 foreach (var pair in AlbumManager.LoadedAlbums)
                 {
                     var album = pair.Value;
+                    if (!IsAlbumAvailable(album)) continue;
+
                     var sheet = GetPreferredSheet(album);
                     if (sheet != null && sheet.Md5 == chartKey)
                     {
@@ -259,10 +268,12 @@ namespace MDEN.Managers
             if (musicInfo == null || string.IsNullOrWhiteSpace(musicInfo.uid)) return null;
 
             var album = AlbumManager.GetByUid(musicInfo.uid);
-            if (album != null) return album;
+            if (IsAlbumAvailable(album)) return album;
 
             var md5 = GetMd5(musicInfo.uid);
-            if (!string.IsNullOrEmpty(md5) && CustomAlbumsByMd5.TryGetValue(md5, out album))
+            if (!string.IsNullOrEmpty(md5) &&
+                CustomAlbumsByMd5.TryGetValue(md5, out album) &&
+                IsAlbumAvailable(album))
             {
                 return album;
             }
@@ -273,6 +284,7 @@ namespace MDEN.Managers
         private static string GetEntryKey(MusicInfo musicInfo)
         {
             var md5 = GetMd5(musicInfo);
+            if (musicInfo?.albumIndex == AlbumManager.Uid) return md5;
             return md5 ?? musicInfo?.uid;
         }
 
@@ -287,6 +299,8 @@ namespace MDEN.Managers
             if (string.IsNullOrEmpty(uid) || !uid.StartsWith(AlbumManager.Uid.ToString())) return null;
 
             Album album = AlbumManager.GetByUid(uid);
+            if (!IsAlbumAvailable(album)) return null;
+
             var sheet = GetPreferredSheet(album);
             if (sheet != null)
             {
@@ -316,9 +330,62 @@ namespace MDEN.Managers
             return ChartSelectionRules.IsCustomChartKey(chartKey);
         }
 
+        private static string EncodeEntryPart(string value)
+        {
+            if (string.IsNullOrEmpty(value)) return string.Empty;
+            return "__mden_uri__" + Uri.EscapeDataString(value);
+        }
+
+        private static string DecodeEntryPart(string value)
+        {
+            if (string.IsNullOrEmpty(value)) return value;
+            const string prefix = "__mden_uri__";
+            if (!value.StartsWith(prefix, StringComparison.Ordinal)) return value;
+
+            try
+            {
+                return Uri.UnescapeDataString(value.Substring(prefix.Length));
+            }
+            catch
+            {
+                return value;
+            }
+        }
+
+        private static string[] SplitEntry(string entry)
+        {
+            return entry.Split(new[] { '#' }, 4);
+        }
+
         private static void OnAlbumLoaded(object sender, CustomAlbums.ModExtensions.AlbumEventArgs e)
         {
             QueueAlbumLoadedRefresh();
+        }
+
+        private static void OnAlbumRemoved(object sender, CustomAlbums.ModExtensions.AlbumEventArgs e)
+        {
+            QueueAlbumLoadedRefresh();
+        }
+
+        private static void TrySubscribeOptionalAlbumEvent(string eventName, Delegate handler)
+        {
+            try
+            {
+                var eventInfo = typeof(CustomAlbums.ModExtensions.Events).GetEvent(
+                    eventName,
+                    BindingFlags.Public | BindingFlags.Static);
+                if (eventInfo == null)
+                {
+                    ClientLogManager.Msg($"CustomAlbums event {eventName} is unavailable; album index will refresh on album load.");
+                    return;
+                }
+
+                eventInfo.AddEventHandler(null, handler);
+            }
+            catch (Exception ex)
+            {
+                ClientLogManager.Warning($"Subscribe CustomAlbums event {eventName} failed: {ex.Message}");
+            }
         }
 
         private static void QueueAlbumLoadedRefresh()
@@ -342,12 +409,20 @@ namespace MDEN.Managers
             foreach (var pair in AlbumManager.LoadedAlbums)
             {
                 var album = pair.Value;
+                if (!IsAlbumAvailable(album)) continue;
+
                 var sheet = GetPreferredSheet(album);
                 if (sheet != null)
                 {
                     CustomAlbumsByMd5[sheet.Md5] = album;
                 }
             }
+        }
+
+        private static bool IsAlbumAvailable(Album album)
+        {
+            if (album == null || string.IsNullOrWhiteSpace(album.Path)) return false;
+            return album.IsPackaged ? File.Exists(album.Path) : Directory.Exists(album.Path);
         }
     }
 }

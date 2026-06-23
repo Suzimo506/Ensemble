@@ -475,8 +475,8 @@ namespace MDEN.UI.Displays
         private void ConfigureMessageClick(Text text, ChatPushMsg msg)
         {
             var missingChart = GetMissingChartClickData(msg);
-            var previewChartName = GetPreviewableChartName(msg);
-            if (!missingChart.HasValue && string.IsNullOrWhiteSpace(previewChartName)) return;
+            var previewChart = GetPreviewableChartData(msg);
+            if (!missingChart.HasValue && !previewChart.HasValue) return;
 
             text.raycastTarget = true;
             var button = text.gameObject.GetComponent<Button>() ?? text.gameObject.AddComponent<Button>();
@@ -493,7 +493,10 @@ namespace MDEN.UI.Displays
                     return;
                 }
 
-                JumpToPlaylistChartPreview(previewChartName);
+                JumpToPlaylistChartPreview(
+                    previewChart.Value.ChartName,
+                    previewChart.Value.ChartKey,
+                    previewChart.Value.Difficulty);
             }));
         }
 
@@ -739,11 +742,11 @@ namespace MDEN.UI.Displays
             if ((msg.Message == "PlaylistAdd" || msg.Message == "PlaylistRemove") &&
                 !string.IsNullOrWhiteSpace(msg.ExtraData))
             {
-                var parts = msg.ExtraData.Split(new[] { '#' }, 2);
-                if (parts.Length == 2)
+                var playlistEvent = ParsePlaylistEventData(msg);
+                if (playlistEvent.HasValue)
                 {
-                    var playerName = parts[0];
-                    var chartName = parts[1];
+                    var playerName = playlistEvent.Value.PlayerName;
+                    var chartName = playlistEvent.Value.ChartName;
                     var action = msg.Message == "PlaylistAdd" ? "添加了" : "移除了";
                     return $"{SystemPrefix()} {ColorText(EscapeRichText(playerName), GetPlayerColorByName(playerName))} {action} {ColorText(EscapeRichText(CleanChartNameForDisplay(chartName)), Constants.ColorYellow)}";
                 }
@@ -861,22 +864,24 @@ namespace MDEN.UI.Displays
             return null;
         }
 
-        private static string GetPreviewableChartName(ChatPushMsg msg)
+        private static (string ChartName, string ChartKey, int Difficulty)? GetPreviewableChartData(ChatPushMsg msg)
         {
             if (msg == null || !msg.IsSystem || msg.Message != "PlaylistAdd" || string.IsNullOrWhiteSpace(msg.ExtraData))
             {
                 return null;
             }
 
-            var parts = msg.ExtraData.Split(new[] { '#' }, 2);
-            return parts.Length == 2 ? CleanChartNameForDisplay(parts[1]) : null;
+            var playlistEvent = ParsePlaylistEventData(msg);
+            return playlistEvent.HasValue
+                ? (CleanChartNameForDisplay(playlistEvent.Value.ChartName), playlistEvent.Value.ChartKey, playlistEvent.Value.Difficulty)
+                : null;
         }
 
-        private static void JumpToPlaylistChartPreview(string chartName)
+        private static void JumpToPlaylistChartPreview(string chartName, string chartKey, int difficulty)
         {
             if (string.IsNullOrWhiteSpace(chartName)) return;
 
-            var target = FindPlaylistEntryByChartName(chartName);
+            var target = FindPlaylistEntryForPreview(chartName, chartKey, difficulty);
             if (target == null)
             {
                 ShowText.ShowInfo("未在歌曲列表找到该谱面");
@@ -886,12 +891,31 @@ namespace MDEN.UI.Displays
             ChartPreviewController.Preview(target);
         }
 
-        private static PlaylistEntryViewModel FindPlaylistEntryByChartName(string chartName)
+        private static PlaylistEntryViewModel FindPlaylistEntryForPreview(string chartName, string chartKey, int difficulty)
+        {
+            var items = PlaylistManager.GetPlaylistItems();
+            if (!string.IsNullOrWhiteSpace(chartKey))
+            {
+                for (var i = 0; i < items.Length; i++)
+                {
+                    var item = items[i];
+                    if (item == null || item.ChartKey != chartKey) continue;
+
+                    if (difficulty <= 0 || item.Difficulty == difficulty)
+                    {
+                        return item;
+                    }
+                }
+            }
+
+            return FindPlaylistEntryByChartName(chartName, items);
+        }
+
+        private static PlaylistEntryViewModel FindPlaylistEntryByChartName(string chartName, PlaylistEntryViewModel[] items)
         {
             var normalizedTarget = NormalizeChartNameForMatch(chartName);
             if (string.IsNullOrWhiteSpace(normalizedTarget)) return null;
 
-            var items = PlaylistManager.GetPlaylistItems();
             for (var i = 0; i < items.Length; i++)
             {
                 var item = items[i];
@@ -922,12 +946,27 @@ namespace MDEN.UI.Displays
             var parts = msg.ExtraData.Split('#');
             if (parts.Length < 2) return null;
 
-            if (parts.Length >= 5 && IsLikelyEntryPayload(parts))
+            if (TryParseEntryPayload(parts, out var chartName, out var chartKey, out _))
             {
-                return (parts[0], string.Join("#", parts, 4, parts.Length - 4), parts[1]);
+                return (parts[0], chartName, chartKey);
             }
 
-            return (parts[0], string.Join("#", parts, 1, parts.Length - 1), null);
+            return (parts[0], DecodeEntryPart(string.Join("#", parts, 1, parts.Length - 1)), null);
+        }
+
+        private static (string PlayerName, string ChartName, string ChartKey, int Difficulty)? ParsePlaylistEventData(ChatPushMsg msg)
+        {
+            if (string.IsNullOrWhiteSpace(msg?.ExtraData)) return null;
+
+            var parts = msg.ExtraData.Split('#');
+            if (parts.Length < 2) return null;
+
+            if (TryParseEntryPayload(parts, out var chartName, out var chartKey, out var difficulty))
+            {
+                return (parts[0], chartName, chartKey, difficulty);
+            }
+
+            return (parts[0], DecodeEntryPart(string.Join("#", parts, 1, parts.Length - 1)), null, 0);
         }
 
         private static (string Uid, string Text)? ParsePlayerEventData(ChatPushMsg msg)
@@ -975,16 +1014,44 @@ namespace MDEN.UI.Displays
         {
             if (string.IsNullOrWhiteSpace(chartName)) return string.Empty;
 
-            var value = Regex.Replace(chartName, "<.*?>", string.Empty);
+            var value = Regex.Replace(DecodeEntryPart(chartName), "<.*?>", string.Empty);
             value = Regex.Replace(value, @"^\s*([【\[].*?[\]】]\s*)+", string.Empty);
             return value.Trim();
         }
 
-        private static bool IsLikelyEntryPayload(string[] parts)
+        private static bool TryParseEntryPayload(string[] parts, out string chartName, out string chartKey, out int difficulty)
         {
-            return parts.Length >= 5 &&
-                   ChartSelectionRules.IsValidChartKey(parts[1]) &&
-                   int.TryParse(parts[2], out _);
+            chartName = null;
+            chartKey = null;
+            difficulty = 0;
+
+            if (parts == null ||
+                parts.Length < 5 ||
+                !ChartSelectionRules.IsValidChartKey(parts[1]) ||
+                !int.TryParse(parts[2], out difficulty))
+            {
+                return false;
+            }
+
+            chartKey = parts[1];
+            chartName = DecodeEntryPart(string.Join("#", parts, 4, parts.Length - 4));
+            return true;
+        }
+
+        private static string DecodeEntryPart(string value)
+        {
+            if (string.IsNullOrEmpty(value)) return value;
+            const string prefix = "__mden_uri__";
+            if (!value.StartsWith(prefix, StringComparison.Ordinal)) return value;
+
+            try
+            {
+                return Uri.UnescapeDataString(value.Substring(prefix.Length));
+            }
+            catch
+            {
+                return value;
+            }
         }
 
         private static string FormatMissingChartNameForDisplay(string chartName)

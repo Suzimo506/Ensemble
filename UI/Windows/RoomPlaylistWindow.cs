@@ -2,6 +2,7 @@ using LocalizeLib;
 using Il2CppAssets.Scripts.UI.Controls;
 using MDEN.Managers;
 using MDEN.Protocol.Messages.Lobby;
+using MDEN.Protocol.Rules;
 using MDEN.UI.Core;
 using MelonLoader;
 using PopupLib.UI.Components;
@@ -15,20 +16,20 @@ namespace MDEN.UI.Windows
         private ForumWindow _window;
         private PlaylistEntryViewModel[] _items = new PlaylistEntryViewModel[0];
         private int _lastSelectedIndex = -1;
-        private readonly object _refreshLock = new object();
-        private bool _refreshQueued;
-        private int _lastLobbyId = -1;
-        private string _lastPlaylistSnapshot = string.Empty;
+        private bool _closeQueued;
+        private bool _suppressNextCompletion;
+        private System.IDisposable _hudSuppression;
 
         public override void Show()
         {
+            _hudSuppression = RoomHudController.SuppressForPopupWindow("playlist window");
             _window = new ForumWindow();
             _window.AutoReset = true;
             BuildList();
-            CapturePlaylistSnapshot(LobbyManager.CurrentLobby);
             LobbyManager.CurrentLobbyChanged += HandleCurrentLobbyChanged;
             _window.OnSelectionChanged += OnSelectionChanged;
             _window.OnInternalShow += OnInternalShowInjectTitle;
+            _window.OnCompletion += OnWindowCompletion;
             _window.Show();
 
             RegisterEventCleanup(() =>
@@ -39,36 +40,36 @@ namespace MDEN.UI.Windows
                 {
                     _window.OnSelectionChanged -= OnSelectionChanged;
                     _window.OnInternalShow -= OnInternalShowInjectTitle;
+                    _window.OnCompletion -= OnWindowCompletion;
                 }
+
+                ReleaseHudSuppression();
             });
+        }
+
+        private void OnWindowCompletion(PopupLib.UI.Windows.Abstract.BaseWindow w)
+        {
+            if (_suppressNextCompletion)
+            {
+                _suppressNextCompletion = false;
+                return;
+            }
+
+            WindowStackController.NotifyWindowCompleted(this);
         }
 
         private void HandleCurrentLobbyChanged(LobbySyncPush lobby)
         {
-            lock (_refreshLock)
-            {
-                if (!HasPlaylistStateChanged(lobby) || _refreshQueued) return;
-                _refreshQueued = true;
-            }
+            if (lobby != null || _closeQueued) return;
+            _closeQueued = true;
 
             MainThreadDispatcher.Enqueue(() =>
             {
-                lock (_refreshLock)
-                {
-                    _refreshQueued = false;
-                }
-
+                _closeQueued = false;
                 if (IsDisposed) return;
 
-                if (lobby == null)
-                {
-                    Close();
-                    WindowStackController.OpenWindow(new RoomListWindow());
-                    return;
-                }
-
-                CapturePlaylistSnapshot(lobby);
-                RefreshWindowContent();
+                Close();
+                WindowStackController.OpenWindow(new RoomListWindow());
             });
         }
 
@@ -86,41 +87,23 @@ namespace MDEN.UI.Windows
 
             for (var i = 0; i < _items.Length; i++)
             {
-                var item = _items[i];
-                var title = $"{EscapeRichText(item.DisplayName)} {FormatDifficulty(item.Difficulty)}";
-                var desc = $"谱面: {EscapeRichText(item.DisplayName)}\n难度: {FormatDifficulty(item.Difficulty)}\n添加者: {EscapeRichText(item.OwnerName)}";
-                AddButton(title, desc);
+                try
+                {
+                    var item = _items[i];
+                    AddButton(GetItemTitle(item), GetItemDescription(item));
+                }
+                catch (System.Exception ex)
+                {
+                    MDEN.Managers.ClientLogManager.Warning($"Build playlist item failed: {ex.Message}");
+                    AddButton("无法显示的谱面", "该歌曲列表项格式异常");
+                }
             }
-        }
-
-        private bool HasPlaylistStateChanged(LobbySyncPush lobby)
-        {
-            var lobbyId = lobby?.Id ?? -1;
-            var snapshot = BuildPlaylistSnapshot(lobby);
-            return lobbyId != _lastLobbyId || snapshot != _lastPlaylistSnapshot;
-        }
-
-        private void CapturePlaylistSnapshot(LobbySyncPush lobby)
-        {
-            _lastLobbyId = lobby?.Id ?? -1;
-            _lastPlaylistSnapshot = BuildPlaylistSnapshot(lobby);
-        }
-
-        private static string BuildPlaylistSnapshot(LobbySyncPush lobby)
-        {
-            if (lobby == null) return string.Empty;
-
-            var playlist = lobby.Playlist == null || lobby.Playlist.Length == 0
-                ? string.Empty
-                : string.Join("\u001F", lobby.Playlist);
-
-            return $"{lobby.PlaylistSize}|{lobby.Locked}|{lobby.IsPlaying}|{playlist}";
         }
 
         private ForumObject AddButton(string title, string desc)
         {
             var obj = new ForumObject(new LocalString(title), new LocalString(desc));
-            obj.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("RoomList.png")?.texture;
+            obj.Texture = ResourceManager.GetSprite("RoomList.png")?.texture;
             _window.ForumObjects.Add(obj);
             return obj;
         }
@@ -139,7 +122,23 @@ namespace MDEN.UI.Windows
 
         private static string EscapeRichText(string value)
         {
-            return value?.Replace("<", "＜").Replace(">", "＞") ?? string.Empty;
+            if (string.IsNullOrEmpty(value)) return string.Empty;
+
+            var safe = value
+                .Replace("\r", " ")
+                .Replace("\n", " ")
+                .Replace("\t", " ")
+                .Replace("<", "＜")
+                .Replace(">", "＞");
+            return TruncateSafe(safe, 96);
+        }
+
+        private static string TruncateSafe(string value, int maxLength)
+        {
+            if (string.IsNullOrEmpty(value) || value.Length <= maxLength) return value ?? string.Empty;
+            var length = maxLength;
+            if (length > 0 && char.IsHighSurrogate(value[length - 1])) length--;
+            return value.Substring(0, length);
         }
 
         private void OnSelectionChanged(PopupLib.UI.Windows.Interfaces.IListWindow window, int objectIndex)
@@ -154,11 +153,46 @@ namespace MDEN.UI.Windows
             if (!PlaylistManager.CanChangePlaylist || objectIndex >= _items.Length) return;
 
             var item = _items[objectIndex];
-            NativeConfirmDialog.Show("删除歌曲", $"确认从歌曲列表移除「{item.DisplayName}」吗？", confirmed =>
+            if (item == null) return;
+
+            NativeConfirmDialog.Show("删除歌曲", $"确认从歌曲列表移除「{GetConfirmDisplayName(item)}」吗？", confirmed =>
             {
                 if (!confirmed) return;
                 _ = RemoveItemAsync(item);
             });
+        }
+
+        private static string GetItemTitle(PlaylistEntryViewModel item)
+        {
+            return $"{EscapeRichText(item.DisplayName)} {FormatDifficulty(item.Difficulty)}";
+        }
+
+        private static string GetItemDescription(PlaylistEntryViewModel item)
+        {
+            if (IsCustomEntry(item))
+            {
+                return $"谱面: {EscapeRichText(item.DisplayName)}\n类型: 自制谱\n难度: {FormatDifficulty(item.Difficulty)}\n添加者: {EscapeRichText(item.OwnerName)}\nID: {FormatCustomChartId(item.ChartKey)}";
+            }
+
+            return $"谱面: {EscapeRichText(item.DisplayName)}\n难度: {FormatDifficulty(item.Difficulty)}\n添加者: {EscapeRichText(item.OwnerName)}";
+        }
+
+        private static string GetConfirmDisplayName(PlaylistEntryViewModel item)
+        {
+            return IsCustomEntry(item)
+                ? $"{EscapeRichText(item.DisplayName)} ({FormatCustomChartId(item.ChartKey)})"
+                : EscapeRichText(item.DisplayName);
+        }
+
+        private static bool IsCustomEntry(PlaylistEntryViewModel item)
+        {
+            return ChartSelectionRules.IsCustomChartKey(item?.ChartKey);
+        }
+
+        private static string FormatCustomChartId(string chartKey)
+        {
+            if (string.IsNullOrWhiteSpace(chartKey)) return "Unknown";
+            return chartKey.Length <= 8 ? chartKey : chartKey.Substring(0, 8).ToUpperInvariant();
         }
 
         private async System.Threading.Tasks.Task RemoveItemAsync(PlaylistEntryViewModel item)
@@ -220,9 +254,15 @@ namespace MDEN.UI.Windows
             _lastSelectedIndex = -1;
             if (_window != null)
             {
+                _window.OnSelectionChanged -= OnSelectionChanged;
+                _window.OnInternalShow -= OnInternalShowInjectTitle;
+                _window.OnCompletion -= OnWindowCompletion;
+                _suppressNextCompletion = true;
                 _window.ForceClose();
                 _window = null;
             }
+
+            ReleaseHudSuppression();
         }
 
         private string GetTitleText()
@@ -232,28 +272,33 @@ namespace MDEN.UI.Windows
             var maxCount = lobby?.PlaylistSize ?? 0;
             return $"歌曲列表 {currentCount}/{maxCount}";
         }
+
         private void RebuildWindow()
         {
             if (_window == null) return;
             _window.OnSelectionChanged -= OnSelectionChanged;
             _window.OnInternalShow -= OnInternalShowInjectTitle;
+            _window.OnCompletion -= OnWindowCompletion;
+            _suppressNextCompletion = true;
             _window.ForceClose();
+            _suppressNextCompletion = false;
             _window = new ForumWindow();
             _window.AutoReset = true;
             BuildList();
             _window.OnSelectionChanged += OnSelectionChanged;
             _window.OnInternalShow += OnInternalShowInjectTitle;
+            _window.OnCompletion += OnWindowCompletion;
             _window.Show();
             _lastSelectedIndex = -1;
         }
 
-        private void RefreshWindowContent()
+        private void ReleaseHudSuppression()
         {
-            if (_window == null) return;
+            var suppression = _hudSuppression;
+            if (suppression == null) return;
 
-            BuildList();
-            OnInternalShowInjectTitle(null);
-            _lastSelectedIndex = -1;
+            _hudSuppression = null;
+            suppression.Dispose();
         }
     }
 }

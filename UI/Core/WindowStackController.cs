@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
+using System.Runtime.CompilerServices;
 using MelonLoader;
 
 namespace MDEN.UI.Core
@@ -39,11 +41,29 @@ namespace MDEN.UI.Core
         }
 
         // 关闭顶部窗口并开新窗，确保栈中只有一个活跃业务窗口
-        public static void OpenWindow(MDENWindowBase newWindow)
+        public static void OpenWindow(
+            MDENWindowBase newWindow,
+            [CallerMemberName] string callerMemberName = null,
+            [CallerFilePath] string callerFilePath = null,
+            [CallerLineNumber] int callerLineNumber = 0)
         {
+            MDEN.Managers.ClientLogManager.Msg(
+                $"OpenWindow: {newWindow?.GetType().Name ?? "null"} from {Path.GetFileName(callerFilePath)}:{callerLineNumber} {callerMemberName}");
             CloseCurrentWindow();
             _windowStack.Push(newWindow);
             newWindow.Show();
+        }
+
+        public static void NotifyWindowCompleted(MDENWindowBase window)
+        {
+            if (window == null) return;
+
+            if (_windowStack.Count > 0 && ReferenceEquals(_windowStack.Peek(), window))
+            {
+                _windowStack.Pop();
+            }
+
+            window.Dispose();
         }
 
         // 销毁并关闭当前窗口

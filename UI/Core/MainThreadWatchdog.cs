@@ -6,11 +6,8 @@ namespace MDEN.UI.Core
 {
     internal static class MainThreadWatchdog
     {
-        private const int CheckIntervalMs = 2000;
         private const double StallThresholdSeconds = 5.0;
         private const double WarningCooldownSeconds = 20.0;
-        private static readonly object SyncRoot = new object();
-        private static Timer _timer;
         private static long _lastHeartbeatTicks;
         private static long _lastWarningTicks;
         private static volatile string _lastStage = "not-started";
@@ -18,45 +15,28 @@ namespace MDEN.UI.Core
 
         public static void Initialize()
         {
-            lock (SyncRoot)
-            {
-                _lastHeartbeatTicks = DateTime.UtcNow.Ticks;
-                _lastWarningTicks = 0;
-                _lastStage = "initialized";
-                _currentScene = "unknown";
-                _timer?.Dispose();
-                _timer = new Timer(Check, null, CheckIntervalMs, CheckIntervalMs);
-            }
+            Interlocked.Exchange(ref _lastHeartbeatTicks, 0);
+            Interlocked.Exchange(ref _lastWarningTicks, 0);
+            _lastStage = "waiting-for-first-heartbeat";
+            _currentScene = "unknown";
         }
 
         public static void Shutdown()
         {
-            lock (SyncRoot)
-            {
-                _timer?.Dispose();
-                _timer = null;
-            }
+            Interlocked.Exchange(ref _lastHeartbeatTicks, 0);
+            Interlocked.Exchange(ref _lastWarningTicks, 0);
         }
 
         public static void Heartbeat(string stage)
         {
-            _lastStage = string.IsNullOrWhiteSpace(stage) ? "unknown" : stage;
-            Interlocked.Exchange(ref _lastHeartbeatTicks, DateTime.UtcNow.Ticks);
-        }
-
-        public static void SetScene(string sceneName)
-        {
-            _currentScene = string.IsNullOrWhiteSpace(sceneName) ? "unknown" : sceneName;
-            Heartbeat("SceneLoaded." + _currentScene);
-        }
-
-        private static void Check(object state)
-        {
             var nowTicks = DateTime.UtcNow.Ticks;
-            var heartbeatTicks = Interlocked.Read(ref _lastHeartbeatTicks);
-            if (heartbeatTicks <= 0) return;
+            var previousTicks = Interlocked.Exchange(ref _lastHeartbeatTicks, nowTicks);
+            var previousStage = _lastStage;
+            _lastStage = string.IsNullOrWhiteSpace(stage) ? "unknown" : stage;
 
-            var stalledSeconds = TimeSpan.FromTicks(nowTicks - heartbeatTicks).TotalSeconds;
+            if (previousTicks <= 0) return;
+
+            var stalledSeconds = TimeSpan.FromTicks(nowTicks - previousTicks).TotalSeconds;
             if (stalledSeconds < StallThresholdSeconds) return;
 
             var lastWarningTicks = Interlocked.Read(ref _lastWarningTicks);
@@ -68,7 +48,13 @@ namespace MDEN.UI.Core
 
             Interlocked.Exchange(ref _lastWarningTicks, nowTicks);
             MelonLogger.Warning(
-                $"[MDEN.Watchdog] Main thread stalled for {stalledSeconds:F1}s, scene={_currentScene}, lastStage={_lastStage}");
+                $"[MDEN.Watchdog] Main thread stalled for {stalledSeconds:F1}s, scene={_currentScene}, lastStage={previousStage}");
+        }
+
+        public static void SetScene(string sceneName)
+        {
+            _currentScene = string.IsNullOrWhiteSpace(sceneName) ? "unknown" : sceneName;
+            Heartbeat("SceneLoaded." + _currentScene);
         }
     }
 }

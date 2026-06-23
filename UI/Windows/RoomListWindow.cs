@@ -31,6 +31,7 @@ namespace MDEN.UI.Windows
         private bool _joinInProgress;
         private int? _joiningLobbyId;
         private int _lastSelectedIndex = -1;
+        private bool _suppressNextCompletion;
         private readonly bool _readOnly;
 
         public RoomListWindow()
@@ -59,6 +60,7 @@ namespace MDEN.UI.Windows
             BuildList();
             _window.OnSelectionChanged += OnSelectionChanged;
             _window.OnInternalShow += OnInternalShowInjectTitle;
+            _window.OnCompletion += OnWindowCompletion;
             _window.Show();
             _lastSelectedIndex = -1;
 
@@ -68,6 +70,7 @@ namespace MDEN.UI.Windows
                 {
                     _window.OnSelectionChanged -= OnSelectionChanged;
                     _window.OnInternalShow -= OnInternalShowInjectTitle;
+                    _window.OnCompletion -= OnWindowCompletion;
                 }
 
                 RemoveInjectedTitle();
@@ -78,6 +81,17 @@ namespace MDEN.UI.Windows
             {
                 StartAutoRefresh();
             }
+        }
+
+        private void OnWindowCompletion(PopupLib.UI.Windows.Abstract.BaseWindow w)
+        {
+            if (_suppressNextCompletion)
+            {
+                _suppressNextCompletion = false;
+                return;
+            }
+
+            WindowStackController.NotifyWindowCompleted(this);
         }
 
         private void OnInternalShowInjectTitle(PopupLib.UI.Windows.Abstract.BaseWindow w)
@@ -350,6 +364,7 @@ namespace MDEN.UI.Windows
 
             if (_window != null)
             {
+                _suppressNextCompletion = true;
                 _window.ForceClose();
             }
 
@@ -603,12 +618,15 @@ namespace MDEN.UI.Windows
 
             _window.OnSelectionChanged -= OnSelectionChanged;
             _window.OnInternalShow -= OnInternalShowInjectTitle;
+            _window.OnCompletion -= OnWindowCompletion;
             ForceCloseWindowSafe();
+            _suppressNextCompletion = false;
             _window = new ForumWindow();
             _window.AutoReset = true;
             BuildList();
             _window.OnSelectionChanged += OnSelectionChanged;
             _window.OnInternalShow += OnInternalShowInjectTitle;
+            _window.OnCompletion += OnWindowCompletion;
             _window.Show();
             _lastSelectedIndex = -1;
         }
@@ -621,6 +639,9 @@ namespace MDEN.UI.Windows
             LobbyManager.CancelPendingJoin();
             if (_window != null)
             {
+                _window.OnSelectionChanged -= OnSelectionChanged;
+                _window.OnInternalShow -= OnInternalShowInjectTitle;
+                _window.OnCompletion -= OnWindowCompletion;
                 ForceCloseWindowSafe();
                 _window = null;
             }

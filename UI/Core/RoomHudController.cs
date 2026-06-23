@@ -28,6 +28,7 @@ namespace MDEN.UI.Core
         private static bool _nativeInputBlockedByChat;
         private static bool _battleSceneActive;
         private static bool _roomHudDeferred;
+        private static int _popupSuppressionCount;
 
         public static void Initialize()
         {
@@ -67,6 +68,14 @@ namespace MDEN.UI.Core
         {
             if (lobby == null && LobbyManager.CurrentLobby != null) return;
             if (lobby != null && LobbyManager.CurrentLobby?.Id != lobby.Id) return;
+
+            if (IsPopupSuppressed)
+            {
+                _roomHudDeferred = true;
+                HidePopupSensitiveObjects();
+                MultiplayerBattleController.OnLobbyChanged();
+                return;
+            }
 
             var isNewLobbyEntry = lobby != null && _entranceTrackedLobbyId != lobby.Id;
             if (lobby == null)
@@ -155,6 +164,12 @@ namespace MDEN.UI.Core
 
         public static void Update()
         {
+            if (IsPopupSuppressed)
+            {
+                RestoreNativeInput();
+                return;
+            }
+
             if (ShouldPauseRoomHudUpdate())
             {
                 RestoreNativeInput();
@@ -174,6 +189,12 @@ namespace MDEN.UI.Core
 
         private static void Refresh(MDEN.Protocol.Messages.Lobby.LobbySyncPush lobby, int retryCount = 0)
         {
+            if (IsPopupSuppressed)
+            {
+                HidePopupSensitiveObjects();
+                return;
+            }
+
             if (lobby == null || !LobbyManager.IsInLobby)
             {
                 Destroy();
@@ -264,6 +285,62 @@ namespace MDEN.UI.Core
             RoomCharacterDisplay.DestroyGeneratedObjects();
         }
 
+        public static System.IDisposable SuppressForPopupWindow(string reason)
+        {
+            _popupSuppressionCount++;
+            if (_popupSuppressionCount == 1)
+            {
+                MDEN.Managers.ClientLogManager.Msg($"Room HUD suppressed for popup: {reason}");
+                HidePopupSensitiveObjects();
+            }
+
+            return new PopupSuppressionToken(ReleasePopupSuppression);
+        }
+
+        private static bool IsPopupSuppressed => _popupSuppressionCount > 0;
+
+        private static void ReleasePopupSuppression()
+        {
+            if (_popupSuppressionCount <= 0) return;
+
+            _popupSuppressionCount--;
+            if (_popupSuppressionCount > 0) return;
+
+            _popupSuppressionCount = 0;
+            _roomHudDeferred = false;
+            MDEN.Managers.ClientLogManager.Msg("Room HUD popup suppression released.");
+            RequestRefresh();
+        }
+
+        private static void HidePopupSensitiveObjects()
+        {
+            RestoreNativeInput();
+            PlayerList.Destroy();
+            Chat.ResetSceneObjects();
+            ReadyDisplay.Destroy();
+            RoomSceneOverlay.Destroy();
+            RoomCharacterDisplay.DestroyGeneratedObjects();
+        }
+
+        private sealed class PopupSuppressionToken : System.IDisposable
+        {
+            private System.Action _release;
+
+            public PopupSuppressionToken(System.Action release)
+            {
+                _release = release;
+            }
+
+            public void Dispose()
+            {
+                var release = _release;
+                if (release == null) return;
+
+                _release = null;
+                release();
+            }
+        }
+
         private static void ScheduleRefreshRetry(MDEN.Protocol.Messages.Lobby.LobbySyncPush lobby, int retryCount)
         {
             if (retryCount >= MaxRefreshRetries) return;
@@ -315,6 +392,7 @@ namespace MDEN.UI.Core
             _pendingRetryGeneration++;
             _retryDelayFrames = 0;
             _roomHudDeferred = false;
+            _popupSuppressionCount = 0;
             ResetEntranceFallback();
             _characterNotReadyLogged = false;
             _characterRepairCooldownFrames = 0;
@@ -334,6 +412,7 @@ namespace MDEN.UI.Core
             _pendingRetryGeneration++;
             _retryDelayFrames = 0;
             _roomHudDeferred = false;
+            _popupSuppressionCount = 0;
             ResetEntranceFallback(false);
             _characterNotReadyLogged = false;
             _characterRepairCooldownFrames = 0;

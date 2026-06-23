@@ -73,8 +73,8 @@ namespace MDEN.Managers
         {
             var playlist = LobbyManager.CurrentLobby?.Playlist;
             if (playlist == null || playlist.Length == 0) return new PlaylistEntryViewModel[0];
-            return playlist
-                .Select(ChartManager.ParseEntry)
+
+            return playlist.Select(ParsePlaylistItemSafe)
                 .Where(item => item != null)
                 .ToArray();
         }
@@ -121,6 +121,7 @@ namespace MDEN.Managers
             if (!LobbyManager.IsInLobby) return "PLAY!";
             if (!CanChangePlaylist) return LobbyManager.CurrentLobby?.Locked == true ? "等待准备" : "等待房主选歌";
             var entry = ChartManager.GetCurrentEntry();
+            if (string.IsNullOrEmpty(entry)) return "未选择谱面";
             if (!string.IsNullOrEmpty(entry) && ContainsEntry(entry)) return "移除歌曲列表";
             if (IsCurrentChartUnsupported()) return UnsupportedChartMessage;
             if (IsPlaylistFull()) return "歌曲列表已满";
@@ -132,6 +133,7 @@ namespace MDEN.Managers
             if (!LobbyManager.IsInLobby) return true;
             if (!CanChangePlaylist) return false;
             var entry = ChartManager.GetCurrentEntry();
+            if (string.IsNullOrEmpty(entry)) return false;
             if (!string.IsNullOrEmpty(entry) && ContainsEntry(entry)) return true;
             return !ChartSelectionRules.IsUnsupportedPlaylistEntry(entry) && !IsPlaylistFull();
         }
@@ -229,6 +231,11 @@ namespace MDEN.Managers
         public static async Task SetReadyAsync(bool ready)
         {
             EnsureReady();
+            if (ready)
+            {
+                await PlayerManager.SyncChartStateAsync();
+            }
+
             await NetworkClient.Instance.SendRequestAsync<LobbyReadyRequest, LobbyReadyResponse>(
                 OpCodes.LobbyReadyReq,
                 new LobbyReadyRequest { Ready = ready });
@@ -260,6 +267,26 @@ namespace MDEN.Managers
         {
             var playlist = LobbyManager.CurrentLobby?.Playlist;
             return playlist?.FirstOrDefault(item => ChartManager.IsSameChart(item, entry));
+        }
+
+        private static PlaylistEntryViewModel ParsePlaylistItemSafe(string entry)
+        {
+            try
+            {
+                return ChartManager.ParseEntry(entry);
+            }
+            catch (System.Exception ex)
+            {
+                MDEN.Managers.ClientLogManager.Warning($"Parse playlist entry failed: {ex.Message}");
+                return new PlaylistEntryViewModel
+                {
+                    Entry = entry,
+                    ChartKey = entry ?? string.Empty,
+                    Difficulty = 0,
+                    OwnerName = "Unknown",
+                    ChartName = "无法显示的谱面"
+                };
+            }
         }
 
         private static string GetCurrentPlaylistEntryText(LobbySyncPush lobby, out int playlistIndex)
