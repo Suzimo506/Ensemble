@@ -91,7 +91,9 @@ namespace MDEN.Network
                 var respEnv = JsonSerializer.Deserialize<ServerEnvelope>(payloadBuf, ProtocolJson.Options);
                 if (respEnv != null && respEnv.Op == OpCodes.ServerInfoResp && respEnv.Success)
                 {
-                    return JsonSerializer.Deserialize<ServerInfoResponse>(((JsonElement)respEnv.Payload).GetRawText());
+                    return JsonSerializer.Deserialize<ServerInfoResponse>(
+                        ((JsonElement)respEnv.Payload).GetRawText(),
+                        ProtocolJson.Options);
                 }
             }
             catch

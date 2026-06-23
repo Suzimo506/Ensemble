@@ -117,7 +117,10 @@ namespace MDEN.Managers
 
             _lastBattleReturnedAttemptUtc = now;
             _forcedDead = !alive;
-            StopSyncLoop();
+            if (alive)
+            {
+                StopSyncLoop();
+            }
 
             var playedSeconds = GetPlayedSeconds();
             await FlushFinalBattleDataAsync();

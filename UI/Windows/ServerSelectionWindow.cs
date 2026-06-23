@@ -30,7 +30,7 @@ namespace MDEN.UI.Windows
         private int _lastSelectedIndex = -1;
         private bool _isRefreshingNodes;
 
-        public override async void Show()
+        public override void Show()
         {
             _window = new ForumWindow();
             _window.AutoReset = true;
@@ -45,8 +45,20 @@ namespace MDEN.UI.Windows
             _lastSelectedIndex = -1; // 在 Show 之后重置选择索引
             RegisterWindowCleanup();
 
-            await RefreshNodesAsync();
-            await RebuildWindowOnMainThreadAsync();
+            _ = ShowAsync();
+        }
+
+        private async Task ShowAsync()
+        {
+            try
+            {
+                await RefreshNodesAsync();
+                await RebuildWindowOnMainThreadAsync();
+            }
+            catch (Exception ex)
+            {
+                MDEN.Managers.ClientLogManager.Warning($"Server selection show failed: {ex.Message}");
+            }
         }
 
         private void InjectTitle()
@@ -204,7 +216,7 @@ namespace MDEN.UI.Windows
 
         private Task RebuildWindowOnMainThreadAsync()
         {
-            var completion = new TaskCompletionSource<bool>();
+            var completion = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
             if (IsDisposed)
             {
                 completion.SetResult(true);

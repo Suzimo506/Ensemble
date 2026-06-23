@@ -9,9 +9,10 @@
     <LangVersion>preview</LangVersion>
     <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
     <AssemblyName>Ensemble</AssemblyName>
+    <CopyToMuseDash Condition="'$(CopyToMuseDash)' == ''">false</CopyToMuseDash>
   </PropertyGroup>
 
-  <Target Name="CopyDLLs" AfterTargets="Build">
+  <Target Name="CopyDLLs" AfterTargets="Build" Condition="'$(CopyToMuseDash)' == 'true'">
     <Copy SourceFiles="$(TargetDir)$(AssemblyName).dll" DestinationFolder="$(MD_NET6_DIRECTORY)\Mods" />
     <Copy SourceFiles="$(TargetDir)MDEN.Protocol.dll" DestinationFolder="$(MD_NET6_DIRECTORY)\UserLibs" />
     <Message Text="Copied DLL -&gt; $(MD_NET6_DIRECTORY)\Mods\$(AssemblyName).dll" Importance="High" />

@@ -5,6 +5,7 @@ using System.Text.RegularExpressions;
 using Il2CppAssets.Scripts.UI.Controls;
 using MDEN.Managers;
 using MDEN.Protocol.Messages.Chat;
+using MDEN.Protocol.Rules;
 using MDEN.UI.Core;
 using MelonLoader;
 using UnityEngine;
@@ -473,9 +474,9 @@ namespace MDEN.UI.Displays
 
         private void ConfigureMessageClick(Text text, ChatPushMsg msg)
         {
-            var copyName = GetCopyableChartName(msg);
+            var missingChart = GetMissingChartClickData(msg);
             var previewChartName = GetPreviewableChartName(msg);
-            if (string.IsNullOrWhiteSpace(copyName) && string.IsNullOrWhiteSpace(previewChartName)) return;
+            if (!missingChart.HasValue && string.IsNullOrWhiteSpace(previewChartName)) return;
 
             text.raycastTarget = true;
             var button = text.gameObject.GetComponent<Button>() ?? text.gameObject.AddComponent<Button>();
@@ -484,10 +485,11 @@ namespace MDEN.UI.Displays
             button.onClick.RemoveAllListeners();
             button.onClick.AddListener((UnityAction)(() =>
             {
-                if (!string.IsNullOrWhiteSpace(copyName))
+                if (missingChart.HasValue)
                 {
-                    GUIUtility.systemCopyBuffer = copyName;
-                    ShowText.ShowInfo($"已复制谱面名: {copyName}");
+                    MissingChartImportManager.HandleMissingChartClick(
+                        missingChart.Value.ChartName,
+                        missingChart.Value.ChartKey);
                     return;
                 }
 
@@ -838,20 +840,22 @@ namespace MDEN.UI.Displays
             return !string.IsNullOrWhiteSpace(chartName);
         }
 
-        private static string GetCopyableChartName(ChatPushMsg msg)
+        private static (string ChartName, string ChartKey)? GetMissingChartClickData(ChatPushMsg msg)
         {
             if (msg == null || !msg.IsSystem) return null;
 
             if (msg.Message == "PlayerMissingChart")
             {
                 var missing = ParsePlayerMissingChart(msg);
-                return missing.HasValue ? CleanChartNameForCopy(missing.Value.ChartName) : null;
+                return missing.HasValue
+                    ? (CleanChartNameForCopy(missing.Value.ChartName), missing.Value.ChartKey)
+                    : null;
             }
 
             var textMissing = ParseTextMissingChart(msg.Message);
             if (textMissing.HasValue)
             {
-                return CleanChartNameForCopy(textMissing.Value.ChartName);
+                return (CleanChartNameForCopy(textMissing.Value.ChartName), null);
             }
 
             return null;
@@ -911,14 +915,19 @@ namespace MDEN.UI.Displays
                 .Trim()
                 .ToLowerInvariant();
         }
-        private static (string PlayerName, string ChartName)? ParsePlayerMissingChart(ChatPushMsg msg)
+        private static (string PlayerName, string ChartName, string ChartKey)? ParsePlayerMissingChart(ChatPushMsg msg)
         {
             if (string.IsNullOrWhiteSpace(msg?.ExtraData)) return null;
 
-            var parts = msg.ExtraData.Split(new[] { '#' }, 2);
+            var parts = msg.ExtraData.Split('#');
             if (parts.Length < 2) return null;
 
-            return (parts[0], parts[1]);
+            if (parts.Length >= 5 && IsLikelyEntryPayload(parts))
+            {
+                return (parts[0], string.Join("#", parts, 4, parts.Length - 4), parts[1]);
+            }
+
+            return (parts[0], string.Join("#", parts, 1, parts.Length - 1), null);
         }
 
         private static (string Uid, string Text)? ParsePlayerEventData(ChatPushMsg msg)
@@ -969,6 +978,13 @@ namespace MDEN.UI.Displays
             var value = Regex.Replace(chartName, "<.*?>", string.Empty);
             value = Regex.Replace(value, @"^\s*([【\[].*?[\]】]\s*)+", string.Empty);
             return value.Trim();
+        }
+
+        private static bool IsLikelyEntryPayload(string[] parts)
+        {
+            return parts.Length >= 5 &&
+                   ChartSelectionRules.IsValidChartKey(parts[1]) &&
+                   int.TryParse(parts[2], out _);
         }
 
         private static string FormatMissingChartNameForDisplay(string chartName)

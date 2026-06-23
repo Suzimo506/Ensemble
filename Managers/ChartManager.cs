@@ -1,6 +1,7 @@
 using CustomAlbums.Data;
 using CustomAlbums.Managers;
 using Il2CppAssets.Scripts.Database;
+using MDEN.Protocol.Rules;
 using MDEN.UI.Core;
 using System.Collections.Generic;
 using System.Linq;
@@ -312,7 +313,7 @@ namespace MDEN.Managers
 
         private static bool IsCustomChartKey(string chartKey)
         {
-            return !string.IsNullOrWhiteSpace(chartKey) && chartKey.Length >= 16 && !chartKey.StartsWith($"{AlbumManager.Uid}-");
+            return ChartSelectionRules.IsCustomChartKey(chartKey);
         }
 
         private static void OnAlbumLoaded(object sender, CustomAlbums.ModExtensions.AlbumEventArgs e)

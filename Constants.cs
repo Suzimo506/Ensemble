@@ -25,7 +25,7 @@ namespace MDEN
             "<color=" + ColorPink + ">XMJjs</color> — Mod与服务器后端开发者\n" +
             "<color=" + ColorPink + ">Cookie</color> — Mod与服务器后端开发者\n" +
             "[ 测试团队 ]\n" +
-            "MSC☆言叶. AP的是给 浅夏 莼畹ChunWan_ 冬瓜糖 飞翔冥王星 GreenHub 纯鹿人 苏达 nuxwalker 萧千岁 fish 姫坂乃愛\n" +
+            "MSC☆言叶. AP的是给 浅夏 莼畹ChunWan_ 冬瓜糖 飞翔冥王星 晓屿云叙 GreenHub 纯鹿人 苏达 nuxwalker 萧千岁 fish 姫坂乃愛\n" +
             "[ 特别感谢 ]\n" +
             "<color=" + ColorLavender + ">浅夏ぬ浅离</color> — 横幅选择与剪辑\n" +
             "<color=" + ColorLavender + ">XMJjs</color> — mden.top网站维护人\n" +

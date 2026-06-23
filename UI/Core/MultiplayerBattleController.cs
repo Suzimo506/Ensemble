@@ -1,6 +1,7 @@
 using Il2Cpp;
 using Il2CppAssets.Scripts.Database;
 using Il2CppAssets.Scripts.UI.Controls;
+using MDEN.Protocol.Rules;
 using UnityEngine;
 
 namespace MDEN.UI.Core
@@ -108,7 +109,10 @@ namespace MDEN.UI.Core
         private static bool TryStartCurrentPlaylistEntry(string battleId, string entryText, int retriesRemaining)
         {
             var entry = Managers.ChartManager.ParseEntry(entryText);
-            if (entry == null)
+            if (entry == null ||
+                entry.Difficulty < 0 ||
+                entry.Difficulty > 4 ||
+                ChartSelectionRules.IsUnsupportedChartKey(entry.ChartKey))
             {
                 ReportStartFailure(
                     Managers.LobbyManager.CurrentLobby?.Id ?? 0,
