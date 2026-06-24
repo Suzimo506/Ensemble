@@ -75,6 +75,12 @@ namespace MDEN.UI.Core
                 return;
             }
 
+            if (PlaylistManager.IsRookieReadySelectionActive())
+            {
+                await SetRookieReadyAsync();
+                return;
+            }
+
             _busy = true;
             Refresh();
             IDisposable uiLock = WindowStackController.LockUI("Updating playlist...");
@@ -89,6 +95,44 @@ namespace MDEN.UI.Core
             {
                 MDEN.Managers.ClientLogManager.Warning($"Toggle playlist chart failed: {ex.Message}");
                 MainThreadDispatcher.Enqueue(() => ShowText.ShowInfo(ex.Message));
+            }
+            finally
+            {
+                _busy = false;
+                MainThreadDispatcher.Enqueue(Refresh);
+                await MainThreadDispatcher.InvokeAsync(() => uiLock?.Dispose());
+            }
+        }
+
+        private static async System.Threading.Tasks.Task SetRookieReadyAsync()
+        {
+            var entry = PlaylistManager.GetCurrentPlaylistEntry();
+            if (!ChartManager.IsCurrentSelectedChart(entry))
+            {
+                ShowText.ShowInfo("请先选择本局谱面");
+                return;
+            }
+
+            var difficulty = ChartManager.CurrentDifficulty;
+            if (!MDEN.Protocol.Rules.DifficultyDisplayRules.IsKnownDifficulty(difficulty))
+            {
+                ShowText.ShowInfo("请选择有效难度");
+                return;
+            }
+
+            _busy = true;
+            Refresh();
+            IDisposable uiLock = WindowStackController.LockUI("Setting ready...");
+
+            try
+            {
+                await PlaylistManager.SetReadyAsync(true, difficulty);
+                MainThreadDispatcher.Enqueue(() => ShowText.ShowInfo("已选择并准备"));
+            }
+            catch (Exception ex)
+            {
+                MDEN.Managers.ClientLogManager.Warning($"Set rookie ready failed: {ex.Message}");
+                MainThreadDispatcher.Enqueue(() => ShowText.ShowInfo($"准备失败：{ex.Message}"));
             }
             finally
             {

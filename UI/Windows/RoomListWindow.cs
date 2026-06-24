@@ -207,6 +207,7 @@ namespace MDEN.UI.Windows
             var host = EscapeRichText(lobby.HostName ?? lobby.HostUid ?? "Unknown");
             return $"房主: <color={Constants.ColorPink}>{host}</color>\n" +
                    $"人数: <color={Constants.ColorCyan}>{lobby.PlayerCount}/{lobby.MaxPlayers}</color>\n" +
+                   $"游玩模式: {LobbyRuleTextFormatter.FormatPlayMode(lobby.PlayMode, false)}\n" +
                    $"歌曲列表: <color={Constants.ColorYellow}>{lobby.PlaylistCount}/{lobby.PlaylistSize}</color>\n" +
                    $"玩法: <color={Constants.ColorBlue}>{GetPlayTypeName(lobby.PlayType)}</color>\n" +
                    $"选谱: <color={Constants.ColorBlue}>{GetChartSelectionName(lobby.ChartSelection)}</color>\n" +
@@ -535,6 +536,7 @@ namespace MDEN.UI.Windows
                 left.Name == right.Name &&
                 left.HostUid == right.HostUid &&
                 left.HostName == right.HostName &&
+                left.PlayMode == right.PlayMode &&
                 left.PlayType == right.PlayType &&
                 left.ChartSelection == right.ChartSelection &&
                 left.Goal == right.Goal &&

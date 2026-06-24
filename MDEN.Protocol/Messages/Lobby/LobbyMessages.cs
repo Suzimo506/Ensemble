@@ -7,6 +7,7 @@ namespace MDEN.Protocol.Messages.Lobby
     {
         public string Name { get; set; }
         public ushort MaxPlayers { get; set; }
+        public byte PlayMode { get; set; }
         public byte PlayType { get; set; }
         public byte ChartSelection { get; set; }
         public byte Goal { get; set; }
@@ -39,6 +40,7 @@ namespace MDEN.Protocol.Messages.Lobby
     public class LobbyReadyRequest
     {
         public bool Ready { get; set; }
+        public int Difficulty { get; set; }
     }
 
     public class LobbyReadyResponse
@@ -91,6 +93,8 @@ namespace MDEN.Protocol.Messages.Lobby
         public byte Goal { get; set; }
         public bool UpdateSettlementEnabled { get; set; }
         public bool SettlementEnabled { get; set; }
+        public bool UpdatePlayMode { get; set; }
+        public byte PlayMode { get; set; }
 
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public string Password { get; set; }
@@ -131,6 +135,7 @@ namespace MDEN.Protocol.Messages.Lobby
         public string Name { get; set; }
         public string HostUid { get; set; }
         public string HostName { get; set; }
+        public byte PlayMode { get; set; }
         public byte PlayType { get; set; }
         public byte ChartSelection { get; set; }
         public byte Goal { get; set; }
@@ -150,8 +155,20 @@ namespace MDEN.Protocol.Messages.Lobby
         public string[] MutedPlayers { get; set; }
         public string[] ChartSelectBannedPlayers { get; set; }
         public string[] Playlist { get; set; }
+        public LobbyPlaylistOwnerEntry[] PlaylistOwners { get; set; }
+        public string TenziSelectedEntry { get; set; }
+        public bool TenziRoundClosed { get; set; }
+        public long TenziDrawSeed { get; set; }
+        public LobbyPlayerDifficultyEntry[] ReadyPlayerDifficulties { get; set; }
+        public LobbyPlayerDifficultyEntry[] CurrentBattleDifficulties { get; set; }
         public PlayerSyncEntry[] PlayerDetails { get; set; }
         public LobbyPlayerCharacterEntry[] PlayerCharacters { get; set; }
+    }
+
+    public class LobbyPlaylistOwnerEntry
+    {
+        public string Entry { get; set; }
+        public string Uid { get; set; }
     }
 
     public class LobbyPlayerCharacterEntry

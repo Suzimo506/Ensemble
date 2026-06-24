@@ -9,6 +9,7 @@
     <LangVersion>preview</LangVersion>
     <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
     <AssemblyName>Ensemble</AssemblyName>
+    <CopyToMuseDash Condition="'$(CopyToMuseDash)' == '' and '$(MD_NET6_DIRECTORY)' != ''">true</CopyToMuseDash>
     <CopyToMuseDash Condition="'$(CopyToMuseDash)' == ''">false</CopyToMuseDash>
   </PropertyGroup>
 

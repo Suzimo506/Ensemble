@@ -22,6 +22,7 @@ namespace MDEN.Protocol.Models
     public class BattlePlayerEntry
     {
         public string Uid { get; set; }
+        public int Difficulty { get; set; }
         public uint Score { get; set; }
         public float Accuracy { get; set; }
         public ushort Perfects { get; set; }
@@ -43,6 +44,7 @@ namespace MDEN.Protocol.Models
         public string Name { get; set; }
         public string HostUid { get; set; }
         public string HostName { get; set; }
+        public byte PlayMode { get; set; }
         public byte PlayType { get; set; }
         public byte ChartSelection { get; set; }
         public byte Goal { get; set; }
@@ -63,5 +65,11 @@ namespace MDEN.Protocol.Models
     public class DisconnectMessage
     {
         public string Reason { get; set; }
+    }
+
+    public class LobbyPlayerDifficultyEntry
+    {
+        public string Uid { get; set; }
+        public int Difficulty { get; set; }
     }
 }

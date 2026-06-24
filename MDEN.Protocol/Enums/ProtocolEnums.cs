@@ -28,4 +28,12 @@ namespace MDEN.Protocol.Enums
         Playlist = 1,
         Random = 2
     }
+
+    public enum LobbyPlayMode : byte
+    {
+        Normal = 0,
+        Rookie = 1,
+        Fearless = 2,
+        Tenzi = 3
+    }
 }

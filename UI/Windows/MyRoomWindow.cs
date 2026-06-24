@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -6,6 +7,7 @@ using MDEN.Managers;
 using MDEN.Protocol.Enums;
 using MDEN.Protocol.Messages.Lobby;
 using MDEN.Protocol.Models;
+using MDEN.Protocol.Rules;
 using MDEN.UI.Core;
 using PopupLib.UI.Components;
 using PopupLib.UI.Windows;
@@ -17,6 +19,7 @@ namespace MDEN.UI.Windows
     {
         private ForumWindow _window;
         private ForumObject _btnLeave;
+        private ForumObject _btnPlayMode;
         private ForumObject _btnGoal;
         private ForumObject _btnSettlement;
         private ForumObject _btnJoinLock;
@@ -121,6 +124,7 @@ namespace MDEN.UI.Windows
                 lobby.Name ?? string.Empty,
                 lobby.HostUid ?? string.Empty,
                 lobby.HostName ?? string.Empty,
+                lobby.PlayMode,
                 lobby.PlayType,
                 lobby.ChartSelection,
                 lobby.Goal,
@@ -138,8 +142,20 @@ namespace MDEN.UI.Windows
                 JoinOrdered(lobby.ReadyPlayers),
                 JoinOrdered(lobby.MutedPlayers),
                 JoinOrdered(lobby.ChartSelectBannedPlayers),
+                JoinDifficulties(lobby.ReadyPlayerDifficulties),
+                JoinDifficulties(lobby.CurrentBattleDifficulties),
                 JoinPlaylist(lobby.Playlist),
                 players);
+        }
+
+        private static string JoinDifficulties(LobbyPlayerDifficultyEntry[] values)
+        {
+            if (values == null || values.Length == 0) return string.Empty;
+
+            return string.Join(",", values
+                .Where(value => !string.IsNullOrWhiteSpace(value?.Uid))
+                .OrderBy(value => value.Uid)
+                .Select(value => $"{value.Uid}:{value.Difficulty}"));
         }
 
         private static string JoinOrdered(string[] values)
@@ -204,6 +220,12 @@ namespace MDEN.UI.Windows
 
             if (lobby != null)
             {
+                _btnPlayMode = new ForumObject(
+                    new LocalString("游玩模式"),
+                    new LocalString($"当前: {Highlight(LobbyRuleTextFormatter.GetPlayModeName(lobby.PlayMode), LobbyRuleTextFormatter.GetPlayModeColor(lobby.PlayMode))}\n点击切换为{Highlight(LobbyRuleTextFormatter.GetPlayModeName((byte)LobbyRuleTextFormatter.GetNextPlayMode(lobby.PlayMode)), LobbyRuleTextFormatter.GetPlayModeColor((byte)LobbyRuleTextFormatter.GetNextPlayMode(lobby.PlayMode)))}"));
+                _btnPlayMode.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("OptionsPanel.png")?.texture;
+                _window.ForumObjects.Add(_btnPlayMode);
+
                 _btnGoal = new ForumObject(
                     new LocalString("获胜方式"),
                     new LocalString($"当前: {Highlight(GetGoalName(lobby.Goal), Constants.ColorYellow)}\n点击切换为{Highlight(GetGoalName(GetNextGoal(lobby.Goal)), Constants.ColorCyan)}"));
@@ -218,6 +240,7 @@ namespace MDEN.UI.Windows
             }
             else
             {
+                _btnPlayMode = null;
                 _btnGoal = null;
                 _btnSettlement = null;
             }
@@ -355,6 +378,7 @@ namespace MDEN.UI.Windows
             var hostName = EscapeRichText(lobby.HostName ?? lobby.HostUid ?? "Unknown");
             return $"房主: {Highlight(hostName, Constants.ColorPink)}\n" +
                    $"人数: {Highlight($"{GetPlayerCount(lobby)}/{lobby.MaxPlayers}", Constants.ColorCyan)}\n" +
+                   $"游玩模式: {Highlight(LobbyRuleTextFormatter.GetPlayModeName(lobby.PlayMode), LobbyRuleTextFormatter.GetPlayModeColor(lobby.PlayMode))}\n" +
                    $"歌曲列表: {Highlight($"{GetPlaylistCount(lobby)}/{lobby.PlaylistSize}", Constants.ColorYellow)}\n" +
                    $"获胜方式: {Highlight(GetGoalName(lobby.Goal), Constants.ColorYellow)}\n" +
                    $"结算功能: {Highlight(lobby.SettlementEnabled ? "开启" : "关闭", Constants.ColorYellow)}\n" +
@@ -438,17 +462,28 @@ namespace MDEN.UI.Windows
                 return;
             }
 
+            if (button == _btnPlayMode)
+            {
+                var lobby = LobbyManager.CurrentLobby;
+                if (!CanChangeRoomRules(lobby)) return;
+
+                _ = UpdateLobbySettingsAsync(
+                    () => LobbyManager.SetPlayModeAsync((byte)LobbyRuleTextFormatter.GetNextPlayMode(lobby.PlayMode)),
+                    LocalLobbySettingsChange.ForPlayMode(
+                        lobby.JoinLocked,
+                        (byte)LobbyRuleTextFormatter.GetNextPlayMode(lobby.PlayMode)));
+                return;
+            }
+
             if (button == _btnGoal)
             {
                 var lobby = LobbyManager.CurrentLobby;
                 if (!CanChangeRoomRules(lobby)) return;
 
-                _ = UpdateLobbySettingsAsync(new LobbySettingsRequest
-                {
-                    JoinLocked = lobby.JoinLocked,
-                    UpdateGoal = true,
-                    Goal = GetNextGoal(lobby.Goal)
-                });
+                var nextGoal = GetNextGoal(lobby.Goal);
+                _ = UpdateLobbySettingsAsync(
+                    () => LobbyManager.SetGoalAsync(nextGoal),
+                    LocalLobbySettingsChange.ForGoal(lobby.JoinLocked, nextGoal));
                 return;
             }
 
@@ -457,12 +492,10 @@ namespace MDEN.UI.Windows
                 var lobby = LobbyManager.CurrentLobby;
                 if (!CanChangeRoomRules(lobby)) return;
 
-                _ = UpdateLobbySettingsAsync(new LobbySettingsRequest
-                {
-                    JoinLocked = lobby.JoinLocked,
-                    UpdateSettlementEnabled = true,
-                    SettlementEnabled = !lobby.SettlementEnabled
-                });
+                var settlementEnabled = !lobby.SettlementEnabled;
+                _ = UpdateLobbySettingsAsync(
+                    () => LobbyManager.SetSettlementEnabledAsync(settlementEnabled),
+                    LocalLobbySettingsChange.Settlement(lobby.JoinLocked, settlementEnabled));
                 return;
             }
 
@@ -471,10 +504,10 @@ namespace MDEN.UI.Windows
                 var lobby = LobbyManager.CurrentLobby;
                 if (!CanChangeRoomSettings(lobby)) return;
 
-                _ = UpdateLobbySettingsAsync(new LobbySettingsRequest
-                {
-                    JoinLocked = !lobby.JoinLocked
-                });
+                var joinLocked = !lobby.JoinLocked;
+                _ = UpdateLobbySettingsAsync(
+                    () => LobbyManager.SetJoinLockedAsync(joinLocked),
+                    LocalLobbySettingsChange.JoinLock(joinLocked));
                 return;
             }
 
@@ -515,8 +548,22 @@ namespace MDEN.UI.Windows
         {
             if (lobby == null) return false;
             if (!lobby.Locked && !lobby.IsPlaying) return true;
+            if (IsHostKnownOffline(lobby)) return true;
 
             Il2CppAssets.Scripts.UI.Controls.ShowText.ShowInfo("请先停止游戏");
+            return false;
+        }
+
+        private static bool IsHostKnownOffline(MDEN.Protocol.Messages.Lobby.LobbySyncPush lobby)
+        {
+            if (lobby?.PlayerDetails == null || string.IsNullOrWhiteSpace(lobby.HostUid)) return false;
+
+            foreach (var player in lobby.PlayerDetails)
+            {
+                if (player?.Uid != lobby.HostUid) continue;
+                return (PlayerStatus)player.Status == PlayerStatus.Offline;
+            }
+
             return false;
         }
 
@@ -538,24 +585,21 @@ namespace MDEN.UI.Windows
                     return;
                 }
 
-                _ = UpdateLobbySettingsAsync(new LobbySettingsRequest
-                {
-                    JoinLocked = LobbyManager.CurrentLobby?.JoinLocked == true,
-                    UpdatePassword = true,
-                    Password = value
-                });
+                _ = UpdateLobbySettingsAsync(
+                    () => LobbyManager.SetPasswordAsync(value),
+                    LocalLobbySettingsChange.ForPassword(LobbyManager.CurrentLobby?.JoinLocked == true, value));
             };
             input.Show();
         }
 
-        private async Task UpdateLobbySettingsAsync(LobbySettingsRequest request)
+        private async Task UpdateLobbySettingsAsync(Func<Task> updateAsync, LocalLobbySettingsChange localChange)
         {
             IDisposable uiLock = WindowStackController.LockUI("处理中...");
 
             try
             {
-                await LobbyManager.SetLobbySettingsAsync(request);
-                await MainThreadDispatcher.InvokeAsync(() => ApplyLocalLobbySettings(request));
+                await updateAsync();
+                await MainThreadDispatcher.InvokeAsync(() => ApplyLocalLobbySettings(localChange));
                 if (IsDisposed) return;
 
                 await MainThreadDispatcher.InvokeAsync(() =>
@@ -575,25 +619,99 @@ namespace MDEN.UI.Windows
             }
         }
 
-        private static void ApplyLocalLobbySettings(LobbySettingsRequest request)
+        private static void ApplyLocalLobbySettings(LocalLobbySettingsChange change)
         {
             var lobby = LobbyManager.CurrentLobby;
-            if (lobby == null || request == null) return;
+            if (lobby == null || change == null) return;
 
-            lobby.JoinLocked = request.JoinLocked;
-            if (request.UpdatePassword)
+            lobby.JoinLocked = change.JoinLocked;
+            if (change.UpdatePassword)
             {
-                lobby.IsPrivate = !string.IsNullOrWhiteSpace(request.Password);
+                lobby.IsPrivate = !string.IsNullOrWhiteSpace(change.Password);
             }
 
-            if (request.UpdateGoal)
+            if (change.UpdateGoal)
             {
-                lobby.Goal = request.Goal;
+                lobby.Goal = change.Goal;
             }
 
-            if (request.UpdateSettlementEnabled)
+            if (change.UpdateSettlementEnabled)
             {
-                lobby.SettlementEnabled = request.SettlementEnabled;
+                lobby.SettlementEnabled = change.SettlementEnabled;
+            }
+
+            if (change.UpdatePlayMode)
+            {
+                lobby.PlayMode = change.PlayMode;
+                lobby.ReadyPlayerDifficulties = new LobbyPlayerDifficultyEntry[0];
+                lobby.CurrentBattleDifficulties = new LobbyPlayerDifficultyEntry[0];
+                lobby.TenziSelectedEntry = null;
+                lobby.TenziRoundClosed = false;
+                lobby.TenziDrawSeed = 0;
+                lobby.PlaylistOwners = new LobbyPlaylistOwnerEntry[0];
+                if (LobbyPlayModeRules.IsTenzi(change.PlayMode))
+                {
+                    lobby.Playlist = new string[0];
+                    lobby.CurrentPlaylistEntry = 0;
+                }
+            }
+        }
+
+        private sealed class LocalLobbySettingsChange
+        {
+            public bool JoinLocked { get; private set; }
+            public bool UpdatePassword { get; private set; }
+            public string Password { get; private set; }
+            public bool UpdateGoal { get; private set; }
+            public byte Goal { get; private set; }
+            public bool UpdateSettlementEnabled { get; private set; }
+            public bool SettlementEnabled { get; private set; }
+            public bool UpdatePlayMode { get; private set; }
+            public byte PlayMode { get; private set; }
+
+            public static LocalLobbySettingsChange JoinLock(bool joinLocked)
+            {
+                return new LocalLobbySettingsChange { JoinLocked = joinLocked };
+            }
+
+            public static LocalLobbySettingsChange ForPassword(bool joinLocked, string password)
+            {
+                return new LocalLobbySettingsChange
+                {
+                    JoinLocked = joinLocked,
+                    UpdatePassword = true,
+                    Password = password
+                };
+            }
+
+            public static LocalLobbySettingsChange ForGoal(bool joinLocked, byte goal)
+            {
+                return new LocalLobbySettingsChange
+                {
+                    JoinLocked = joinLocked,
+                    UpdateGoal = true,
+                    Goal = goal
+                };
+            }
+
+            public static LocalLobbySettingsChange Settlement(bool joinLocked, bool settlementEnabled)
+            {
+                return new LocalLobbySettingsChange
+                {
+                    JoinLocked = joinLocked,
+                    UpdateSettlementEnabled = true,
+                    SettlementEnabled = settlementEnabled
+                };
+            }
+
+            public static LocalLobbySettingsChange ForPlayMode(bool joinLocked, byte playMode)
+            {
+                return new LocalLobbySettingsChange
+                {
+                    JoinLocked = joinLocked,
+                    UpdatePlayMode = true,
+                    PlayMode = playMode
+                };
             }
         }
 

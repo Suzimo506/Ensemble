@@ -110,14 +110,7 @@ namespace MDEN.UI.Windows
 
         private static string FormatDifficulty(int difficulty)
         {
-            return difficulty switch
-            {
-                1 => "<color=00d45aff>萌新</color>",
-                2 => $"<color={Constants.ColorBlue}>高手</color>",
-                3 => "<color=9b55ffff>大触</color>",
-                4 => "<color=ff5555ff>隐藏</color>",
-                _ => difficulty.ToString()
-            };
+            return LobbyRuleTextFormatter.FormatDifficulty(difficulty, false);
         }
 
         private static string EscapeRichText(string value)
@@ -150,10 +143,15 @@ namespace MDEN.UI.Windows
                 return;
             }
 
-            if (!PlaylistManager.CanChangePlaylist || objectIndex >= _items.Length) return;
+            if (objectIndex >= _items.Length) return;
 
             var item = _items[objectIndex];
             if (item == null) return;
+            if (!PlaylistManager.CanRemovePlaylistEntry(item))
+            {
+                ShowText.ShowInfo(PlaylistManager.GetPlaylistRemoveBlockedMessage(item));
+                return;
+            }
 
             NativeConfirmDialog.Show("删除歌曲", $"确认从歌曲列表移除「{GetConfirmDisplayName(item)}」吗？", confirmed =>
             {
@@ -233,6 +231,8 @@ namespace MDEN.UI.Windows
 
             var oldTitle = imgBase.Find("MDENTitle");
             if (oldTitle != null) UnityEngine.Object.Destroy(oldTitle.gameObject);
+            var oldTenziTitle = imgBase.Find("MDENTenziDrawTitle");
+            if (oldTenziTitle != null) UnityEngine.Object.Destroy(oldTenziTitle.gameObject);
 
             var newTitle = GameObject.Instantiate(txtTitleObj.gameObject, imgBase);
             newTitle.name = "MDENTitle";
@@ -263,6 +263,7 @@ namespace MDEN.UI.Windows
             }
 
             ReleaseHudSuppression();
+            RemoveInjectedTitle();
         }
 
         private string GetTitleText()
@@ -271,6 +272,16 @@ namespace MDEN.UI.Windows
             var currentCount = lobby?.Playlist?.Length ?? _items?.Length ?? 0;
             var maxCount = lobby?.PlaylistSize ?? 0;
             return $"歌曲列表 {currentCount}/{maxCount}";
+        }
+
+        private static void RemoveInjectedTitle()
+        {
+            var panel = GameObject.Find("UI/Forward/Tips/PnlBulletinNew");
+            var imgBase = panel?.transform.Find("ImgBase");
+            if (imgBase == null) return;
+
+            var title = imgBase.Find("MDENTitle");
+            if (title != null) UnityEngine.Object.Destroy(title.gameObject);
         }
 
         private void RebuildWindow()

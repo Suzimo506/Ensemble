@@ -94,6 +94,7 @@ namespace MDEN.Managers
                 Name = entry.Name,
                 HostUid = entry.HostUid,
                 HostName = entry.HostName,
+                PlayMode = entry.PlayMode,
                 MaxPlayers = entry.MaxPlayers,
                 PlaylistSize = entry.PlaylistSize,
                 SettlementEnabled = entry.SettlementEnabled,
@@ -109,6 +110,7 @@ namespace MDEN.Managers
                 MutedPlayers = new string[0],
                 ChartSelectBannedPlayers = new string[0],
                 Playlist = new string[0],
+                PlaylistOwners = new LobbyPlaylistOwnerEntry[0],
                 PlayerDetails = string.IsNullOrEmpty(currentUid)
                     ? new PlayerSyncEntry[0]
                     : new[]
@@ -147,6 +149,36 @@ namespace MDEN.Managers
                 request);
 
             return response?.LobbyId ?? 0;
+        }
+
+        public static Task<int> CreateLobbyAsync(
+            string name,
+            ushort maxPlayers,
+            byte playMode,
+            LobbyGoal goal,
+            ushort playlistSize,
+            bool settlementEnabled,
+            string password)
+        {
+            return CreateLobbyWithSnapshotAsync(new CreateLobbyRequest
+            {
+                Name = name,
+                MaxPlayers = maxPlayers,
+                PlayMode = playMode,
+                PlayType = (byte)LobbyPlayType.All,
+                ChartSelection = (byte)LobbyChartSelection.HostPlaylist,
+                Goal = (byte)goal,
+                PlaylistSize = playlistSize,
+                SettlementEnabled = settlementEnabled,
+                Password = password
+            });
+        }
+
+        private static async Task<int> CreateLobbyWithSnapshotAsync(CreateLobbyRequest request)
+        {
+            var lobbyId = await CreateLobbyAsync(request);
+            MarkLobbyEntered(lobbyId, request);
+            return lobbyId;
         }
 
         public static async Task LeaveLobbyAsync()
@@ -262,6 +294,54 @@ namespace MDEN.Managers
             });
         }
 
+        public static Task SetJoinLockedAsync(bool joinLocked)
+        {
+            return SetLobbySettingsAsync(new LobbySettingsRequest
+            {
+                JoinLocked = joinLocked
+            });
+        }
+
+        public static Task SetPasswordAsync(string password)
+        {
+            return SetLobbySettingsAsync(new LobbySettingsRequest
+            {
+                JoinLocked = CurrentLobby?.JoinLocked == true,
+                UpdatePassword = true,
+                Password = password
+            });
+        }
+
+        public static Task SetPlayModeAsync(byte playMode)
+        {
+            return SetLobbySettingsAsync(new LobbySettingsRequest
+            {
+                JoinLocked = CurrentLobby?.JoinLocked == true,
+                UpdatePlayMode = true,
+                PlayMode = playMode
+            });
+        }
+
+        public static Task SetGoalAsync(byte goal)
+        {
+            return SetLobbySettingsAsync(new LobbySettingsRequest
+            {
+                JoinLocked = CurrentLobby?.JoinLocked == true,
+                UpdateGoal = true,
+                Goal = goal
+            });
+        }
+
+        public static Task SetSettlementEnabledAsync(bool settlementEnabled)
+        {
+            return SetLobbySettingsAsync(new LobbySettingsRequest
+            {
+                JoinLocked = CurrentLobby?.JoinLocked == true,
+                UpdateSettlementEnabled = true,
+                SettlementEnabled = settlementEnabled
+            });
+        }
+
         public static async Task SetLobbySettingsAsync(LobbySettingsRequest request)
         {
             EnsureReady();
@@ -307,6 +387,7 @@ namespace MDEN.Managers
                 Name = request.Name,
                 HostUid = currentUid,
                 HostName = currentName,
+                PlayMode = request.PlayMode,
                 MaxPlayers = request.MaxPlayers,
                 PlaylistSize = request.PlaylistSize,
                 SettlementEnabled = request.SettlementEnabled,
@@ -319,7 +400,10 @@ namespace MDEN.Managers
                 IsPlaying = false,
                 Players = string.IsNullOrEmpty(currentUid) ? new string[0] : new[] { currentUid },
                 ReadyPlayers = new string[0],
+                MutedPlayers = new string[0],
+                ChartSelectBannedPlayers = new string[0],
                 Playlist = new string[0],
+                PlaylistOwners = new LobbyPlaylistOwnerEntry[0],
                 PlayerDetails = string.IsNullOrEmpty(currentUid)
                     ? new PlayerSyncEntry[0]
                     : new[]
@@ -414,6 +498,20 @@ namespace MDEN.Managers
                    push.Revision <= latestRevision;
         }
 
+        public static int GetReadyDifficulty(string uid)
+        {
+            return GetDifficulty(CurrentLobby?.ReadyPlayerDifficulties, uid);
+        }
+
+        public static int GetCurrentBattleDifficulty(string uid)
+        {
+            var difficulty = GetDifficulty(CurrentLobby?.CurrentBattleDifficulties, uid);
+            if (difficulty > 0) return difficulty;
+
+            var entry = PlaylistManager.GetCurrentPlaylistEntry();
+            return entry?.Difficulty ?? 0;
+        }
+
         private static bool IsPingOnlyLobbySync(LobbySyncPush previous, LobbySyncPush next)
         {
             if (previous == null || next == null || previous.Revision <= 0) return false;
@@ -421,6 +519,7 @@ namespace MDEN.Managers
             if (previous.Name != next.Name ||
                 previous.HostUid != next.HostUid ||
                 previous.HostName != next.HostName ||
+                previous.PlayMode != next.PlayMode ||
                 previous.PlayType != next.PlayType ||
                 previous.ChartSelection != next.ChartSelection ||
                 previous.Goal != next.Goal ||
@@ -434,7 +533,10 @@ namespace MDEN.Managers
                 previous.WatcherCount != next.WatcherCount ||
                 previous.CurrentPlaylistEntry != next.CurrentPlaylistEntry ||
                 previous.CurrentBattleId != next.CurrentBattleId ||
-                previous.CurrentBattleEntry != next.CurrentBattleEntry)
+                previous.CurrentBattleEntry != next.CurrentBattleEntry ||
+                previous.TenziSelectedEntry != next.TenziSelectedEntry ||
+                previous.TenziRoundClosed != next.TenziRoundClosed ||
+                previous.TenziDrawSeed != next.TenziDrawSeed)
             {
                 return false;
             }
@@ -444,6 +546,9 @@ namespace MDEN.Managers
                    StringArrayEquals(previous.MutedPlayers, next.MutedPlayers) &&
                    StringArrayEquals(previous.ChartSelectBannedPlayers, next.ChartSelectBannedPlayers) &&
                    StringArrayEquals(previous.Playlist, next.Playlist) &&
+                   PlaylistOwnerEntriesEqual(previous.PlaylistOwners, next.PlaylistOwners) &&
+                   DifficultyEntriesEqual(previous.ReadyPlayerDifficulties, next.ReadyPlayerDifficulties) &&
+                   DifficultyEntriesEqual(previous.CurrentBattleDifficulties, next.CurrentBattleDifficulties) &&
                    PlayerCharactersEqual(previous.PlayerCharacters, next.PlayerCharacters) &&
                    PlayerDetailsEqualIgnoringPing(previous.PlayerDetails, next.PlayerDetails);
         }
@@ -460,6 +565,68 @@ namespace MDEN.Managers
             }
 
             return true;
+        }
+
+        private static bool DifficultyEntriesEqual(LobbyPlayerDifficultyEntry[] left, LobbyPlayerDifficultyEntry[] right)
+        {
+            var leftLength = left?.Length ?? 0;
+            var rightLength = right?.Length ?? 0;
+            if (leftLength != rightLength) return false;
+
+            for (var i = 0; i < leftLength; i++)
+            {
+                var a = left[i];
+                var b = right[i];
+                if (a == null || b == null)
+                {
+                    if (a != b) return false;
+                    continue;
+                }
+
+                if (a.Uid != b.Uid || a.Difficulty != b.Difficulty)
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        private static bool PlaylistOwnerEntriesEqual(LobbyPlaylistOwnerEntry[] left, LobbyPlaylistOwnerEntry[] right)
+        {
+            var leftLength = left?.Length ?? 0;
+            var rightLength = right?.Length ?? 0;
+            if (leftLength != rightLength) return false;
+
+            for (var i = 0; i < leftLength; i++)
+            {
+                var a = left[i];
+                var b = right[i];
+                if (a == null || b == null)
+                {
+                    if (a != b) return false;
+                    continue;
+                }
+
+                if (a.Entry != b.Entry || a.Uid != b.Uid)
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        private static int GetDifficulty(LobbyPlayerDifficultyEntry[] entries, string uid)
+        {
+            if (entries == null || string.IsNullOrWhiteSpace(uid)) return 0;
+
+            for (var i = 0; i < entries.Length; i++)
+            {
+                if (entries[i]?.Uid == uid) return entries[i].Difficulty;
+            }
+
+            return 0;
         }
 
         private static bool PlayerCharactersEqual(LobbyPlayerCharacterEntry[] left, LobbyPlayerCharacterEntry[] right)

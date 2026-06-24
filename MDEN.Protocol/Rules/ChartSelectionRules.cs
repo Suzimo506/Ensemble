@@ -39,6 +39,12 @@ namespace MDEN.Protocol.Rules
             return true;
         }
 
+        public static bool IsFearlessAllowedChart(string chartKey, int difficulty)
+        {
+            return IsCustomChartIdentity(chartKey) ||
+                   DifficultyDisplayRules.IsFearlessDifficulty(difficulty);
+        }
+
         public static bool IsUnsupportedChartKey(string chartKey)
         {
             return !string.IsNullOrWhiteSpace(chartKey) &&
@@ -52,6 +58,19 @@ namespace MDEN.Protocol.Rules
             var separatorIndex = entry.IndexOf('#');
             var chartKey = separatorIndex >= 0 ? entry.Substring(0, separatorIndex) : entry;
             return IsUnsupportedChartKey(chartKey);
+        }
+
+        private static bool IsCustomChartIdentity(string chartKey)
+        {
+            return IsCustomChartKey(chartKey) || IsCustomChartUid(chartKey);
+        }
+
+        private static bool IsCustomChartUid(string chartKey)
+        {
+            if (string.IsNullOrWhiteSpace(chartKey)) return false;
+
+            return chartKey.StartsWith("999-", StringComparison.Ordinal) ||
+                   chartKey.StartsWith("UID-999", StringComparison.OrdinalIgnoreCase);
         }
 
         private static bool IsOfficialChartKey(string chartKey)

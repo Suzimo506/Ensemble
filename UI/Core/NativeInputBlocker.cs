@@ -33,6 +33,27 @@ namespace MDEN.UI.Core
             SetBlocked(reason, false);
         }
 
+        public static void ClearAndForceUnblockIfIdle(string reason)
+        {
+            if (!string.IsNullOrWhiteSpace(reason))
+            {
+                Reasons.Remove(reason);
+            }
+
+            if (Reasons.Count == 0)
+            {
+                ForceUnblock();
+            }
+        }
+
+        public static void ForceUnblockIfIdle()
+        {
+            if (Reasons.Count == 0)
+            {
+                ForceUnblock();
+            }
+        }
+
         public static void ClearAll()
         {
             Reasons.Clear();

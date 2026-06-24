@@ -520,6 +520,7 @@ namespace MDEN.UI.Core
             if (left == null || right == null) return left == right;
 
             return left.Uid == right.Uid &&
+                   left.Difficulty == right.Difficulty &&
                    left.Score == right.Score &&
                    Math.Abs(left.Accuracy - right.Accuracy) < 0.0001f &&
                    left.Perfects == right.Perfects &&
@@ -538,6 +539,7 @@ namespace MDEN.UI.Core
             return new BattlePlayerEntry
             {
                 Uid = entry.Uid,
+                Difficulty = entry.Difficulty,
                 Score = entry.Score,
                 Accuracy = entry.Accuracy,
                 Perfects = entry.Perfects,
@@ -688,14 +690,21 @@ namespace MDEN.UI.Core
             {
                 if (!blocked)
                 {
-                    NativeInputBlocker.Clear("BattleResult");
+                    NativeInputBlocker.ClearAndForceUnblockIfIdle("BattleResult");
                 }
 
                 return;
             }
 
             _keyboardBlocked = blocked;
-            NativeInputBlocker.SetBlocked("BattleResult", blocked);
+            if (blocked)
+            {
+                NativeInputBlocker.SetBlocked("BattleResult", true);
+            }
+            else
+            {
+                NativeInputBlocker.ClearAndForceUnblockIfIdle("BattleResult");
+            }
         }
 
         private static void HandleEnterKeyEdge()

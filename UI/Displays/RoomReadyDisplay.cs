@@ -254,7 +254,9 @@ namespace MDEN.UI.Displays
             _message.text = BuildMessageText(lobby, chartTitle, recommended, entry);
 
             bool isReady = PlaylistManager.IsLocalPlayerReady();
-            _buttonMainText.text = lobby.IsPlaying ? "游戏中" : (isReady ? $"{lobby.ReadyPlayers?.Length ?? 0} / {lobby.Players?.Length ?? 0}" : "准备");
+            _buttonMainText.text = lobby.IsPlaying
+                ? "游戏中"
+                : GetMainButtonText(lobby, isReady);
 
             RefreshButtonStates(lobby);
         }
@@ -312,6 +314,12 @@ namespace MDEN.UI.Displays
         private async void OnReadyClicked()
         {
             if (_busy || LobbyManager.CurrentLobby?.IsPlaying == true) return;
+            if (PlaylistManager.IsRookieMode() && !PlaylistManager.IsLocalPlayerReady())
+            {
+                JumpToRookieDifficultySelection();
+                return;
+            }
+
             if (CustomAlbumsWindowGuard.CloseIfOpen("ready"))
             {
                 MainThreadDispatcher.Enqueue(() => ShowText.ShowInfo("已关闭自制谱窗口，请重新准备"));
@@ -326,7 +334,7 @@ namespace MDEN.UI.Displays
                 IDisposable uiLock = WindowStackController.LockUI("Setting ready...");
                 try
                 {
-                await PlaylistManager.SetReadyAsync(!PlaylistManager.IsLocalPlayerReady());
+                    await PlaylistManager.SetReadyAsync(!PlaylistManager.IsLocalPlayerReady());
                 }
                 finally
                 {
@@ -410,8 +418,10 @@ namespace MDEN.UI.Displays
         {
             if (_buttonMain == null || _buttonStop == null || _buttonEquip == null || lobby == null) return;
 
+            var isRookie = PlaylistManager.IsRookieMode();
             var isReady = PlaylistManager.IsLocalPlayerReady();
-            var mainDisabled = isReady || lobby.IsPlaying || _busy;
+            var canClickMain = !lobby.IsPlaying && !_busy && (isRookie || !isReady);
+            var mainDisabled = !canClickMain;
             var mainImage = _buttonMain.GetComponent<Image>();
             var mainButton = _buttonMain.GetComponent<Button>();
             if (mainImage != null)
@@ -421,12 +431,13 @@ namespace MDEN.UI.Displays
 
             if (mainButton != null)
             {
-                mainButton.interactable = !_busy && !lobby.IsPlaying;
+                mainButton.interactable = canClickMain;
             }
 
             if (_buttonMainText != null)
             {
                 _buttonMainText.color = mainDisabled ? new Color(0.6f, 0.6f, 0.6f, 1f) : new Color(0.536f, 1f, 0.05f, 1f);
+                _buttonMainText.fontSize = isRookie && !isReady ? 17 : 26;
             }
 
             var canStop = lobby.HostUid == PlayerManager.CurrentUid && !_stopBusy;
@@ -463,6 +474,35 @@ namespace MDEN.UI.Displays
                 _buttonEquipText.text = recommendationEquipped ? "已选择" : "使用推荐";
                 _buttonEquipText.color = canEquip ? Color.white : new Color(0.7f, 0.7f, 0.7f, 1f);
             }
+        }
+
+        private static string GetMainButtonText(LobbySyncPush lobby, bool isReady)
+        {
+            if (PlaylistManager.IsRookieMode())
+            {
+                return isReady ? "取消准备" : "跳转选择难度";
+            }
+
+            return isReady
+                ? $"{lobby.ReadyPlayers?.Length ?? 0} / {lobby.Players?.Length ?? 0}"
+                : "准备";
+        }
+
+        private static void JumpToRookieDifficultySelection()
+        {
+            if (CustomAlbumsWindowGuard.CloseIfOpen("rookie difficulty selection"))
+            {
+                MainThreadDispatcher.Enqueue(() => ShowText.ShowInfo("已关闭自制谱窗口，请重新点击跳转"));
+                return;
+            }
+
+            if (MultiplayerBattleController.NavigateToRookieReadyChart())
+            {
+                MainThreadDispatcher.Enqueue(() => ShowText.ShowInfo("请选择难度后点击 Play 准备"));
+                return;
+            }
+
+            MainThreadDispatcher.Enqueue(() => ShowText.ShowInfo("未找到本局谱面"));
         }
 
         private static string BuildMessageText(LobbySyncPush lobby, string chartTitle, string recommended, PlaylistEntryViewModel entry)

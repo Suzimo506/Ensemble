@@ -58,6 +58,7 @@ namespace MDEN.Patches
         internal static void UpdateBattleUiState()
         {
             TryShowBattleResultByKeyboard();
+            RecoverNativeResultInputIfReady();
             if (!IsMultiplayerBattleContext) return;
             if (Time.frameCount < _nextPauseButtonHideFrame) return;
 
@@ -233,6 +234,36 @@ namespace MDEN.Patches
             }
 
             BattleResultBannerDisplay.ShowOrRefresh(GetBattleResultSnapshot());
+        }
+
+        private static void RecoverNativeResultInputIfReady()
+        {
+            if (!LobbyManager.IsInLobby) return;
+            if (BattleResultBannerDisplay.IsConsumingKeyboard) return;
+            if (!IsNativeResultPanelVisible()) return;
+
+            if (!BattleResultFlowManager.CanExitBattleResult)
+            {
+                if (LobbyManager.CurrentLobby?.IsPlaying == true) return;
+
+                BattleResultFlowManager.SetCanExitBattleResult(true);
+                BattleResultFlowManager.SetBattleResultFlowPending(false);
+                SetVictoryButtons(true);
+            }
+
+            NativeInputBlocker.ForceUnblockIfIdle();
+        }
+
+        private static bool IsNativeResultPanelVisible()
+        {
+            return IsVisible("UI_2D/Standard/PnlVictory") ||
+                   IsVisible("UI_2D/Standard/PnlFail");
+        }
+
+        private static bool IsVisible(string path)
+        {
+            var obj = GameObject.Find(path);
+            return obj != null && obj.activeInHierarchy;
         }
 
         private static bool HidePauseButton()

@@ -33,6 +33,7 @@ namespace MDEN.Managers
         private static bool _accuracyInitialized;
         private static bool _multiplayerBattleActive;
         private static DateTime _battleStartedUtc;
+        private static int _localBattleDifficulty;
 
         public static bool Synchronizing => _synchronizing;
         public static bool IsActiveMultiplayerBattle =>
@@ -57,6 +58,8 @@ namespace MDEN.Managers
             MarkMultiplayerBattleStarting();
             _battleStartedUtc = DateTime.UtcNow;
             _activeBattleId = LobbyManager.CurrentLobby?.CurrentBattleId;
+            _localBattleDifficulty = 0;
+            _localBattleDifficulty = ResolveLocalBattleDifficulty();
             _lastBattleReturnedAttemptUtc = default;
 
             lock (BattleDataLock)
@@ -181,6 +184,7 @@ namespace MDEN.Managers
                     PlayerBattleData[uid] = new BattlePlayerEntry
                     {
                         Uid = uid,
+                        Difficulty = GetBattleDifficultyForPlayer(uid),
                         Alive = alive,
                         FC = false
                     };
@@ -239,6 +243,7 @@ namespace MDEN.Managers
             _battleRoleAttributeComponent = null;
             _accuracyInitialized = false;
             _battleStartedUtc = default;
+            _localBattleDifficulty = 0;
 
             lock (BattleDataLock)
             {
@@ -337,6 +342,7 @@ namespace MDEN.Managers
                             notify.Misses,
                             notify.FC,
                             notify.Alive,
+                            GetBattleDifficultyForPlayer(uid),
                             0))
                     {
                         return;
@@ -345,6 +351,7 @@ namespace MDEN.Managers
                     PlayerBattleData[uid] = new BattlePlayerEntry
                     {
                         Uid = uid,
+                        Difficulty = GetBattleDifficultyForPlayer(uid),
                         Score = notify.Score,
                         Accuracy = notify.Accuracy,
                         Perfects = notify.Perfects,
@@ -381,6 +388,7 @@ namespace MDEN.Managers
             return new BattlePlayerEntry
             {
                 Uid = entry.Uid,
+                Difficulty = entry.Difficulty,
                 Score = entry.Score,
                 Accuracy = entry.Accuracy,
                 Perfects = entry.Perfects,
@@ -452,16 +460,17 @@ namespace MDEN.Managers
                 foreach (var player in players)
                 {
                     if (player == null || string.IsNullOrWhiteSpace(player.Uid)) continue;
+                    var normalizedPlayer = NormalizePushedBattleEntry(player);
                     if (!PlayerBattleData.TryGetValue(player.Uid, out var entry))
                     {
-                        PlayerBattleData[player.Uid] = player;
+                        PlayerBattleData[player.Uid] = normalizedPlayer;
                         changed = true;
                         continue;
                     }
 
-                    if (SameBattleEntry(entry, player)) continue;
+                    if (SameBattleEntry(entry, normalizedPlayer)) continue;
 
-                    PlayerBattleData[player.Uid] = player;
+                    PlayerBattleData[player.Uid] = normalizedPlayer;
                     changed = true;
                 }
 
@@ -545,6 +554,39 @@ namespace MDEN.Managers
             return _activeBattleId;
         }
 
+        private static int ResolveLocalBattleDifficulty()
+        {
+            var difficulty = LobbyManager.GetCurrentBattleDifficulty(PlayerManager.CurrentUid);
+            if (difficulty > 0) return difficulty;
+
+            return ChartManager.CurrentDifficulty;
+        }
+
+        private static int GetBattleDifficultyForPlayer(string uid)
+        {
+            if (!string.IsNullOrWhiteSpace(uid) &&
+                uid == PlayerManager.CurrentUid &&
+                _localBattleDifficulty > 0)
+            {
+                return _localBattleDifficulty;
+            }
+
+            return LobbyManager.GetCurrentBattleDifficulty(uid);
+        }
+
+        private static BattlePlayerEntry NormalizePushedBattleEntry(BattlePlayerEntry entry)
+        {
+            if (entry == null) return null;
+            if (entry.Uid != PlayerManager.CurrentUid || entry.Difficulty > 0) return entry;
+
+            var difficulty = GetBattleDifficultyForPlayer(entry.Uid);
+            if (difficulty <= 0) return entry;
+
+            var clone = CloneBattleEntry(entry);
+            clone.Difficulty = difficulty;
+            return clone;
+        }
+
         private static BattlePlayerEntry[] CreateBattleDataSnapshotUnsafe()
         {
             var result = new BattlePlayerEntry[PlayerBattleData.Count];
@@ -567,6 +609,7 @@ namespace MDEN.Managers
                 right.Misses,
                 right.FC,
                 right.Alive,
+                right.Difficulty,
                 right.PingMS);
         }
 
@@ -581,9 +624,11 @@ namespace MDEN.Managers
             ushort misses,
             bool fc,
             bool alive,
+            int difficulty,
             ushort pingMs)
         {
             return entry.Score == score &&
+                   entry.Difficulty == difficulty &&
                    Math.Abs(entry.Accuracy - accuracy) < 0.0001f &&
                    entry.Perfects == perfects &&
                    entry.Greats == greats &&

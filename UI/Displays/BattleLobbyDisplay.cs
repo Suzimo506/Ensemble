@@ -5,6 +5,7 @@ using Il2CppDG.Tweening;
 using MDEN.Managers;
 using MDEN.Protocol.Enums;
 using MDEN.Protocol.Models;
+using MDEN.Protocol.Rules;
 using MDEN.UI.Core;
 using UnityEngine;
 using UnityEngine.UI;
@@ -285,6 +286,15 @@ namespace MDEN.UI.Displays
 
         internal static string FormatResultRank(BattlePlayerEntry player, int rank)
         {
+            if (LobbyPlayModeRules.IsRookie(LobbyManager.CurrentLobby?.PlayMode ?? 0))
+            {
+                var difficulty = player?.Difficulty ?? 0;
+                if (difficulty > 0)
+                {
+                    return $"{LobbyRuleTextFormatter.FormatDifficulty(difficulty, true)} {FormatRank(player, rank)}";
+                }
+            }
+
             return FormatRank(player, rank);
         }
 
@@ -453,6 +463,7 @@ namespace MDEN.UI.Displays
             return new BattlePlayerEntry
             {
                 Uid = uid,
+                Difficulty = LobbyManager.GetCurrentBattleDifficulty(uid),
                 Accuracy = 0f,
                 FC = false,
                 Alive = true
@@ -659,6 +670,7 @@ namespace MDEN.UI.Displays
                 {
                     var player = players[i];
                     hash = hash * 31 + GetStringHash(player?.Uid);
+                    hash = hash * 31 + (player?.Difficulty ?? 0);
                     hash = hash * 31 + (int)(player?.Score ?? 0);
                     hash = hash * 31 + Mathf.RoundToInt((player?.Accuracy ?? 0f) * 1000f);
                     hash = hash * 31 + (player?.Perfects ?? 0);

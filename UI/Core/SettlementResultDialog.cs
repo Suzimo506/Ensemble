@@ -744,14 +744,7 @@ namespace MDEN.UI.Core
 
         private static string FormatDifficulty(int difficulty)
         {
-            return difficulty switch
-            {
-                1 => ColorLabel("萌新", "00d45aff"),
-                2 => ColorLabel("高手", Constants.ColorBlue),
-                3 => ColorLabel("大触", "9b55ffff"),
-                4 => ColorLabel("隐藏", "ff5555ff"),
-                _ => ColorLabel($"难度{difficulty}", "b8b8b8ff")
-            };
+            return LobbyRuleTextFormatter.FormatDifficulty(difficulty, false);
         }
 
         private static string ColorLabel(string value, string color)

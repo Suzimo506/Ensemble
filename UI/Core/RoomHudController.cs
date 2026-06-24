@@ -101,6 +101,7 @@ namespace MDEN.UI.Core
             }
 
             ChartPreviewController.OnLobbyChanged(lobby);
+            TenziDrawController.OnLobbyChanged(lobby);
             MultiplayerBattleController.OnLobbyChanged();
         }
 
@@ -281,6 +282,7 @@ namespace MDEN.UI.Core
             PlayerList.Destroy();
             Chat.ResetSceneObjects();
             ReadyDisplay.Destroy();
+            TenziDrawController.Close();
             RoomSceneOverlay.Hide();
             RoomCharacterDisplay.DestroyGeneratedObjects();
         }
@@ -318,6 +320,7 @@ namespace MDEN.UI.Core
             PlayerList.Destroy();
             Chat.ResetSceneObjects();
             ReadyDisplay.Destroy();
+            TenziDrawController.Close();
             RoomSceneOverlay.Destroy();
             RoomCharacterDisplay.DestroyGeneratedObjects();
         }
@@ -399,6 +402,7 @@ namespace MDEN.UI.Core
             PlayerList.Destroy();
             Chat.Destroy();
             ReadyDisplay.Destroy();
+            TenziDrawController.Reset();
             StageDesignerTextController.Restore();
             RoomSceneOverlay.Destroy();
             RoomCharacterDisplay.Destroy();
@@ -419,6 +423,7 @@ namespace MDEN.UI.Core
             PlayerList.Destroy();
             Chat.ResetSceneObjects();
             ReadyDisplay.Destroy();
+            TenziDrawController.Reset();
             StageDesignerTextController.Restore();
             RoomSceneOverlay.Destroy();
             RoomCharacterDisplay.Destroy();

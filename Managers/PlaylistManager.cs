@@ -26,6 +26,7 @@ namespace MDEN.Managers
         private const int LockNotSynced = 5;
         private const int LockUnsupported = 6;
         private const string UnsupportedChartMessage = "该谱面暂不支持联机";
+        private const string FearlessDifficultyMessage = "无畏模式只能选择大触或隐藏难度";
         private static int _cachedEntryLobbyId;
         private static string _cachedEntryBattleId;
         private static int _cachedEntryIndex = -1;
@@ -38,8 +39,7 @@ namespace MDEN.Managers
             get
             {
                 var lobby = LobbyManager.CurrentLobby;
-                if (lobby == null || lobby.Locked || lobby.IsPlaying) return false;
-                return true;
+                return lobby != null && !lobby.Locked && !lobby.IsPlaying;
             }
         }
 
@@ -54,13 +54,13 @@ namespace MDEN.Managers
             var entry = ChartManager.GetCurrentEntry();
             return !string.IsNullOrEmpty(entry) &&
                    !ContainsEntry(entry) &&
-                   ChartSelectionRules.IsUnsupportedPlaylistEntry(entry);
+                   IsEntryUnsupportedForCurrentLobby(entry);
         }
 
         public static bool ContainsEntry(string entry)
         {
             var playlist = LobbyManager.CurrentLobby?.Playlist;
-            return playlist != null && playlist.Any(item => ChartManager.IsSameChart(item, entry));
+            return playlist != null && playlist.Any(item => IsSamePlaylistEntryForCurrentMode(item, entry));
         }
 
         public static bool IsPlaylistFull()
@@ -119,11 +119,28 @@ namespace MDEN.Managers
         public static string GetPreparationButtonText()
         {
             if (!LobbyManager.IsInLobby) return "PLAY!";
+            if (IsRookieReadySelectionActive())
+            {
+                return IsLocalPlayerReady() ? "已准备" : "选择并准备";
+            }
+
             if (!CanChangePlaylist) return LobbyManager.CurrentLobby?.Locked == true ? "等待准备" : "等待房主选歌";
             var entry = ChartManager.GetCurrentEntry();
             if (string.IsNullOrEmpty(entry)) return "未选择谱面";
-            if (!string.IsNullOrEmpty(entry) && ContainsEntry(entry)) return "移除歌曲列表";
-            if (IsCurrentChartUnsupported()) return UnsupportedChartMessage;
+            if (ContainsEntry(entry))
+            {
+                var actualEntry = FindActualEntry(entry) ?? entry;
+                if (IsTenziMode() && !IsTenziEntryOwner(actualEntry, PlayerManager.CurrentUid))
+                {
+                    return "只能移除自己的谱面";
+                }
+
+                return "移除歌曲列表";
+            }
+
+            if (IsCurrentChartUnsupported()) return GetCurrentChartUnsupportedMessage(entry);
+            if (IsTenziMode() && HasLocalTenziEntry()) return "先移除自己的谱面";
+            if (IsTenziRoundClosed()) return "本轮已封盘";
             if (IsPlaylistFull()) return "歌曲列表已满";
             return "加入歌曲列表";
         }
@@ -131,11 +148,23 @@ namespace MDEN.Managers
         public static bool CanUsePreparationButton()
         {
             if (!LobbyManager.IsInLobby) return true;
+            if (IsRookieReadySelectionActive())
+            {
+                return !IsLocalPlayerReady() && ChartManager.IsCurrentSelectedChart(PlaylistManager.GetCurrentPlaylistEntry());
+            }
+
             if (!CanChangePlaylist) return false;
             var entry = ChartManager.GetCurrentEntry();
             if (string.IsNullOrEmpty(entry)) return false;
-            if (!string.IsNullOrEmpty(entry) && ContainsEntry(entry)) return true;
-            return !ChartSelectionRules.IsUnsupportedPlaylistEntry(entry) && !IsPlaylistFull();
+            if (ContainsEntry(entry))
+            {
+                var actualEntry = FindActualEntry(entry) ?? entry;
+                return !IsTenziMode() || IsTenziEntryOwner(actualEntry, PlayerManager.CurrentUid);
+            }
+
+            if (IsTenziMode() && HasLocalTenziEntry()) return false;
+            if (IsTenziRoundClosed()) return false;
+            return !IsEntryUnsupportedForCurrentLobby(entry) && !IsPlaylistFull();
         }
 
         public static async Task<PlaylistToggleResult> ToggleCurrentChartAsync()
@@ -149,11 +178,19 @@ namespace MDEN.Managers
 
             if (ContainsEntry(entry))
             {
+                var actualEntry = FindActualEntry(entry) ?? entry;
+                if (IsTenziMode() && !IsTenziEntryOwner(actualEntry, PlayerManager.CurrentUid))
+                {
+                    throw new System.InvalidOperationException("天子模式只能移除自己选择的谱面");
+                }
+
                 await RemoveAsync(entry);
                 return PlaylistToggleResult.Removed;
             }
 
             EnsureEntrySupported(entry);
+            EnsureEntryAllowedByPlayMode(entry);
+            EnsureEntryAllowedByTenziMode();
             await AddAsync(entry);
             return PlaylistToggleResult.Added;
         }
@@ -162,6 +199,8 @@ namespace MDEN.Managers
         {
             EnsureReady();
             EnsureEntrySupported(entry);
+            EnsureEntryAllowedByPlayMode(entry);
+            EnsureEntryAllowedByTenziMode();
             await PlayerManager.SyncChartStateAsync();
             var response = await NetworkClient.Instance.SendRequestAsync<PlaylistAddRequest, PlaylistAddResponse>(
                 OpCodes.PlaylistAddReq,
@@ -230,6 +269,11 @@ namespace MDEN.Managers
 
         public static async Task SetReadyAsync(bool ready)
         {
+            await SetReadyAsync(ready, 0);
+        }
+
+        public static async Task SetReadyAsync(bool ready, int difficulty)
+        {
             EnsureReady();
             if (ready)
             {
@@ -238,7 +282,7 @@ namespace MDEN.Managers
 
             await NetworkClient.Instance.SendRequestAsync<LobbyReadyRequest, LobbyReadyResponse>(
                 OpCodes.LobbyReadyReq,
-                new LobbyReadyRequest { Ready = ready });
+                new LobbyReadyRequest { Ready = ready, Difficulty = difficulty });
         }
 
         public static async Task ContinueAsync()
@@ -266,7 +310,18 @@ namespace MDEN.Managers
         private static string FindActualEntry(string entry)
         {
             var playlist = LobbyManager.CurrentLobby?.Playlist;
-            return playlist?.FirstOrDefault(item => ChartManager.IsSameChart(item, entry));
+            return playlist?.FirstOrDefault(item => IsSamePlaylistEntryForCurrentMode(item, entry));
+        }
+
+        private static bool IsSamePlaylistEntryForCurrentMode(string left, string right)
+        {
+            if (!IsRookieMode()) return ChartManager.IsSameChart(left, right);
+
+            var leftEntry = ChartManager.ParseEntry(left);
+            var rightEntry = ChartManager.ParseEntry(right);
+            return leftEntry != null &&
+                   rightEntry != null &&
+                   leftEntry.ChartKey == rightEntry.ChartKey;
         }
 
         private static PlaylistEntryViewModel ParsePlaylistItemSafe(string entry)
@@ -297,6 +352,11 @@ namespace MDEN.Managers
                 return lobby.CurrentBattleEntry;
             }
 
+            if (IsTenziMode() && !string.IsNullOrWhiteSpace(lobby.TenziSelectedEntry))
+            {
+                return lobby.TenziSelectedEntry;
+            }
+
             var playlist = lobby.Playlist;
             if (playlist == null || playlist.Length == 0) return null;
 
@@ -312,6 +372,16 @@ namespace MDEN.Managers
             }
         }
 
+        private static void EnsureEntryAllowedByPlayMode(string entry)
+        {
+            if (!IsFearlessMode()) return;
+
+            if (!IsEntryAllowedByFearlessMode(entry))
+            {
+                throw new System.InvalidOperationException(FearlessDifficultyMessage);
+            }
+        }
+
         private static void EnsurePlaylistSupported()
         {
             var playlist = LobbyManager.CurrentLobby?.Playlist;
@@ -321,6 +391,85 @@ namespace MDEN.Managers
             {
                 throw new System.InvalidOperationException("歌曲列表包含暂不支持联机的谱面");
             }
+
+            if (IsFearlessMode() && playlist.Any(entry => !IsEntryAllowedByFearlessMode(entry)))
+            {
+                throw new System.InvalidOperationException(FearlessDifficultyMessage);
+            }
+        }
+
+        private static bool IsEntryUnsupportedForCurrentLobby(string entry)
+        {
+            if (ChartSelectionRules.IsUnsupportedPlaylistEntry(entry)) return true;
+            if (!IsFearlessMode()) return false;
+
+            return !IsEntryAllowedByFearlessMode(entry);
+        }
+
+        private static string GetCurrentChartUnsupportedMessage(string entry)
+        {
+            if (IsFearlessMode() && !IsEntryAllowedByFearlessMode(entry))
+            {
+                return FearlessDifficultyMessage;
+            }
+
+            return UnsupportedChartMessage;
+        }
+
+        private static bool IsEntryAllowedByFearlessMode(string entry)
+        {
+            var parsed = ChartManager.ParseEntry(entry);
+            return ChartSelectionRules.IsFearlessAllowedChart(parsed?.ChartKey, parsed?.Difficulty ?? 0);
+        }
+
+        public static bool IsRookieMode()
+        {
+            return LobbyPlayModeRules.IsRookie(LobbyManager.CurrentLobby?.PlayMode ?? 0);
+        }
+
+        public static bool IsFearlessMode()
+        {
+            return LobbyPlayModeRules.IsFearless(LobbyManager.CurrentLobby?.PlayMode ?? 0);
+        }
+
+        public static bool IsTenziMode()
+        {
+            return LobbyPlayModeRules.IsTenzi(LobbyManager.CurrentLobby?.PlayMode ?? 0);
+        }
+
+        public static bool HasLocalTenziEntry()
+        {
+            return IsTenziMode() && HasTenziEntryFromPlayer(PlayerManager.CurrentUid);
+        }
+
+        public static bool CanRemovePlaylistEntry(PlaylistEntryViewModel item)
+        {
+            if (item == null) return false;
+            var lobby = LobbyManager.CurrentLobby;
+            if (lobby == null || lobby.IsPlaying) return false;
+            if (!IsTenziMode()) return !lobby.Locked;
+            return IsTenziEntryOwner(item.Entry, PlayerManager.CurrentUid);
+        }
+
+        public static string GetPlaylistRemoveBlockedMessage(PlaylistEntryViewModel item)
+        {
+            var lobby = LobbyManager.CurrentLobby;
+            if (lobby?.IsPlaying == true) return "游戏进行中，不能修改歌曲列表";
+            if (IsTenziMode() && !IsTenziEntryOwner(item?.Entry, PlayerManager.CurrentUid))
+            {
+                return "天子模式只能移除自己选择的谱面";
+            }
+
+            return "游戏准备或进行中，不能修改歌曲列表";
+        }
+
+        public static bool IsRookieReadySelectionActive()
+        {
+            var lobby = LobbyManager.CurrentLobby;
+            return lobby != null &&
+                   LobbyPlayModeRules.IsRookie(lobby.PlayMode) &&
+                   lobby.Locked &&
+                   !lobby.IsPlaying;
         }
 
         private static void EnsureReady()
@@ -331,6 +480,41 @@ namespace MDEN.Managers
             {
                 throw new System.InvalidOperationException("Not in lobby.");
             }
+        }
+
+        private static void EnsureEntryAllowedByTenziMode()
+        {
+            if (IsTenziMode() && HasLocalTenziEntry())
+            {
+                throw new System.InvalidOperationException("天子模式请先移除自己选择的谱面");
+            }
+
+            if (IsTenziRoundClosed())
+            {
+                throw new System.InvalidOperationException("天子模式本轮已封盘，请先移除本轮谱面");
+            }
+        }
+
+        private static bool IsTenziRoundClosed()
+        {
+            var lobby = LobbyManager.CurrentLobby;
+            return IsTenziMode() &&
+                   lobby?.TenziRoundClosed == true &&
+                   !string.IsNullOrWhiteSpace(lobby.TenziSelectedEntry);
+        }
+
+        private static bool HasTenziEntryFromPlayer(string uid)
+        {
+            var owners = LobbyManager.CurrentLobby?.PlaylistOwners;
+            if (owners == null || string.IsNullOrWhiteSpace(uid)) return false;
+            return owners.Any(owner => owner?.Uid == uid);
+        }
+
+        private static bool IsTenziEntryOwner(string entry, string uid)
+        {
+            var owners = LobbyManager.CurrentLobby?.PlaylistOwners;
+            if (owners == null || string.IsNullOrWhiteSpace(entry) || string.IsNullOrWhiteSpace(uid)) return false;
+            return owners.Any(owner => owner?.Entry == entry && owner.Uid == uid);
         }
     }
 }

@@ -24,6 +24,14 @@ namespace MDEN.UI.Core
             var lobby = Managers.LobbyManager.CurrentLobby;
             if (lobby == null || !lobby.IsPlaying)
             {
+                if (lobby != null &&
+                    lobby.Locked &&
+                    !lobby.IsPlaying &&
+                    Managers.PlaylistManager.IsRookieMode())
+                {
+                    NavigateToRookieReadyChart();
+                }
+
                 Reset();
                 if (!Managers.BattleResultFlowManager.IsHoldingBattleResult)
                 {
@@ -48,6 +56,22 @@ namespace MDEN.UI.Core
             _startedBattleId = lobby.CurrentBattleId;
             _startedBattleEntry = battleEntry;
             ScheduleStartCurrentPlaylistEntry(lobby.Id, lobby.CurrentBattleId, battleEntry);
+        }
+
+        public static bool NavigateToRookieReadyChart()
+        {
+            var entry = Managers.PlaylistManager.GetCurrentPlaylistEntry();
+            if (entry == null) return false;
+            if (Managers.ChartManager.IsCurrentSelectedChart(entry)) return true;
+
+            var musicInfo = Managers.ChartManager.GetMusicInfo(entry.ChartKey);
+            if (musicInfo == null)
+            {
+                return false;
+            }
+
+            NativeChartNavigator.JumpToChart(musicInfo);
+            return true;
         }
 
         public static void Reset()
@@ -148,6 +172,23 @@ namespace MDEN.UI.Core
                     "ChartMissing",
                     $"本地缺少谱面 {entry.ChartKey}，未能进入联机游戏。");
                 return true;
+            }
+
+            if (Managers.PlaylistManager.IsRookieMode())
+            {
+                var selectedDifficulty = Managers.LobbyManager.GetCurrentBattleDifficulty(Managers.PlayerManager.CurrentUid);
+                if (!DifficultyDisplayRules.IsKnownDifficulty(selectedDifficulty))
+                {
+                    ReportStartFailure(
+                        Managers.LobbyManager.CurrentLobby?.Id ?? 0,
+                        Managers.LobbyManager.CurrentLobby?.CurrentBattleId,
+                        entryText,
+                        "DifficultyMissing",
+                        "本局未选择难度，未能进入联机游戏。");
+                    return true;
+                }
+
+                entry.Difficulty = selectedDifficulty;
             }
 
             var syncKey = $"{battleId}:{entry.ChartKey}";

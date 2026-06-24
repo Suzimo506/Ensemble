@@ -148,6 +148,16 @@ namespace MDEN.Managers
                 left.Difficulty == right.Difficulty;
         }
 
+        public static bool IsCurrentSelectedChart(PlaylistEntryViewModel entry)
+        {
+            if (entry == null) return false;
+
+            var musicInfo = CurrentMusicInfo;
+            var currentKey = GetEntryKey(musicInfo);
+            return !string.IsNullOrWhiteSpace(currentKey) &&
+                   currentKey == entry.ChartKey;
+        }
+
         public static string GetCustomChartMd5(string uid)
         {
             return GetMd5(uid);

@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using MDEN.Managers;
 using MDEN.Protocol.Messages.Lobby;
+using MDEN.Protocol.Models;
+using MDEN.Protocol.Rules;
 using UnityEngine;
 using UnityEngine.AddressableAssets;
 using UnityEngine.UI;
@@ -99,7 +101,7 @@ namespace MDEN.UI.Core
             }
 
             var homeVisible = IsHomeVisible;
-            if (lobby.IsPlaying && !homeVisible)
+            if (!ShouldShowRoomInfo(lobby, homeVisible))
             {
                 Hide();
                 return;
@@ -107,12 +109,6 @@ namespace MDEN.UI.Core
 
             EnsureFrame();
             if (_frame == null) return;
-
-            if (IsNativeSettingsVisible() || (!homeVisible && !IsStageVisible()))
-            {
-                _frame.SetActive(false);
-                return;
-            }
 
             if (homeVisible)
             {
@@ -132,12 +128,15 @@ namespace MDEN.UI.Core
 
         public static void UpdateVisibility()
         {
-            if (_frame == null) return;
             var lobby = LobbyManager.CurrentLobby;
             var homeVisible = IsHomeVisible;
-            var visible = LobbyManager.IsInLobby &&
-                          !IsNativeSettingsVisible() &&
-                          (homeVisible || (lobby?.IsPlaying != true && IsStageVisible()));
+            var visible = LobbyManager.IsInLobby && ShouldShowRoomInfo(lobby, homeVisible);
+            if (visible)
+            {
+                EnsureFrame();
+            }
+
+            if (_frame == null) return;
             _frame.SetActive(visible);
             if (visible)
             {
@@ -243,12 +242,14 @@ namespace MDEN.UI.Core
 
         private static bool GetRoomInfoVisible()
         {
-            return !IsNativeSettingsVisible() && (GetHomeVisible() || IsStageVisible());
+            return LobbyManager.IsInLobby && ShouldShowRoomInfo(LobbyManager.CurrentLobby, GetHomeVisible());
         }
 
-        private static bool IsStageVisible()
+        private static bool ShouldShowRoomInfo(LobbySyncPush lobby, bool homeVisible)
         {
-            return IsPanelVisible(StagePanelPath) && !IsPanelVisible(PreparationPanelPath);
+            return lobby != null &&
+                   !IsNativeSettingsVisible() &&
+                   (homeVisible || !lobby.IsPlaying);
         }
 
         private static bool IsPanelVisible(string path)
@@ -500,7 +501,9 @@ namespace MDEN.UI.Core
 
             var roomName = EscapeRichText(lobby.Name);
             var hostName = EscapeRichText(GetHostName(lobby));
-            _roomTitle.text = $"<color=#{Constants.ColorYellow}>【{roomName}】</color>";
+            _roomTitle.text =
+                $"<color=#{Constants.ColorYellow}>【{roomName}】</color> " +
+                LobbyRuleTextFormatter.FormatPlayMode(lobby.PlayMode, true);
             _roomMeta.text =
                 $"房主：<color=#{GetPlayerColor(lobby.HostUid)}>{hostName}</color>  " +
                 $"人数：<color=#{Constants.ColorCyan}>{GetPlayerCount(lobby)}/{lobby.MaxPlayers}</color>  " +
@@ -645,9 +648,40 @@ namespace MDEN.UI.Core
             var ready = !string.IsNullOrEmpty(uid) &&
                         lobby.ReadyPlayers != null &&
                         Array.IndexOf(lobby.ReadyPlayers, uid) >= 0;
-            return ready
+            var state = ready
                 ? new PlayerStateText("已准备", PlayerReadyColor)
                 : new PlayerStateText("未准备", PlayerNotReadyColor);
+
+            if (LobbyPlayModeRules.IsRookie(lobby.PlayMode))
+            {
+                var difficulty = GetPlayerDifficulty(lobby, uid);
+                if (difficulty > 0)
+                {
+                    state = new PlayerStateText(
+                        $"{LobbyRuleTextFormatter.FormatDifficulty(difficulty, true)} {ColorText(state.Text, state.Color)}",
+                        null);
+                }
+            }
+
+            return state;
+        }
+
+        private static int GetPlayerDifficulty(LobbySyncPush lobby, string uid)
+        {
+            var difficulty = GetDifficulty(lobby?.CurrentBattleDifficulties, uid);
+            return difficulty > 0 ? difficulty : GetDifficulty(lobby?.ReadyPlayerDifficulties, uid);
+        }
+
+        private static int GetDifficulty(LobbyPlayerDifficultyEntry[] entries, string uid)
+        {
+            if (entries == null || string.IsNullOrWhiteSpace(uid)) return 0;
+
+            for (var i = 0; i < entries.Length; i++)
+            {
+                if (entries[i]?.Uid == uid) return entries[i].Difficulty;
+            }
+
+            return 0;
         }
 
         private static RoomInfoPlayer[] GetRoomInfoPlayers(LobbySyncPush lobby)
@@ -809,6 +843,13 @@ namespace MDEN.UI.Core
             return value?.Replace("<", "＜").Replace(">", "＞") ?? string.Empty;
         }
 
+        private static string ColorText(string text, string color)
+        {
+            if (string.IsNullOrEmpty(text)) return string.Empty;
+            if (string.IsNullOrEmpty(color)) return text;
+            return $"<color=#{color}>{text}</color>";
+        }
+
         private static string Truncate(string value, int maxLength)
         {
             if (string.IsNullOrEmpty(value) || value.Length <= maxLength) return value;
@@ -922,7 +963,7 @@ namespace MDEN.UI.Core
                 {
                     _state.text = string.IsNullOrEmpty(stateText)
                         ? string.Empty
-                        : $"<color=#{stateColor}>{stateText}</color>";
+                        : ColorText(stateText, stateColor);
                 }
             }
 

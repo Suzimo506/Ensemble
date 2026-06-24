@@ -4,7 +4,6 @@ using Il2CppAssets.Scripts.UI.Controls;
 using LocalizeLib;
 using MDEN.Managers;
 using MDEN.Protocol.Enums;
-using MDEN.Protocol.Messages.Lobby;
 using MDEN.UI.Core;
 using MelonLoader;
 using PopupLib.UI.Components;
@@ -19,6 +18,7 @@ namespace MDEN.UI.Windows
         private ForumObject _btnBack;
         private ForumObject _btnName;
         private ForumObject _btnMaxPlayers;
+        private ForumObject _btnPlayMode;
         private ForumObject _btnPlaylistSize;
         private ForumObject _btnGoal;
         private ForumObject _btnSettlement;
@@ -29,6 +29,7 @@ namespace MDEN.UI.Windows
 
         private string _roomName = "联机房间";
         private ushort _maxPlayers = 4;
+        private LobbyPlayMode _playMode = LobbyPlayMode.Normal;
         private ushort _playlistSize = 12;
         private LobbyGoal _goal = LobbyGoal.Accuracy;
         private bool _settlementEnabled;
@@ -72,6 +73,12 @@ namespace MDEN.UI.Windows
             _btnMaxPlayers = new ForumObject(new LocalString("人数"), new LocalString($"最多人数: {HighlightValue(_maxPlayers)}\n点击后输入人数，范围 2-10"));
             _btnMaxPlayers.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("PlayerCard.png")?.texture;
             _window.ForumObjects.Add(_btnMaxPlayers);
+
+            _btnPlayMode = new ForumObject(
+                new LocalString("游玩模式"),
+                new LocalString($"游玩模式: {FormatPlayMode(_playMode)}\n点击切换为{FormatPlayMode(LobbyRuleTextFormatter.GetNextPlayMode((byte)_playMode))}"));
+            _btnPlayMode.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("OptionsPanel.png")?.texture;
+            _window.ForumObjects.Add(_btnPlayMode);
 
             _btnPlaylistSize = new ForumObject(new LocalString("歌曲列表长度"), new LocalString($"列表长度: {HighlightValue(_playlistSize)}\n点击后输入歌曲列表长度，范围 2-32"));
             _btnPlaylistSize.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("RoomList.png")?.texture;
@@ -129,6 +136,11 @@ namespace MDEN.UI.Windows
             else if (button == _btnMaxPlayers)
             {
                 ShowMaxPlayersInput();
+            }
+            else if (button == _btnPlayMode)
+            {
+                _playMode = LobbyRuleTextFormatter.GetNextPlayMode((byte)_playMode);
+                RebuildWindow();
             }
             else if (button == _btnPlaylistSize)
             {
@@ -271,22 +283,16 @@ namespace MDEN.UI.Windows
 
             try
             {
-                var request = new CreateLobbyRequest
-                {
-                    Name = _roomName,
-                    MaxPlayers = _maxPlayers,
-                    PlayType = (byte)LobbyPlayType.All,
-                    ChartSelection = (byte)LobbyChartSelection.HostPlaylist,
-                    Goal = (byte)_goal,
-                    PlaylistSize = _playlistSize,
-                    SettlementEnabled = _settlementEnabled,
-                    Password = _password
-                };
-
-                var lobbyId = await LobbyManager.CreateLobbyAsync(request);
+                var lobbyId = await LobbyManager.CreateLobbyAsync(
+                    _roomName,
+                    _maxPlayers,
+                    (byte)_playMode,
+                    _goal,
+                    _playlistSize,
+                    _settlementEnabled,
+                    _password);
                 if (IsDisposed) return;
 
-                await MainThreadDispatcher.InvokeAsync(() => LobbyManager.MarkLobbyEntered(lobbyId, request));
                 keepPending = true;
 
                 MDEN.Managers.ClientLogManager.Msg($"Created lobby: {lobbyId}");
@@ -326,7 +332,7 @@ namespace MDEN.UI.Windows
 
         private string BuildSummary()
         {
-            return $"名称: {HighlightValue(EscapeRichText(_roomName))}\n人数: {HighlightValue(_maxPlayers)}\n歌曲列表长度: {HighlightValue(_playlistSize)}\n获胜方式: {HighlightValue(GetGoalName())}\n结算功能: {HighlightValue(GetSettlementNamePlain())}\n密码: {HighlightValue(string.IsNullOrWhiteSpace(_password) ? "无" : "已设置")}";
+            return $"名称: {HighlightValue(EscapeRichText(_roomName))}\n人数: {HighlightValue(_maxPlayers)}\n游玩模式: {FormatPlayMode(_playMode)}\n歌曲列表长度: {HighlightValue(_playlistSize)}\n获胜方式: {HighlightValue(GetGoalName())}\n结算功能: {HighlightValue(GetSettlementNamePlain())}\n密码: {HighlightValue(string.IsNullOrWhiteSpace(_password) ? "无" : "已设置")}";
         }
 
         private string GetGoalName()
@@ -349,6 +355,11 @@ namespace MDEN.UI.Windows
         private static string HighlightValue(object value)
         {
             return $"<color={Constants.ColorYellow}>{value}</color>";
+        }
+
+        private static string FormatPlayMode(LobbyPlayMode mode)
+        {
+            return LobbyRuleTextFormatter.FormatPlayMode((byte)mode, false);
         }
 
         private static string EscapeRichText(string value)

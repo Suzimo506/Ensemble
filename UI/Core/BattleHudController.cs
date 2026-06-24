@@ -115,7 +115,7 @@ namespace MDEN.UI.Core
             var ordered = players
                 .Where(player => player != null)
                 .OrderBy(player => player.Uid)
-                .Select(player => $"{player.Uid}:{player.Score}:{player.Accuracy:0.0000}:{player.Perfects}:{player.Greats}:{player.Earlies}:{player.Lates}:{player.Misses}:{player.FC}:{player.Alive}");
+                .Select(player => $"{player.Uid}:{player.Difficulty}:{player.Score}:{player.Accuracy:0.0000}:{player.Perfects}:{player.Greats}:{player.Earlies}:{player.Lates}:{player.Misses}:{player.FC}:{player.Alive}");
             return string.Join("|", ordered);
         }
 

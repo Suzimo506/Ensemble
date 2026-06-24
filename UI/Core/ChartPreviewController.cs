@@ -1,4 +1,6 @@
+using System.Collections;
 using Il2CppAssets.Scripts.Database;
+using Il2CppAssets.Scripts.UI.Panels;
 using MDEN.Managers;
 using MDEN.Protocol.Messages.Lobby;
 using MelonLoader;
@@ -42,7 +44,7 @@ namespace MDEN.UI.Core
             _resultPreviewHeld = true;
             _resultPanelSeen = false;
             var generation = ++_resultHoldGeneration;
-            MainThreadDispatcher.Enqueue(() => RunResultPanelHold(generation, ResultPanelWaitFrames));
+            MelonCoroutines.Start(RunResultPanelHold(generation, ResultPanelWaitFrames));
         }
 
         public static void Reset()
@@ -71,6 +73,12 @@ namespace MDEN.UI.Core
 
             _previewLobbyId = lobby.Id;
             _previewEntry = entry.Entry;
+            if (ShouldDelayPreviewForBattleResult())
+            {
+                HoldPreviewUntilResultPanelCloses();
+                return;
+            }
+
             if (!IsNativeResultPanelVisible())
             {
                 Preview(entry);
@@ -79,35 +87,33 @@ namespace MDEN.UI.Core
             SchedulePreviewRetry(lobby.Id, entry.Entry, PreviewRetryCount);
         }
 
-        private static void RunResultPanelHold(int generation, int framesUntilFallbackRelease)
+        private static IEnumerator RunResultPanelHold(int generation, int framesUntilFallbackRelease)
         {
-            if (generation != _resultHoldGeneration || !_resultPreviewHeld) return;
-
-            var resultPanelVisible = IsNativeResultPanelVisible();
-            if (resultPanelVisible)
+            var framesRemaining = framesUntilFallbackRelease;
+            while (generation == _resultHoldGeneration && _resultPreviewHeld)
             {
-                _resultPanelSeen = true;
-            }
-
-            if (_resultPanelSeen)
-            {
-                if (!resultPanelVisible)
+                var resultPanelVisible = ShouldDelayPreviewForBattleResult();
+                if (resultPanelVisible)
                 {
-                    ReleaseResultHold(generation);
-                    return;
+                    _resultPanelSeen = true;
                 }
 
-                MainThreadDispatcher.Enqueue(() => RunResultPanelHold(generation, framesUntilFallbackRelease));
-                return;
-            }
+                if (_resultPanelSeen)
+                {
+                    if (!resultPanelVisible)
+                    {
+                        ReleaseResultHold(generation);
+                        yield break;
+                    }
+                }
+                else if (framesRemaining-- <= 0)
+                {
+                    ReleaseResultHold(generation);
+                    yield break;
+                }
 
-            if (framesUntilFallbackRelease <= 0)
-            {
-                ReleaseResultHold(generation);
-                return;
+                yield return new WaitForEndOfFrame();
             }
-
-            MainThreadDispatcher.Enqueue(() => RunResultPanelHold(generation, framesUntilFallbackRelease - 1));
         }
 
         private static void ReleaseResultHold(int generation)
@@ -129,43 +135,68 @@ namespace MDEN.UI.Core
         private static void SchedulePreviewRetry(int lobbyId, string entryText, int retriesRemaining)
         {
             var generation = ++_previewGeneration;
-            MainThreadDispatcher.Enqueue(() => RunPreviewRetry(generation, lobbyId, entryText, retriesRemaining, PreviewRetryDelayFrames));
+            MelonCoroutines.Start(RunPreviewRetry(generation, lobbyId, entryText, retriesRemaining));
         }
 
-        private static void RunPreviewRetry(int generation, int lobbyId, string entryText, int retriesRemaining, int delayFrames)
+        private static IEnumerator RunPreviewRetry(int generation, int lobbyId, string entryText, int retriesRemaining)
         {
-            if (generation != _previewGeneration) return;
-            if (!LobbyManager.IsInLobby || LobbyManager.CurrentLobby?.Id != lobbyId) return;
-            if (LobbyManager.CurrentLobby.IsPlaying || !LobbyManager.CurrentLobby.Locked) return;
-
-            if (delayFrames > 0)
+            while (retriesRemaining-- > 0)
             {
-                MainThreadDispatcher.Enqueue(() => RunPreviewRetry(generation, lobbyId, entryText, retriesRemaining, delayFrames - 1));
-                return;
-            }
+                for (var delayFrames = PreviewRetryDelayFrames; delayFrames > 0; delayFrames--)
+                {
+                    yield return new WaitForEndOfFrame();
+                }
 
-            var entry = PlaylistManager.GetCurrentPlaylistEntry();
-            if (entry == null || entry.Entry != entryText) return;
+                if (generation != _previewGeneration) yield break;
+                if (!LobbyManager.IsInLobby || LobbyManager.CurrentLobby?.Id != lobbyId) yield break;
+                if (LobbyManager.CurrentLobby.IsPlaying || !LobbyManager.CurrentLobby.Locked) yield break;
 
-            if (!IsNativeResultPanelVisible())
-            {
+                if (ShouldDelayPreviewForBattleResult())
+                {
+                    HoldPreviewUntilResultPanelCloses();
+                    yield break;
+                }
+
+                var entry = PlaylistManager.GetCurrentPlaylistEntry();
+                if (entry == null || entry.Entry != entryText) yield break;
+
                 Preview(entry);
             }
+        }
 
-            if (retriesRemaining <= 1) return;
-            MainThreadDispatcher.Enqueue(() => RunPreviewRetry(generation, lobbyId, entryText, retriesRemaining - 1, PreviewRetryDelayFrames));
+        private static bool ShouldDelayPreviewForBattleResult()
+        {
+            return BattleResultFlowManager.IsBattleResultFlowPending ||
+                   BattleResultBannerDisplay.IsVisible ||
+                   BattleResultBannerDisplay.ShowingResults ||
+                   IsNativeResultPanelVisible();
         }
 
         private static bool IsNativeResultPanelVisible()
         {
             return IsVisible("UI_2D/Standard/PnlVictory") ||
-                   IsVisible("UI_2D/Standard/PnlFail");
+                   IsVisible("UI_2D/Standard/PnlFail") ||
+                   IsVisible("UI_2D/Standard/PnlRank") ||
+                   IsActiveRankPanelVisible();
         }
 
         private static bool IsVisible(string path)
         {
             var obj = GameObject.Find(path);
             return obj != null && obj.activeInHierarchy;
+        }
+
+        private static bool IsActiveRankPanelVisible()
+        {
+            try
+            {
+                var panel = GameObject.FindObjectOfType<PnlRank>();
+                return panel != null && panel.gameObject != null && panel.gameObject.activeInHierarchy;
+            }
+            catch
+            {
+                return false;
+            }
         }
 
         internal static void Preview(PlaylistEntryViewModel entry)
