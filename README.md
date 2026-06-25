@@ -34,9 +34,11 @@ MDEN（Muse Dash Ensemble）是一个基于 MelonLoader 的 Muse Dash 联机模�
 
 | 路径 | 说明 |
 |---|---|
-| `Main.cs` | MelonLoader 模组入口，负责初始化管理器、UI 控制器与场景钩子。 |
+| `Main.cs` | MelonLoader 模组入口，只转发生命周期回调。 |
+| `Bootstrap/` | 客户端启动、场景切换、每帧更新和关闭流程编排。 |
 | `Constants.cs` | 模组常量、颜色、资源路径与关于页面鸣谢文本。 |
 | `Network/` | TCP 连接、封包拆包、请求响应配对、Push 派发与重连。 |
+| `Threading/` | 网络层到主线程队列的边界适配，避免网络层直接依赖 UI。 |
 | `Managers/` | 房间、玩家、聊天、对战、配置等业务状态与网络调用。 |
 | `UI/` | PopupLib 窗口、游戏内 HUD、房间显示、结算显示与 UI 生命周期控制。 |
 | `Patches/` | Harmony Patch，负责把入口和游戏流程接入原版 Muse Dash。 |

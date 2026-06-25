@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Text.Json;
 using MDEN.Protocol;
-using MDEN.UI.Core;
+using MDEN.Threading;
 using MelonLoader;
 
 namespace MDEN.Network
@@ -30,7 +30,7 @@ namespace MDEN.Network
                     return;
                 }
 
-                MainThreadDispatcher.Enqueue(() => handler(msg));
+                ClientThreadDispatcher.Enqueue(() => handler(msg));
             };
         }
 

@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 using MDEN.Protocol;
 using MDEN.Protocol.Envelopes;
 using MDEN.Protocol.Messages.System;
-using MDEN.UI.Core;
+using MDEN.Threading;
 using MelonLoader;
 
 namespace MDEN.Network
@@ -84,7 +84,7 @@ namespace MDEN.Network
 
             if (notifyDisconnected)
             {
-                MainThreadDispatcher.Enqueue(() => OnDisconnected?.Invoke());
+                ClientThreadDispatcher.Enqueue(() => OnDisconnected?.Invoke());
             }
         }
 
