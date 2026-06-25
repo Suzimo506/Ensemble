@@ -21,7 +21,6 @@ namespace MDEN.UI.Core
         private const float SidePadding = 54f;
         private const float AwardCardWidth = 242f;
         private const float AwardCardHeight = 154f;
-        private const float AwardAvatarSize = 30f;
         private const float AwardNameRowHeight = 34f;
         private const float AwardNamesViewportHeight = 78f;
         private const float ChartViewportHeight = 290f;
@@ -500,26 +499,12 @@ namespace MDEN.UI.Core
             rowRect.offsetMin = new Vector2(0f, -AwardNameRowHeight * (index + 1));
             rowRect.offsetMax = new Vector2(0f, -AwardNameRowHeight * index);
 
-            var avatar = new GameObject("Avatar");
-            avatar.transform.SetParent(rowRect, false);
-            var avatarRect = avatar.AddComponent<RectTransform>();
-            avatarRect.anchorMin = new Vector2(0f, 0.5f);
-            avatarRect.anchorMax = new Vector2(0f, 0.5f);
-            avatarRect.pivot = new Vector2(0f, 0.5f);
-            avatarRect.anchoredPosition = Vector2.zero;
-            avatarRect.sizeDelta = new Vector2(AwardAvatarSize, AwardAvatarSize);
-
-            var avatarImage = avatar.AddComponent<Image>();
-            avatarImage.sprite = GetPlayerAvatarSprite(uid, result);
-            avatarImage.preserveAspect = true;
-            avatarImage.raycastTarget = false;
-
             var name = CreateText(rowRect, "Name", EscapeRichText(GetPlayerName(uid, result)), 20, TextAnchor.MiddleLeft);
             name.color = new Color(1f, 0.96f, 1f, 0.96f);
             var nameRect = name.rectTransform;
             nameRect.anchorMin = Vector2.zero;
             nameRect.anchorMax = Vector2.one;
-            nameRect.offsetMin = new Vector2(AwardAvatarSize + 8f, 0f);
+            nameRect.offsetMin = Vector2.zero;
             nameRect.offsetMax = Vector2.zero;
         }
 
@@ -861,40 +846,6 @@ namespace MDEN.UI.Core
             }
 
             return uid ?? "Unknown";
-        }
-
-        private static Sprite GetPlayerAvatarSprite(string uid, SettlementResultPush result)
-        {
-            if (string.IsNullOrWhiteSpace(uid))
-            {
-                return AvatarManager.GetAvatarSprite(null, null, null);
-            }
-
-            if (result?.PlayerNames != null)
-            {
-                foreach (var player in result.PlayerNames)
-                {
-                    if (player?.Uid != uid) continue;
-                    return AvatarManager.GetAvatarSprite(uid, player.AvatarName, player.AvatarData);
-                }
-            }
-
-            var lobby = LobbyManager.CurrentLobby;
-            if (lobby?.PlayerDetails != null)
-            {
-                foreach (var player in lobby.PlayerDetails)
-                {
-                    if (player?.Uid != uid) continue;
-                    return AvatarManager.GetAvatarSprite(uid, player.AvatarName, player.AvatarData);
-                }
-            }
-
-            if (uid == PlayerManager.CurrentUid)
-            {
-                return AvatarManager.GetCurrentAvatarSprite();
-            }
-
-            return AvatarManager.GetAvatarSprite(uid, null, null);
         }
 
         private static string EscapeRichText(string value)

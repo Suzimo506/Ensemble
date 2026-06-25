@@ -16,6 +16,8 @@ namespace MDEN.UI.Displays
     {
         private const int OverlaySortingOrder = 32767;
         private const int FontSize = 26;
+        private const int CrowdedFontSize = 22;
+        private const int CrowdedPlayerThreshold = 4;
         private const float EntryWidth = 640f;
         private const float EntryHeight = 34f;
         private const string ColorGold = "fff700ff";
@@ -121,10 +123,11 @@ namespace MDEN.UI.Displays
 
             _missPopupsThisRefresh = 0;
             PrimePlayerColors(orderedPlayers);
+            var fontSize = GetFontSize(orderedPlayers.Length);
             for (var i = 0; i < orderedPlayers.Length; i++)
             {
                 var player = orderedPlayers[i];
-                SetEntry(player.Uid, FormatEntry(player, i + 1));
+                SetEntry(player.Uid, FormatEntry(player, i + 1), fontSize);
                 ShowBattlePopupIfNeeded(player);
                 _previousEntries[player.Uid] = BattleEntryState.From(player);
             }
@@ -153,7 +156,7 @@ namespace MDEN.UI.Displays
             _missPopupsThisRefresh = 0;
         }
 
-        private void SetEntry(string uid, string value)
+        private void SetEntry(string uid, string value, int fontSize)
         {
             if (string.IsNullOrEmpty(uid) || _frame == null) return;
 
@@ -167,6 +170,11 @@ namespace MDEN.UI.Displays
             if (text.text != value)
             {
                 text.text = value;
+            }
+
+            if (text.fontSize != fontSize)
+            {
+                text.fontSize = fontSize;
             }
         }
 
@@ -197,6 +205,11 @@ namespace MDEN.UI.Displays
             shadow.effectColor = new Color(0f, 0f, 0f, 0.35f);
 
             return text;
+        }
+
+        private static int GetFontSize(int playerCount)
+        {
+            return playerCount > CrowdedPlayerThreshold ? CrowdedFontSize : FontSize;
         }
 
         internal static BattlePlayerEntry[] OrderPlayers(BattlePlayerEntry[] players)
