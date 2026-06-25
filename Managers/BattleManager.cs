@@ -15,7 +15,7 @@ namespace MDEN.Managers
 {
     public static class BattleManager
     {
-        private const int BattleUpdateIntervalMs = 500;
+        private const int BattleUpdateIntervalMs = 200;
         private const int BattleReturnedRetryIntervalMs = 5000;
         private static readonly object BattleDataLock = new();
         private static readonly object BattleDataDispatchLock = new();
@@ -37,8 +37,9 @@ namespace MDEN.Managers
 
         public static bool Synchronizing => _synchronizing;
         public static bool IsActiveMultiplayerBattle =>
-            LobbyManager.IsInLobby && (_multiplayerBattleActive || LobbyManager.CurrentLobby?.IsPlaying == true);
+            _multiplayerBattleActive || (LobbyManager.IsInLobby && LobbyManager.CurrentLobby?.IsPlaying == true);
         public static bool HasReportedBattleFinished => _finishReported;
+        public static bool HasReportedFailedBattleFinished => _finishReported && _forcedDead;
         public static event Action<BattlePlayerEntry[]> BattleDataChanged;
 
         public static void Init()

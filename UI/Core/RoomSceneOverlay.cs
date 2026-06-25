@@ -27,6 +27,8 @@ namespace MDEN.UI.Core
         private const float PlayerListTop = 68f;
         private const float PlayerLineHeight = 32f;
         private const float PlayerRowGap = 6f;
+        private const float PlayerScrollHintGap = 8f;
+        private const float PlayerScrollHintHeight = 20f;
         private const float PlayerRowInset = 10f;
         private const float PlayerAvatarSize = 28f;
         private const float PlayerAvatarGap = 8f;
@@ -37,6 +39,7 @@ namespace MDEN.UI.Core
         private const float ScrollWheelDeadZone = 0.01f;
         private const int InfoTitleFontSize = 20;
         private const int InfoMetaFontSize = 17;
+        private const int PlayerScrollHintFontSize = 15;
         private const int PlayerNameFontSize = 17;
         private const int PlayerStateFontSize = 17;
         private const string PlayerNotReadyColor = "ff7777ff";
@@ -62,6 +65,7 @@ namespace MDEN.UI.Core
         private static RectTransform _roomInfoPanelRect;
         private static Text _roomTitle;
         private static Text _roomMeta;
+        private static Text _playerScrollHint;
         private static Sprite _roundedSprite;
         private static int _playerScrollOffset;
         private static int _lastLobbyId = -1;
@@ -171,7 +175,8 @@ namespace MDEN.UI.Core
                 _roomInfoPanel != null &&
                 _roomInfoPanelRect != null &&
                 _roomTitle != null &&
-                _roomMeta != null)
+                _roomMeta != null &&
+                _playerScrollHint != null)
             {
                 return;
             }
@@ -214,6 +219,7 @@ namespace MDEN.UI.Core
             _roomInfoPanelRect = null;
             _roomTitle = null;
             _roomMeta = null;
+            _playerScrollHint = null;
             _playerScrollOffset = 0;
             _lastLobbyId = -1;
             _lastLobbyLocked = false;
@@ -288,6 +294,8 @@ namespace MDEN.UI.Core
 
             _roomTitle = CreatePanelText("RoomTitle", InfoPanelPadding, InfoTitleTop, InfoPanelWidth - InfoPanelPadding * 2f, InfoTitleHeight, InfoTitleFontSize, TextAnchor.UpperLeft);
             _roomMeta = CreatePanelText("RoomMeta", InfoPanelPadding, InfoMetaTop, InfoPanelWidth - InfoPanelPadding * 2f, InfoMetaHeight, InfoMetaFontSize, TextAnchor.UpperLeft);
+            _playerScrollHint = CreatePanelText("PlayerScrollHint", InfoPanelPadding, 0f, InfoPanelWidth - InfoPanelPadding * 2f, PlayerScrollHintHeight, PlayerScrollHintFontSize, TextAnchor.UpperCenter);
+            _playerScrollHint.gameObject.SetActive(false);
         }
 
         private static Text CreatePanelText(
@@ -496,7 +504,9 @@ namespace MDEN.UI.Core
             var visiblePlayerCount = Math.Min(players.Length, maxVisibleRows);
             var playerRows = players.Length == 0 ? 1 : Math.Min(players.Length, maxVisibleRows);
             var playerListHeight = playerRows * PlayerLineHeight + Math.Max(0, playerRows - 1) * PlayerRowGap;
-            var panelHeight = PlayerListTop + playerListHeight + InfoPanelPadding;
+            var showScrollHint = players.Length > maxVisibleRows;
+            var scrollHintHeight = showScrollHint ? PlayerScrollHintGap + PlayerScrollHintHeight : 0f;
+            var panelHeight = PlayerListTop + playerListHeight + scrollHintHeight + InfoPanelPadding;
             _roomInfoPanelRect.sizeDelta = new Vector2(InfoPanelWidth, panelHeight);
 
             var roomName = EscapeRichText(lobby.Name);
@@ -508,6 +518,7 @@ namespace MDEN.UI.Core
                 $"房主：<color=#{GetPlayerColor(lobby.HostUid)}>{hostName}</color>  " +
                 $"人数：<color=#{Constants.ColorCyan}>{GetPlayerCount(lobby)}/{lobby.MaxPlayers}</color>  " +
                 $"观众：<color=#{Constants.ColorCyan}>{lobby.WatcherCount}</color>";
+            UpdatePlayerScrollHint(showScrollHint, players.Length - maxVisibleRows, PlayerListTop + playerListHeight);
 
             if (players.Length == 0)
             {
@@ -535,6 +546,23 @@ namespace MDEN.UI.Core
             }
 
             HidePlayerRowsFrom(playerRows);
+        }
+
+        private static void UpdatePlayerScrollHint(bool visible, int hiddenPlayerCount, float playerListBottom)
+        {
+            if (_playerScrollHint == null) return;
+
+            _playerScrollHint.gameObject.SetActive(visible);
+            if (!visible) return;
+
+            var hintRect = _playerScrollHint.GetComponent<RectTransform>();
+            if (hintRect != null)
+            {
+                hintRect.anchoredPosition = new Vector2(InfoPanelPadding, -(playerListBottom + PlayerScrollHintGap));
+            }
+
+            _playerScrollHint.text =
+                $"<color=#{Constants.ColorCyan}>还有 {Math.Max(0, hiddenPlayerCount)} 位玩家未显示，滚动查看</color>";
         }
 
         private static void HandlePlayerListPointerInput(LobbySyncPush lobby)

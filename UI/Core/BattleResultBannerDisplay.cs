@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using Il2CppAssets.Scripts.UI.Panels;
 using MDEN.Managers;
 using MDEN.Protocol.Models;
 using MDEN.UI.Displays;
@@ -16,9 +15,6 @@ namespace MDEN.UI.Core
         private const string RootName = "MDENBattleResultBanner";
         private const string ResultEntryName = "MDENBattleResultEntry";
         private const int OverlaySortingOrder = 32766;
-        private const int NativeMessageSuppressionFrames = 600;
-        private const int NativeMessageSuppressIntervalFrames = 10;
-        private const int NativeMessagePanelLookupIntervalFrames = 30;
         private const float EntryWidth = 1180f;
         private const float EntryHeight = 58f;
         private const float EntrySpacing = 68f;
@@ -31,9 +27,6 @@ namespace MDEN.UI.Core
         private const float EntrySlideDuration = 0.42f;
         private const float ClickSoundVolumeScale = 2.4f;
         private static readonly TimeSpan CellDelay = TimeSpan.FromMilliseconds(145);
-        private static PnlMessage _pnlMessage;
-        private static int _nextNativeMessageDirectLookupFrame;
-        private static int _nextNativeMessageSuppressFrame;
         private static int _allowNativeMessagesUntilFrame;
         private static GameObject _root;
         private static RectTransform _entryRoot;
@@ -41,15 +34,12 @@ namespace MDEN.UI.Core
         private static BattlePlayerEntry[] _displayedPlayers = Array.Empty<BattlePlayerEntry>();
         private static BattlePlayerEntry[] _pendingRefreshPlayers;
         private static int _resultGeneration;
-        private static int _suppressNativeMessagesUntilFrame;
         private static bool _enterWasDown;
         private static int _ignoreMouseInputUntilFrame;
 
         public static bool ShowingResults { get; private set; }
         public static bool IsVisible => _root != null;
         public static bool IsActive => IsVisible || ShowingResults;
-        private static bool IsSuppressingNativeMessages => IsVisible || Time.frameCount <= _suppressNativeMessagesUntilFrame;
-
         public static void RefreshIfVisible(BattlePlayerEntry[] players)
         {
             if (!IsActive) return;
@@ -79,11 +69,6 @@ namespace MDEN.UI.Core
         {
             HandleOverlayInput();
             UpdateEntryAnimations();
-            if (IsSuppressingNativeMessages && Time.frameCount >= _nextNativeMessageSuppressFrame)
-            {
-                _nextNativeMessageSuppressFrame = Time.frameCount + NativeMessageSuppressIntervalFrames;
-                SuppressNativeMessagesNow();
-            }
         }
 
         public static async Task ShowAsync(BattlePlayerEntry[] players)
@@ -110,7 +95,6 @@ namespace MDEN.UI.Core
                     DestroyRoot();
                     CreateRoot();
                     UpdateEntryAnimations();
-                    StartNativeMessageSuppression();
                 });
 
                 EntryLayout layout = null;
@@ -169,11 +153,8 @@ namespace MDEN.UI.Core
         public static void ClearAll()
         {
             _resultGeneration++;
-            _suppressNativeMessagesUntilFrame = 0;
             _displayedPlayers = Array.Empty<BattlePlayerEntry>();
             _pendingRefreshPlayers = null;
-            _nextNativeMessageDirectLookupFrame = 0;
-            _nextNativeMessageSuppressFrame = 0;
             ShowingResults = false;
             _enterWasDown = false;
             _ignoreMouseInputUntilFrame = 0;
@@ -189,22 +170,16 @@ namespace MDEN.UI.Core
 
         public static void SuppressNativeMessages()
         {
-            MainThreadDispatcher.Enqueue(StartNativeMessageSuppression);
         }
 
         internal static bool ShouldSuppressNativeMessageObject(GameObject obj)
         {
-            return IsSuppressingNativeMessages &&
-                   Time.frameCount > _allowNativeMessagesUntilFrame &&
-                   obj != null &&
-                   obj.name == "PnlMessage" &&
-                   obj.GetComponent<PnlMessage>() != null;
+            return false;
         }
 
         private static void ClearAllOnMainThread()
         {
             DestroyRoot();
-            ClearNativeEntries();
             ReleaseBattleResultInputBlock();
         }
 
@@ -543,85 +518,6 @@ namespace MDEN.UI.Core
                 .ToArray();
         }
 
-        private static void StartNativeMessageSuppression()
-        {
-            _suppressNativeMessagesUntilFrame = Math.Max(
-                _suppressNativeMessagesUntilFrame,
-                Time.frameCount + NativeMessageSuppressionFrames);
-            _nextNativeMessageSuppressFrame = Time.frameCount + NativeMessageSuppressIntervalFrames;
-            SuppressNativeMessagesNow();
-        }
-
-        private static void SuppressNativeMessagesNow()
-        {
-            if (Time.frameCount <= _allowNativeMessagesUntilFrame) return;
-
-            SuppressNativeMessagePanel(GetPnlMessage());
-        }
-
-        private static bool SuppressNativeMessagePanel(PnlMessage pnlMessage)
-        {
-            if (!IsScenePnlMessage(pnlMessage)) return false;
-
-            if (pnlMessage.layout != null && pnlMessage.layout.childCount > 0)
-            {
-                ClearNativeEntries(pnlMessage);
-            }
-
-            if (pnlMessage.gameObject.activeSelf)
-            {
-                pnlMessage.gameObject.SetActive(false);
-            }
-
-            return true;
-        }
-
-        private static bool IsScenePnlMessage(PnlMessage pnlMessage)
-        {
-            return pnlMessage != null &&
-                   pnlMessage.gameObject != null &&
-                   pnlMessage.gameObject.name == "PnlMessage" &&
-                   pnlMessage.gameObject.scene.IsValid();
-        }
-
-        private static void ClearNativeEntries()
-        {
-            var pnlMessage = GetPnlMessage();
-            ClearNativeEntries(pnlMessage);
-        }
-
-        private static void ClearNativeEntries(PnlMessage pnlMessage)
-        {
-            if (pnlMessage == null || pnlMessage.layout == null) return;
-
-            for (var i = pnlMessage.layout.childCount - 1; i >= 0; i--)
-            {
-                var child = pnlMessage.layout.GetChild(i);
-                if (child != null)
-                {
-                    UnityEngine.Object.Destroy(child.gameObject);
-                }
-            }
-        }
-
-        private static PnlMessage GetPnlMessage()
-        {
-            if (IsScenePnlMessage(_pnlMessage)) return _pnlMessage;
-            _pnlMessage = null;
-
-            if (Time.frameCount < _nextNativeMessageDirectLookupFrame) return null;
-            _nextNativeMessageDirectLookupFrame = Time.frameCount + NativeMessagePanelLookupIntervalFrames;
-
-            using (PerfTrace.Measure("MDEN.BattleResult.FindNativeMessagePanel"))
-            {
-                var obj = GameObject.Find("CommonManagers/MessagesManager/UI/PnlMessage");
-                if (obj == null) return null;
-
-                _pnlMessage = obj.GetComponent<PnlMessage>();
-                return _pnlMessage;
-            }
-        }
-
         private static void ApplyGameFont(Text text)
         {
             NativeFontCache.ApplyTo(text);
@@ -655,7 +551,6 @@ namespace MDEN.UI.Core
             DestroyRoot();
             CreateRoot();
             ReleaseBattleResultInputBlock();
-            StartNativeMessageSuppression();
             return _root != null && _entryRoot != null;
         }
 

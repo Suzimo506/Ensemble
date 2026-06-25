@@ -16,6 +16,8 @@ namespace MDEN.Network
     {
         private const int ConnectTimeoutMs = 8000;
         private const int SendTimeoutMs = 8000;
+        private const int HeartbeatIntervalMs = 15000;
+        private const int HeartbeatTimeoutMs = 45000;
         private static NetworkClient _instance;
         public static NetworkClient Instance => _instance ??= new NetworkClient();
 
@@ -29,6 +31,7 @@ namespace MDEN.Network
         private CancellationTokenSource _heartbeatCts;
         private int _connectionId;
         private DateTime _lastPingSentUtc;
+        private DateTime _lastServerMessageUtc;
 
         public bool IsConnected => _isConnected;
 
@@ -42,6 +45,7 @@ namespace MDEN.Network
                 Disconnect(false);
 
                 _tcpClient = new TcpClient();
+                _tcpClient.NoDelay = true;
                 var connectTask = _tcpClient.ConnectAsync(host, port);
                 var timeoutTask = Task.Delay(ConnectTimeoutMs);
                 if (await Task.WhenAny(connectTask, timeoutTask) != connectTask)
@@ -52,9 +56,10 @@ namespace MDEN.Network
                 await connectTask;
                 _stream = _tcpClient.GetStream();
                 _isConnected = true;
+                _lastServerMessageUtc = DateTime.UtcNow;
                 var connectionId = unchecked(++_connectionId);
                 _ = ReceiveLoopAsync(connectionId, _stream);
-                StartHeartbeat();
+                StartHeartbeat(connectionId);
                 return true;
             }
             catch (Exception ex)
@@ -211,6 +216,7 @@ namespace MDEN.Network
                         break;
                     }
 
+                    _lastServerMessageUtc = DateTime.UtcNow;
                     receiveFramer.AppendData(buffer, 0, bytesRead);
                     while (receiveFramer.TryDecode(out ServerEnvelope envelope))
                     {
@@ -277,6 +283,7 @@ namespace MDEN.Network
             unchecked { _connectionId++; }
             _isConnected = false;
             _lastPingSentUtc = default;
+            _lastServerMessageUtc = default;
             StopHeartbeat();
             try { _stream?.Close(); } catch { }
             try { _tcpClient?.Close(); } catch { }
@@ -284,11 +291,11 @@ namespace MDEN.Network
             _tcpClient = null;
         }
 
-        private void StartHeartbeat()
+        private void StartHeartbeat(int connectionId)
         {
             StopHeartbeat();
             _heartbeatCts = new CancellationTokenSource();
-            _ = HeartbeatLoopAsync(_heartbeatCts.Token);
+            _ = HeartbeatLoopAsync(connectionId, _heartbeatCts.Token);
         }
 
         private void StopHeartbeat()
@@ -298,16 +305,25 @@ namespace MDEN.Network
             _heartbeatCts = null;
         }
 
-        private async Task HeartbeatLoopAsync(CancellationToken cancellationToken)
+        private async Task HeartbeatLoopAsync(int connectionId, CancellationToken cancellationToken)
         {
             while (!cancellationToken.IsCancellationRequested)
             {
                 try
                 {
-                    await Task.Delay(15000, cancellationToken);
-                    if (!_isConnected || _stream == null) continue;
+                    await Task.Delay(HeartbeatIntervalMs, cancellationToken);
+                    if (!IsCurrentConnection(connectionId) || !_isConnected || _stream == null) continue;
 
-                    _lastPingSentUtc = DateTime.UtcNow;
+                    var now = DateTime.UtcNow;
+                    if (_lastServerMessageUtc != default &&
+                        now - _lastServerMessageUtc > TimeSpan.FromMilliseconds(HeartbeatTimeoutMs))
+                    {
+                        MDEN.Managers.ClientLogManager.Warning("Heartbeat timed out. Disconnecting stale connection.");
+                        DisconnectIfCurrent(connectionId, true);
+                        break;
+                    }
+
+                    _lastPingSentUtc = now;
                     await SendAsync(new ClientEnvelope { Op = OpCodes.Ping });
                 }
                 catch (OperationCanceledException)

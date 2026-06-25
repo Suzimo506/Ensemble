@@ -66,14 +66,23 @@ namespace MDEN.UI.Core
 
         private static void RunQueuedRefresh()
         {
+            var players = _pendingPlayers ?? System.Array.Empty<BattlePlayerEntry>();
+
             if (!_battleActive || !LobbyManager.IsInLobby)
             {
+                if (LobbyManager.IsInLobby)
+                {
+                    SettlementOverlayController.RefreshBattleResultIfVisible(players);
+                }
+
                 if (Display.IsCreated)
                 {
                     Display.Destroy();
                 }
 
-                ResetRefreshState();
+                _pendingPlayers = null;
+                _refreshQueued = false;
+                _lastRefreshFrame = -MinRefreshIntervalFrames;
                 return;
             }
 
@@ -83,15 +92,11 @@ namespace MDEN.UI.Core
                 return;
             }
 
-            var players = _pendingPlayers ?? System.Array.Empty<BattlePlayerEntry>();
             _pendingPlayers = null;
             _refreshQueued = false;
             _lastRefreshFrame = Time.frameCount;
 
-            if (!BattleResultFlowManager.IsBattleResultFlowPending)
-            {
-                SettlementOverlayController.RefreshBattleResultIfVisible(players);
-            }
+            SettlementOverlayController.RefreshBattleResultIfVisible(players);
 
             using (PerfTrace.Measure("MDEN.BattleHud.Refresh"))
             {

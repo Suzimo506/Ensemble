@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using Il2Cpp;
@@ -9,6 +10,8 @@ namespace MDEN.UI.Core
 {
     internal static class HiddenDifficultyController
     {
+        private static readonly Dictionary<string, int> OriginalDifficultyBySlot = new();
+
         public static int Sync(MusicInfo musicInfo, int difficulty)
         {
             if (musicInfo == null) return difficulty;
@@ -79,6 +82,7 @@ namespace MDEN.UI.Core
                     specialSongManager.m_HideBmsInfos.ContainsKey(checkUid))
                 {
                     var hideBmsInfo = specialSongManager.m_HideBmsInfos[checkUid];
+                    RememberOriginalDifficulty(musicInfo, triggerDifficulty);
                     musicInfo.AddMaskValue($"difficulty{triggerDifficulty}", GetDifficultyText(musicInfo, hideBmsInfo.m_HideDiff));
                     musicInfo.AddMaskValue($"levelDesigner{triggerDifficulty}", GetLevelDesignerText(musicInfo, hideBmsInfo.m_HideDiff));
                     musicInfo.SetDifficulty(triggerDifficulty, hideBmsInfo.m_HideDiff);
@@ -108,11 +112,46 @@ namespace MDEN.UI.Core
                 {
                     musicInfo.RemoveMaskValue($"difficulty{triggerDifficulty}");
                     musicInfo.RemoveMaskValue($"levelDesigner{triggerDifficulty}");
+
+                    if (TryRestoreOriginalDifficulty(musicInfo, triggerDifficulty, out var originalDifficulty))
+                    {
+                        musicInfo.SetDifficulty(triggerDifficulty, originalDifficulty);
+                    }
                 }
             }
             catch
             {
             }
+        }
+
+        private static void RememberOriginalDifficulty(MusicInfo musicInfo, int triggerDifficulty)
+        {
+            var key = GetDifficultySlotKey(musicInfo, triggerDifficulty);
+            if (string.IsNullOrEmpty(key) || OriginalDifficultyBySlot.ContainsKey(key)) return;
+
+            var originalDifficulty = musicInfo.GetDifficulty(triggerDifficulty);
+            if (originalDifficulty > 0)
+            {
+                OriginalDifficultyBySlot[key] = originalDifficulty;
+            }
+        }
+
+        private static bool TryRestoreOriginalDifficulty(MusicInfo musicInfo, int triggerDifficulty, out int originalDifficulty)
+        {
+            originalDifficulty = 0;
+            var key = GetDifficultySlotKey(musicInfo, triggerDifficulty);
+            if (string.IsNullOrEmpty(key) || !OriginalDifficultyBySlot.TryGetValue(key, out originalDifficulty))
+            {
+                return false;
+            }
+
+            OriginalDifficultyBySlot.Remove(key);
+            return originalDifficulty > 0;
+        }
+
+        private static string GetDifficultySlotKey(MusicInfo musicInfo, int triggerDifficulty)
+        {
+            return string.IsNullOrEmpty(musicInfo?.uid) ? null : $"{musicInfo.uid}:{triggerDifficulty}";
         }
 
         private static int GetHiddenTriggerDifficulty(string checkUid, SpecialSongManager specialSongManager)
