@@ -32,12 +32,17 @@ jobs:
 
 
       - name: Download game assets (optional)
-        if: ${{ secrets.GAME_ASSETS_URL != '' }}
+        env:
+          GAME_ASSETS_URL: ${{ secrets.GAME_ASSETS_URL }}
         run: |
-          curl -L -o game-assets.zip "${{ secrets.GAME_ASSETS_URL }}"
-          mkdir -p musedash
-          unzip -q game-assets.zip -d musedash
-          echo "MD_NET6_DIRECTORY=$(pwd)/musedash" >> "$GITHUB_ENV"
+          if [ -n "$GAME_ASSETS_URL" ]; then
+            curl -L -o game-assets.zip "$GAME_ASSETS_URL"
+            mkdir -p musedash
+            unzip -q game-assets.zip -d musedash
+            echo "MD_NET6_DIRECTORY=$(pwd)/musedash" >> "$GITHUB_ENV"
+          else
+            echo "GAME_ASSETS_URL not set, skipping full mod build"
+          fi
 
       - name: Build full mod
         if: ${{ env.MD_NET6_DIRECTORY != '' }}
