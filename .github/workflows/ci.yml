@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+permissions:
+  contents: read
+
+jobs:
+  build-protocol:
+    name: Build MDEN.Protocol
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 6
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '6.0.x'
+
+      - name: Cache NuGet
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('MDEN.Protocol/MDEN.Protocol.csproj') }}
+          restore-keys: ${{ runner.os }}-nuget-
+
+      - name: Restore
+        run: dotnet restore MDEN.Protocol/MDEN.Protocol.csproj
+
+      - name: Build
+        run: dotnet build MDEN.Protocol/MDEN.Protocol.csproj -c Release --no-restore
+
+      - name: Upload MDEN.Protocol
+        uses: actions/upload-artifact@v4
+        with:
+          name: MDEN.Protocol
+          path: MDEN.Protocol/bin/Release/net6.0/MDEN.Protocol.dll
+          if-no-files-found: error
