@@ -1,28 +1,25 @@
-using LocalizeLib;
 using MDEN.Managers;
 using MDEN.UI.Core;
-using PopupLib.UI.Components;
-using PopupLib.UI.Windows;
 using UnityEngine;
 
 namespace MDEN.UI.Windows
 {
     public class SettingsWindow : MDENWindowBase
     {
-        private ForumWindow _window;
-        private ForumObject _btnBack;
-        private ForumObject _btnFavGirlDisplayForOthers;
-        private ForumObject _btnHideBattleHealthBar;
-        private ForumObject _btnVerboseLogs;
+        private NativeListWindow _window;
+        private NativeListItem _btnBack;
+        private NativeListItem _btnFavGirlDisplayForOthers;
+        private NativeListItem _btnHideBattleHealthBar;
+        private NativeListItem _btnVerboseLogs;
         private int _lastSelectedIndex = -1;
 
         public override void Show()
         {
-            _window = new ForumWindow();
+            _window = new NativeListWindow();
             _window.AutoReset = true;
             BuildList();
             _window.OnSelectionChanged += OnSelectionChanged;
-            _window.OnInternalShow += OnInternalShowInjectTitle;
+            _window.Title = "设置";
             _window.Show();
             _lastSelectedIndex = -1;
 
@@ -31,16 +28,13 @@ namespace MDEN.UI.Windows
                 if (_window != null)
                 {
                     _window.OnSelectionChanged -= OnSelectionChanged;
-                    _window.OnInternalShow -= OnInternalShowInjectTitle;
                 }
-
-                RemoveInjectedTitle();
             });
         }
 
         private void BuildList()
         {
-            _window.ForumObjects.Clear();
+            _window.Items.Clear();
 
             _btnBack = CreateButton("- 返回 -", "回到主菜单");
             _btnFavGirlDisplayForOthers = CreateButton(
@@ -54,11 +48,11 @@ namespace MDEN.UI.Windows
                 $"显示客户端调试日志和警告日志\n当前设置：{FormatSwitchState(ModConfigManager.EnableVerboseLogs)}");
         }
 
-        private ForumObject CreateButton(string title, string description)
+        private NativeListItem CreateButton(string title, string description)
         {
-            var button = new ForumObject(new LocalString(title), new LocalString(description));
+            var button = new NativeListItem(title, description);
             button.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("OptionsPanel.png")?.texture;
-            _window.ForumObjects.Add(button);
+            _window.Items.Add(button);
             return button;
         }
 
@@ -69,9 +63,9 @@ namespace MDEN.UI.Windows
                 : "<color=ff4444ff>关闭</color>";
         }
 
-        private void OnSelectionChanged(PopupLib.UI.Windows.Interfaces.IListWindow window, int objectIndex)
+        private void OnSelectionChanged(INativeListWindow window, int objectIndex)
         {
-            if (_window == null || objectIndex < 0 || objectIndex >= _window.ForumObjects.Count) return;
+            if (_window == null || objectIndex < 0 || objectIndex >= _window.Items.Count) return;
 
             if (_lastSelectedIndex != objectIndex)
             {
@@ -79,7 +73,7 @@ namespace MDEN.UI.Windows
                 return;
             }
 
-            var button = _window.ForumObjects[objectIndex];
+            var button = _window.Items[objectIndex];
             if (button == _btnBack)
             {
                 Close();
@@ -115,59 +109,14 @@ namespace MDEN.UI.Windows
             if (_window == null) return;
 
             _window.OnSelectionChanged -= OnSelectionChanged;
-            _window.OnInternalShow -= OnInternalShowInjectTitle;
             _window.ForceClose();
-            _window = new ForumWindow();
+            _window = new NativeListWindow();
             _window.AutoReset = true;
+            _window.Title = "设置";
             BuildList();
             _window.OnSelectionChanged += OnSelectionChanged;
-            _window.OnInternalShow += OnInternalShowInjectTitle;
             _window.Show();
             _lastSelectedIndex = -1;
-        }
-
-        private void OnInternalShowInjectTitle(PopupLib.UI.Windows.Abstract.BaseWindow w)
-        {
-            var uiForward = GameObject.Find("UI/Forward");
-            var pnlBulletin = uiForward?.transform.Find("Tips/PnlBulletinNew");
-            var imgBase = pnlBulletin?.Find("ImgBase");
-            var txtTitleObj = pnlBulletin?.Find("TxtTittle");
-            if (imgBase == null || txtTitleObj == null) return;
-
-            RemoveInjectedTitle();
-
-            var newTitle = GameObject.Instantiate(txtTitleObj.gameObject, imgBase);
-            newTitle.name = "MDENTitle";
-            newTitle.SetActive(true);
-
-            var loc = newTitle.GetComponent<Il2CppAssets.Scripts.PeroTools.GeneralLocalization.Localization>();
-            if (loc != null) UnityEngine.Object.Destroy(loc);
-
-            var text = newTitle.GetComponent<UnityEngine.UI.Text>();
-            if (text != null)
-            {
-                text.text = "设置";
-                text.alignment = TextAnchor.MiddleCenter;
-            }
-
-            var rect = newTitle.GetComponent<RectTransform>();
-            if (rect != null)
-            {
-                rect.anchorMin = new Vector2(0.5f, 1f);
-                rect.anchorMax = new Vector2(0.5f, 1f);
-                rect.pivot = new Vector2(0.5f, 0.5f);
-                rect.anchoredPosition = new Vector2(0f, 12f);
-            }
-        }
-
-        private void RemoveInjectedTitle()
-        {
-            var panel = GameObject.Find("UI/Forward/Tips/PnlBulletinNew");
-            if (panel == null) return;
-
-            var titleTrans = panel.transform.Find("ImgBase/ScrollView/MDENTitle");
-            if (titleTrans == null) titleTrans = panel.transform.Find("ImgBase/MDENTitle");
-            if (titleTrans != null) UnityEngine.Object.Destroy(titleTrans.gameObject);
         }
 
         public override void Close()

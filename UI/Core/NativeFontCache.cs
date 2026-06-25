@@ -35,7 +35,8 @@ namespace MDEN.UI.Core
                 var candidates = Resources.FindObjectsOfTypeAll<Text>();
                 foreach (var text in candidates)
                 {
-                    if (text == null || text.font == null) continue;
+                    if (!IsCandidate(text)) continue;
+
                     var fontName = text.font.name ?? string.Empty;
                     if (fontName.Contains("Arial")) continue;
 
@@ -46,6 +47,29 @@ namespace MDEN.UI.Core
             }
 
             return false;
+        }
+
+        // Skip Text components that belong to the mod's own UI hierarchy.
+        // These may not have their font configured yet (NativeFontCache.ApplyTo
+        // hasn't run on them), so caching their font would capture a stale or
+        // fallback font instead of the game's native CJK font.
+        private static bool IsCandidate(Text text)
+        {
+            if (text == null || text.font == null || text.transform == null) return false;
+
+            for (var current = text.transform; current != null; current = current.parent)
+            {
+                var name = current.name ?? string.Empty;
+                if (name == "MDENListWindowRoot" ||
+                    name == "MDENInputDialogRoot" ||
+                    name == "MDENConfirmDialogRoot" ||
+                    name == "BtnMDENMultiplayer")
+                {
+                    return false;
+                }
+            }
+
+            return true;
         }
     }
 }

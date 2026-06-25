@@ -4,7 +4,7 @@ using MelonLoader;
 
 namespace MDEN.UI.Core
 {
-    // 弹窗基类，托管事件生命周期，防止幽灵按键残留
+    // 原生窗口基类，托管事件生命周期，防止幽灵按键残留
     public abstract class MDENWindowBase : IDisposable
     {
         private readonly List<Action> _eventUnsubscribers = new List<Action>();
@@ -20,10 +20,10 @@ namespace MDEN.UI.Core
             }
         }
 
-        // 向 PopupLib 提交生成 Window
+        // 构建并显示原生窗口
         public abstract void Show();
 
-        // 向 PopupLib 发送关闭指令
+        // 关闭并销毁原生窗口
         public abstract void Close();
 
         // 统一销毁流程，自动解绑所有事件

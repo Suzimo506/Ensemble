@@ -4,6 +4,12 @@ using UnityEngine.UI;
 
 namespace MDEN.Patches
 {
+    /// <summary>
+    /// Safety-net patch that suppresses ghost Toggle clicks while a native MDEN
+    /// window is open. With native UI blocking input via isStopKeyAction, this
+    /// patch is a secondary guard — if a native window is active, ALL Toggle
+    /// clicks are suppressed (not just bulletin panel toggles).
+    /// </summary>
     [HarmonyPatch(typeof(Toggle), "OnPointerClick")]
     internal static class ToggleGhostClickPatch
     {
@@ -11,7 +17,6 @@ namespace MDEN.Patches
         {
             __state = null;
             if (__instance == null || !IsMDENPopupWindowActive()) return;
-            if (!IsBulletinListToggle(__instance)) return;
 
             __state = __instance.onValueChanged;
             __instance.onValueChanged = new Toggle.ToggleEvent();
@@ -24,23 +29,18 @@ namespace MDEN.Patches
             __instance.onValueChanged = __state;
         }
 
+        /// <summary>
+        /// Checks whether any native MDEN window root GameObject is active in the scene.
+        /// </summary>
         private static bool IsMDENPopupWindowActive()
         {
-            return HasActiveTitle("UI/Forward/Tips/PnlBulletinNew/ImgBase/MDENTitle") ||
-                   HasActiveTitle("UI/Forward/Tips/PnlBulletinNew/ImgBase/ScrollView/MDENTitle");
-        }
-
-        private static bool HasActiveTitle(string path)
-        {
-            var obj = GameObject.Find(path);
-            return obj != null && obj.activeInHierarchy;
-        }
-
-        private static bool IsBulletinListToggle(Toggle toggle)
-        {
-            var transform = toggle.transform;
-            if (toggle.gameObject.name.Contains("Bulletin")) return true;
-            return transform.parent != null && transform.parent.name == "Content";
+            var listWindow = GameObject.Find("MDENListWindowRoot");
+            if (listWindow != null && listWindow.activeInHierarchy) return true;
+            var dialog = GameObject.Find("MDENInputDialogRoot");
+            if (dialog != null && dialog.activeInHierarchy) return true;
+            var confirm = GameObject.Find("MDENConfirmDialogRoot");
+            if (confirm != null && confirm.activeInHierarchy) return true;
+            return false;
         }
     }
 }

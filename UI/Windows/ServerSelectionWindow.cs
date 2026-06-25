@@ -2,12 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using UnityEngine;
-using PopupLib.UI.Windows;
-using PopupLib.UI.Components;
 using MDEN.Managers;
 using MDEN.Network; // 仅引用 DTO
 using MDEN.Protocol.Messages.System;
-using LocalizeLib;
 using MDEN.UI.Core;
 using MelonLoader;
 
@@ -15,13 +12,13 @@ namespace MDEN.UI.Windows
 {
     public class ServerSelectionWindow : MDENWindowBase
     {
-        private ForumWindow _window;
-        private ForumObject _btnBack;
-        private ForumObject _btnRefresh;
-        private List<ForumObject> _officialNodes = new List<ForumObject>();
-        private List<ForumObject> _customNodes = new List<ForumObject>();
-        private ForumObject _btnAddServer;
-        private ForumObject _btnJoinServer;
+        private NativeListWindow _window;
+        private NativeListItem _btnBack;
+        private NativeListItem _btnRefresh;
+        private List<NativeListItem> _officialNodes = new List<NativeListItem>();
+        private List<NativeListItem> _customNodes = new List<NativeListItem>();
+        private NativeListItem _btnAddServer;
+        private NativeListItem _btnJoinServer;
         private static List<ApiServerEntry> _officialServerData = new List<ApiServerEntry>();
         private static List<Tuple<string, string>> _officialNodeDisplayData = new List<Tuple<string, string>>();
         private static List<string> _officialNodePlainNames = new List<string>();
@@ -32,7 +29,7 @@ namespace MDEN.UI.Windows
 
         public override void Show()
         {
-            _window = new ForumWindow();
+            _window = new NativeListWindow();
             _window.AutoReset = true;
             
             // 构建无官方节点的初始列表
@@ -40,7 +37,7 @@ namespace MDEN.UI.Windows
             BuildList();
 
             _window.OnSelectionChanged += OnSelectionChanged;
-            _window.OnInternalShow += OnInternalShowInjectTitle;
+            _window.Title = "节点列表";
             _window.Show();
             _lastSelectedIndex = -1; // 在 Show 之后重置选择索引
             RegisterWindowCleanup();
@@ -61,53 +58,6 @@ namespace MDEN.UI.Windows
             }
         }
 
-        private void InjectTitle()
-        {
-            var uiForward = GameObject.Find("UI/Forward");
-            if (uiForward != null)
-            {
-                var pnlBulletin = uiForward.transform.Find("Tips/PnlBulletinNew");
-                if (pnlBulletin != null)
-                {
-                    var imgBase = pnlBulletin.Find("ImgBase");
-                    if (imgBase != null)
-                    {
-                        var oldTitle = imgBase.Find("MDENTitle");
-                        if (oldTitle != null) UnityEngine.Object.Destroy(oldTitle.gameObject);
-                        var oldTitleInScroll = imgBase.Find("ScrollView/MDENTitle");
-                        if (oldTitleInScroll != null) UnityEngine.Object.Destroy(oldTitleInScroll.gameObject);
-
-                        var txtTittleObj = pnlBulletin.Find("TxtTittle");
-                        if (txtTittleObj != null)
-                        {
-                            var newTitle = GameObject.Instantiate(txtTittleObj.gameObject, imgBase);
-                            newTitle.name = "MDENTitle";
-                            newTitle.SetActive(true);
-
-                            var loc = newTitle.GetComponent<Il2CppAssets.Scripts.PeroTools.GeneralLocalization.Localization>();
-                            if (loc != null) UnityEngine.Object.Destroy(loc);
-
-                            var txt = newTitle.GetComponent<UnityEngine.UI.Text>();
-                            if (txt != null)
-                            {
-                                txt.text = "节点列表";
-                                txt.alignment = UnityEngine.TextAnchor.MiddleCenter;
-                            }
-
-                            var titleRect = newTitle.GetComponent<RectTransform>();
-                            if (titleRect != null)
-                            {
-                                titleRect.anchorMin = new Vector2(0.5f, 1f);
-                                titleRect.anchorMax = new Vector2(0.5f, 1f);
-                                titleRect.pivot = new Vector2(0.5f, 0.5f);
-                                titleRect.anchoredPosition = new Vector2(0f, 12f);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
         private void RegisterWindowCleanup()
         {
             RegisterEventCleanup(() => 
@@ -115,22 +65,8 @@ namespace MDEN.UI.Windows
                 if (_window != null)
                 {
                     _window.OnSelectionChanged -= OnSelectionChanged;
-                    _window.OnInternalShow -= OnInternalShowInjectTitle;
                 }
-                
-                RemoveInjectedTitle();
             });
-        }
-
-        private void RemoveInjectedTitle()
-        {
-            var panel = GameObject.Find("UI/Forward/Tips/PnlBulletinNew");
-            if (panel != null)
-            {
-                var titleTrans = panel.transform.Find("ImgBase/ScrollView/MDENTitle");
-                if (titleTrans == null) titleTrans = panel.transform.Find("ImgBase/MDENTitle");
-                if (titleTrans != null) UnityEngine.Object.Destroy(titleTrans.gameObject);
-            }
         }
 
         private async Task RefreshNodesAsync(bool forceRefresh = false)
@@ -260,7 +196,7 @@ namespace MDEN.UI.Windows
             for (int i = 0; i < ModConfigManager.CustomServers.Count; i++)
             {
                 var cs = ModConfigManager.CustomServers[i];
-                var fo = new ForumObject(new LocalString($"<color={Constants.ColorBlue}>{cs.Name}</color>"), new LocalString(BuildCustomServerDescription(cs)));
+                var fo = new NativeListItem($"<color={Constants.ColorBlue}>{cs.Name}</color>", BuildCustomServerDescription(cs));
                 fo.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("HomePanel.png")?.texture;
                 _customNodes.Add(fo);
             }
@@ -316,67 +252,61 @@ namespace MDEN.UI.Windows
             if (_window != null) 
             {
                 _window.OnSelectionChanged -= OnSelectionChanged;
-                _window.OnInternalShow -= OnInternalShowInjectTitle;
                 _window.ForceClose();
-                _window = new ForumWindow();
+                _window = new NativeListWindow();
                 _window.AutoReset = true;
+                _window.Title = "节点列表";
                 RebuildCustomNodes();
                 BuildList();
                 _window.OnSelectionChanged += OnSelectionChanged;
-                _window.OnInternalShow += OnInternalShowInjectTitle;
                 _window.Show();
                 _lastSelectedIndex = -1; // 在 Show 之后重置选择索引
             }
         }
 
-        private void OnInternalShowInjectTitle(PopupLib.UI.Windows.Abstract.BaseWindow w)
-        {
-            InjectTitle();
-        }
-
         private void BuildList()
         {
-            _window.ForumObjects.Clear();
+            _window.Items.Clear();
             _lastSelectedIndex = -1; // 重建时清除选中状态
 
-            _btnBack = new ForumObject(new LocalString("- 返回 -"), new LocalString("回到上一个窗口"));
+            _btnBack = new NativeListItem("- 返回 -", "回到上一个窗口");
             _btnBack.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("OptionsPanel.png")?.texture;
-            _window.ForumObjects.Add(_btnBack);
+            _window.Items.Add(_btnBack);
 
-            _btnRefresh = new ForumObject(new LocalString("- 刷新 -"), new LocalString("重新获取最新的服务器节点"));
+            _btnRefresh = new NativeListItem("- 刷新 -", "重新获取最新的服务器节点");
             _btnRefresh.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("RoomList.png")?.texture;
-            _window.ForumObjects.Add(_btnRefresh);
+            _window.Items.Add(_btnRefresh);
 
             _officialNodes.Clear();
             foreach (var data in _officialNodeDisplayData)
             {
-                var fo = new ForumObject(new LocalString(data.Item1), new LocalString(data.Item2));
+                var fo = new NativeListItem(data.Item1, data.Item2);
                 fo.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("PlayerCard.png")?.texture;
                 _officialNodes.Add(fo);
             }
 
             foreach (var node in _officialNodes)
             {
-                _window.ForumObjects.Add(node);
+                _window.Items.Add(node);
             }
 
             foreach (var node in _customNodes)
             {
-                _window.ForumObjects.Add(node);
+                _window.Items.Add(node);
             }
 
-            _btnAddServer = new ForumObject(new LocalString("- 添加服务器 -"), new LocalString("添加私人服务器长期到列表"));
+            _btnAddServer = new NativeListItem("- 添加服务器 -", "添加私人服务器长期到列表");
             _btnAddServer.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("OptionsPanel.png")?.texture;
-            _window.ForumObjects.Add(_btnAddServer);
+            _window.Items.Add(_btnAddServer);
 
-            _btnJoinServer = new ForumObject(new LocalString("- 加入服务器 -"), new LocalString("临时加入私人服务器"));
+            _btnJoinServer = new NativeListItem("- 加入服务器 -", "临时加入私人服务器");
             _btnJoinServer.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("SocialNetwork.png")?.texture;
-            _window.ForumObjects.Add(_btnJoinServer);
+            _window.Items.Add(_btnJoinServer);
         }
 
-        private async void OnSelectionChanged(PopupLib.UI.Windows.Interfaces.IListWindow window, int objectIndex)
+        private async void OnSelectionChanged(INativeListWindow window, int objectIndex)
         {
-            if (objectIndex < 0 || objectIndex >= _window.ForumObjects.Count) return;
+            if (objectIndex < 0 || objectIndex >= _window.Items.Count) return;
 
             // 第一次点击只会选中并且展示右侧文本，第二次点击才生效
             if (_lastSelectedIndex != objectIndex)
@@ -385,7 +315,7 @@ namespace MDEN.UI.Windows
                 return;
             }
 
-            var button = _window.ForumObjects[objectIndex];
+            var button = _window.Items[objectIndex];
 
             if (button == _btnBack)
             {
@@ -401,7 +331,7 @@ namespace MDEN.UI.Windows
             {
                 if (_window != null) _window.ForceClose(); // 必须先关闭当前窗体，否则会被挡住
 
-                var input = new InputWindow();
+                var input = new NativeInputDialog();
                 input.OnCompletion += async (w) => 
                 {
                     var res = input.Result;
@@ -412,7 +342,7 @@ namespace MDEN.UI.Windows
                         await RefreshNodesAsync(true);
                     }
                     
-                    // 刷新会重建 ForumWindow
+                    // 刷新会重建 NativeListWindow
                     RebuildWindowOnMainThread();
                 };
                 input.Show();
@@ -421,7 +351,7 @@ namespace MDEN.UI.Windows
             {
                 if (_window != null) _window.ForceClose();
 
-                var input = new InputWindow();
+                var input = new NativeInputDialog();
                 input.OnCompletion += async (w) => 
                 {
                 var res = input.Result;

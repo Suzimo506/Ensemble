@@ -2,11 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
-using LocalizeLib;
 using MDEN.Managers;
 using MDEN.UI.Core;
-using PopupLib.UI.Components;
-using PopupLib.UI.Windows;
 using ShowText = Il2CppAssets.Scripts.UI.Controls.ShowText;
 using UnityEngine;
 
@@ -14,10 +11,10 @@ namespace MDEN.UI.Windows
 {
     public class AvatarPickerWindow : MDENWindowBase
     {
-        private ForumWindow _window;
-        private ForumObject _btnBack;
-        private readonly Dictionary<ForumObject, AvatarLibraryItem> _avatarItems =
-            new Dictionary<ForumObject, AvatarLibraryItem>();
+        private NativeListWindow _window;
+        private NativeListItem _btnBack;
+        private readonly Dictionary<NativeListItem, AvatarLibraryItem> _avatarItems =
+            new Dictionary<NativeListItem, AvatarLibraryItem>();
         private int _lastSelectedIndex = -1;
 
         public override void Show()
@@ -25,24 +22,23 @@ namespace MDEN.UI.Windows
             ModConfigManager.LoadConfig();
             EnsureAvatarLibraryFolder();
 
-            _window = new ForumWindow();
+            _window = new NativeListWindow();
             _window.AutoReset = true;
             BuildList();
             _window.OnSelectionChanged += OnSelectionChanged;
-            _window.OnInternalShow += OnInternalShowInjectTitle;
+            _window.Title = "选择头像";
             _window.Show();
             _lastSelectedIndex = -1;
 
             RegisterEventCleanup(() =>
             {
                 UnbindWindowEvents();
-                RemoveInjectedTitle();
             });
         }
 
         private void BuildList()
         {
-            _window.ForumObjects.Clear();
+            _window.Items.Clear();
             _avatarItems.Clear();
 
             _btnBack = AddButton("- 返回 -", "回到个人信息");
@@ -64,11 +60,11 @@ namespace MDEN.UI.Windows
             }
         }
 
-        private ForumObject AddButton(string title, string description)
+        private NativeListItem AddButton(string title, string description)
         {
-            var button = new ForumObject(new LocalString(title), new LocalString(description));
+            var button = new NativeListItem(title, description);
             button.Texture = GetListBannerTexture();
-            _window.ForumObjects.Add(button);
+            _window.Items.Add(button);
             return button;
         }
 
@@ -84,9 +80,9 @@ namespace MDEN.UI.Windows
                    $"当前头像文件夹：{EscapeRichText(AvatarManager.GetAvatarLibraryFolder())}</color>";
         }
 
-        private async void OnSelectionChanged(PopupLib.UI.Windows.Interfaces.IListWindow window, int objectIndex)
+        private async void OnSelectionChanged(INativeListWindow window, int objectIndex)
         {
-            if (_window == null || objectIndex < 0 || objectIndex >= _window.ForumObjects.Count) return;
+            if (_window == null || objectIndex < 0 || objectIndex >= _window.Items.Count) return;
 
             if (_lastSelectedIndex != objectIndex)
             {
@@ -94,7 +90,7 @@ namespace MDEN.UI.Windows
                 return;
             }
 
-            var button = _window.ForumObjects[objectIndex];
+            var button = _window.Items[objectIndex];
             if (button == _btnBack)
             {
                 GoBack();
@@ -165,11 +161,11 @@ namespace MDEN.UI.Windows
 
             UnbindWindowEvents();
             _window.ForceClose();
-            _window = new ForumWindow();
+            _window = new NativeListWindow();
             _window.AutoReset = true;
+            _window.Title = "选择头像";
             BuildList();
             _window.OnSelectionChanged += OnSelectionChanged;
-            _window.OnInternalShow += OnInternalShowInjectTitle;
             _window.Show();
             _lastSelectedIndex = -1;
         }
@@ -180,50 +176,6 @@ namespace MDEN.UI.Windows
             WindowStackController.OpenWindow(new ProfileWindow());
         }
 
-        private void OnInternalShowInjectTitle(PopupLib.UI.Windows.Abstract.BaseWindow w)
-        {
-            var uiForward = GameObject.Find("UI/Forward");
-            var pnlBulletin = uiForward?.transform.Find("Tips/PnlBulletinNew");
-            var imgBase = pnlBulletin?.Find("ImgBase");
-            var txtTitleObj = pnlBulletin?.Find("TxtTittle");
-            if (imgBase == null || txtTitleObj == null) return;
-
-            RemoveInjectedTitle();
-
-            var newTitle = GameObject.Instantiate(txtTitleObj.gameObject, imgBase);
-            newTitle.name = "MDENAvatarPickerTitle";
-            newTitle.SetActive(true);
-
-            var loc = newTitle.GetComponent<Il2CppAssets.Scripts.PeroTools.GeneralLocalization.Localization>();
-            if (loc != null) UnityEngine.Object.Destroy(loc);
-
-            var text = newTitle.GetComponent<UnityEngine.UI.Text>();
-            if (text != null)
-            {
-                text.text = "选择头像";
-                text.alignment = TextAnchor.MiddleCenter;
-            }
-
-            var rect = newTitle.GetComponent<RectTransform>();
-            if (rect != null)
-            {
-                rect.anchorMin = new Vector2(0.5f, 1f);
-                rect.anchorMax = new Vector2(0.5f, 1f);
-                rect.pivot = new Vector2(0.5f, 0.5f);
-                rect.anchoredPosition = new Vector2(0f, 12f);
-            }
-        }
-
-        private static void RemoveInjectedTitle()
-        {
-            var panel = GameObject.Find("UI/Forward/Tips/PnlBulletinNew");
-            if (panel == null) return;
-
-            var titleTrans = panel.transform.Find("ImgBase/ScrollView/MDENAvatarPickerTitle");
-            if (titleTrans == null) titleTrans = panel.transform.Find("ImgBase/MDENAvatarPickerTitle");
-            if (titleTrans != null) UnityEngine.Object.Destroy(titleTrans.gameObject);
-        }
-
         private static string EscapeRichText(string value)
         {
             return value?.Replace("<", "＜").Replace(">", "＞") ?? string.Empty;
@@ -232,7 +184,6 @@ namespace MDEN.UI.Windows
         public override void Close()
         {
             _lastSelectedIndex = -1;
-            RemoveInjectedTitle();
             if (_window != null)
             {
                 UnbindWindowEvents();
@@ -246,7 +197,6 @@ namespace MDEN.UI.Windows
             if (_window == null) return;
 
             _window.OnSelectionChanged -= OnSelectionChanged;
-            _window.OnInternalShow -= OnInternalShowInjectTitle;
         }
     }
 }

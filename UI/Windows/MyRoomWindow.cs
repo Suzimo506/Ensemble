@@ -2,29 +2,26 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using LocalizeLib;
 using MDEN.Managers;
 using MDEN.Protocol.Enums;
 using MDEN.Protocol.Messages.Lobby;
 using MDEN.Protocol.Models;
 using MDEN.Protocol.Rules;
 using MDEN.UI.Core;
-using PopupLib.UI.Components;
-using PopupLib.UI.Windows;
 using UnityEngine;
 
 namespace MDEN.UI.Windows
 {
     public class MyRoomWindow : MDENWindowBase
     {
-        private ForumWindow _window;
-        private ForumObject _btnLeave;
-        private ForumObject _btnPlayMode;
-        private ForumObject _btnGoal;
-        private ForumObject _btnSettlement;
-        private ForumObject _btnJoinLock;
-        private ForumObject _btnPassword;
-        private readonly Dictionary<ForumObject, PlayerSyncEntry> _playerItems = new Dictionary<ForumObject, PlayerSyncEntry>();
+        private NativeListWindow _window;
+        private NativeListItem _btnLeave;
+        private NativeListItem _btnPlayMode;
+        private NativeListItem _btnGoal;
+        private NativeListItem _btnSettlement;
+        private NativeListItem _btnJoinLock;
+        private NativeListItem _btnPassword;
+        private readonly Dictionary<NativeListItem, PlayerSyncEntry> _playerItems = new Dictionary<NativeListItem, PlayerSyncEntry>();
         private readonly Dictionary<string, double?> _ratingLevels = new Dictionary<string, double?>();
         private readonly HashSet<string> _loadingRatingLevels = new HashSet<string>();
         private int _lastSelectedIndex = -1;
@@ -42,13 +39,13 @@ namespace MDEN.UI.Windows
         {
             if (IsDisposed) return;
 
-            _window = new ForumWindow();
+            _window = new NativeListWindow();
             _window.AutoReset = true;
             BuildList();
             _lastLobbyRefreshKey = BuildLobbyRefreshKey(LobbyManager.CurrentLobby);
             LobbyManager.CurrentLobbyChanged += HandleCurrentLobbyChanged;
             _window.OnSelectionChanged += OnSelectionChanged;
-            _window.OnInternalShow += OnInternalShowInjectTitle;
+            _window.Title = "我的房间";
             _window.Show();
             _lastSelectedIndex = -1;
 
@@ -59,10 +56,7 @@ namespace MDEN.UI.Windows
                 if (_window != null)
                 {
                     _window.OnSelectionChanged -= OnSelectionChanged;
-                    _window.OnInternalShow -= OnInternalShowInjectTitle;
                 }
-
-                RemoveInjectedTitle();
             });
         }
 
@@ -205,7 +199,7 @@ namespace MDEN.UI.Windows
 
         private void BuildList()
         {
-            _window.ForumObjects.Clear();
+            _window.Items.Clear();
             _playerItems.Clear();
             _lastSelectedIndex = -1;
 
@@ -214,29 +208,29 @@ namespace MDEN.UI.Windows
                 ? "Not in lobby."
                 : BuildRoomSummary(lobby);
 
-            _btnLeave = new ForumObject(new LocalString("- 退出房间 -"), new LocalString("离开当前联机房间"));
+            _btnLeave = new NativeListItem("- 退出房间 -", "离开当前联机房间");
             _btnLeave.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("HomePanel.png")?.texture;
-            _window.ForumObjects.Add(_btnLeave);
+            _window.Items.Add(_btnLeave);
 
             if (lobby != null)
             {
-                _btnPlayMode = new ForumObject(
-                    new LocalString("游玩模式"),
-                    new LocalString($"当前: {Highlight(LobbyRuleTextFormatter.GetPlayModeName(lobby.PlayMode), LobbyRuleTextFormatter.GetPlayModeColor(lobby.PlayMode))}\n点击切换为{Highlight(LobbyRuleTextFormatter.GetPlayModeName((byte)LobbyRuleTextFormatter.GetNextPlayMode(lobby.PlayMode)), LobbyRuleTextFormatter.GetPlayModeColor((byte)LobbyRuleTextFormatter.GetNextPlayMode(lobby.PlayMode)))}"));
+                _btnPlayMode = new NativeListItem(
+                    "游玩模式",
+                    $"当前: {Highlight(LobbyRuleTextFormatter.GetPlayModeName(lobby.PlayMode), LobbyRuleTextFormatter.GetPlayModeColor(lobby.PlayMode))}\n点击切换为{Highlight(LobbyRuleTextFormatter.GetPlayModeName((byte)LobbyRuleTextFormatter.GetNextPlayMode(lobby.PlayMode)), LobbyRuleTextFormatter.GetPlayModeColor((byte)LobbyRuleTextFormatter.GetNextPlayMode(lobby.PlayMode)))}");
                 _btnPlayMode.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("OptionsPanel.png")?.texture;
-                _window.ForumObjects.Add(_btnPlayMode);
+                _window.Items.Add(_btnPlayMode);
 
-                _btnGoal = new ForumObject(
-                    new LocalString("获胜方式"),
-                    new LocalString($"当前: {Highlight(GetGoalName(lobby.Goal), Constants.ColorYellow)}\n点击切换为{Highlight(GetGoalName(GetNextGoal(lobby.Goal)), Constants.ColorCyan)}"));
+                _btnGoal = new NativeListItem(
+                    "获胜方式",
+                    $"当前: {Highlight(GetGoalName(lobby.Goal), Constants.ColorYellow)}\n点击切换为{Highlight(GetGoalName(GetNextGoal(lobby.Goal)), Constants.ColorCyan)}");
                 _btnGoal.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("SocialNetwork.png")?.texture;
-                _window.ForumObjects.Add(_btnGoal);
+                _window.Items.Add(_btnGoal);
 
-                _btnSettlement = new ForumObject(
-                    new LocalString("结算功能"),
-                    new LocalString($"当前: {Highlight(lobby.SettlementEnabled ? "开启" : "关闭", Constants.ColorYellow)}\n点击{Highlight(lobby.SettlementEnabled ? "关闭" : "开启", Constants.ColorCyan)}每五首结算"));
+                _btnSettlement = new NativeListItem(
+                    "结算功能",
+                    $"当前: {Highlight(lobby.SettlementEnabled ? "开启" : "关闭", Constants.ColorYellow)}\n点击{Highlight(lobby.SettlementEnabled ? "关闭" : "开启", Constants.ColorCyan)}每五首结算");
                 _btnSettlement.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("OptionsPanel.png")?.texture;
-                _window.ForumObjects.Add(_btnSettlement);
+                _window.Items.Add(_btnSettlement);
             }
             else
             {
@@ -247,17 +241,17 @@ namespace MDEN.UI.Windows
 
             if (lobby?.HostUid == PlayerManager.CurrentUid)
             {
-                _btnJoinLock = new ForumObject(
-                    new LocalString(lobby.JoinLocked ? "- 手动解锁 -" : "- 手动上锁 -"),
-                    new LocalString(lobby.JoinLocked ? "解锁后其他玩家可以加入房间" : "上锁后其他玩家不能加入房间"));
+                _btnJoinLock = new NativeListItem(
+                    lobby.JoinLocked ? "- 手动解锁 -" : "- 手动上锁 -",
+                    lobby.JoinLocked ? "解锁后其他玩家可以加入房间" : "上锁后其他玩家不能加入房间");
                 _btnJoinLock.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("OptionsPanel.png")?.texture;
-                _window.ForumObjects.Add(_btnJoinLock);
+                _window.Items.Add(_btnJoinLock);
 
-                _btnPassword = new ForumObject(
-                    new LocalString(lobby.IsPrivate ? "- 修改/清除密码 -" : "- 设置密码 -"),
-                    new LocalString(lobby.IsPrivate ? "当前房间需要密码加入，输入空内容可清除密码" : "设置后房间列表会显示（私密），加入时需要输入密码"));
+                _btnPassword = new NativeListItem(
+                    lobby.IsPrivate ? "- 修改/清除密码 -" : "- 设置密码 -",
+                    lobby.IsPrivate ? "当前房间需要密码加入，输入空内容可清除密码" : "设置后房间列表会显示（私密），加入时需要输入密码");
                 _btnPassword.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("SocialNetwork.png")?.texture;
-                _window.ForumObjects.Add(_btnPassword);
+                _window.Items.Add(_btnPassword);
             }
             else
             {
@@ -266,9 +260,9 @@ namespace MDEN.UI.Windows
             }
 
             var roomName = Highlight(EscapeRichText(lobby?.Name ?? "我的房间"), Constants.ColorYellow);
-            var info = new ForumObject(new LocalString(roomName), new LocalString(summary));
+            var info = new NativeListItem(roomName, summary);
             info.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("RoomList.png")?.texture;
-            _window.ForumObjects.Add(info);
+            _window.Items.Add(info);
 
             if (lobby?.PlayerDetails != null && lobby.PlayerDetails.Length > 0)
             {
@@ -290,9 +284,9 @@ namespace MDEN.UI.Windows
                         PingMS = player.PingMS,
                         Status = player.Status
                     };
-                    var item = new ForumObject(new LocalString(name), new LocalString(BuildPlayerDescription(entry)));
+                    var item = new NativeListItem(name, BuildPlayerDescription(entry));
                     item.Texture = AvatarManager.GetAvatarTexture(entry.Uid, entry.AvatarName, entry.AvatarData);
-                    _window.ForumObjects.Add(item);
+                    _window.Items.Add(item);
                     _playerItems[item] = entry;
                     RequestRatingLevel(entry.Uid);
                 }
@@ -315,9 +309,9 @@ namespace MDEN.UI.Windows
                         AvatarName = uid == PlayerManager.CurrentUid ? PlayerManager.CurrentProfile?.AvatarName : null,
                         AvatarData = uid == PlayerManager.CurrentUid ? PlayerManager.CurrentProfile?.AvatarData : null
                     };
-                    var item = new ForumObject(new LocalString(name), new LocalString(BuildPlayerDescription(entry)));
+                    var item = new NativeListItem(name, BuildPlayerDescription(entry));
                     item.Texture = AvatarManager.GetAvatarTexture(entry.Uid, entry.AvatarName, entry.AvatarData);
-                    _window.ForumObjects.Add(item);
+                    _window.Items.Add(item);
                     _playerItems[item] = entry;
                     RequestRatingLevel(entry.Uid);
                 }
@@ -434,9 +428,9 @@ namespace MDEN.UI.Windows
                 : value.Replace("&", "&amp;").Replace("<", "&lt;").Replace(">", "&gt;");
         }
 
-        private void OnSelectionChanged(PopupLib.UI.Windows.Interfaces.IListWindow window, int objectIndex)
+        private void OnSelectionChanged(INativeListWindow window, int objectIndex)
         {
-            if (_window == null || objectIndex < 0 || objectIndex >= _window.ForumObjects.Count) return;
+            if (_window == null || objectIndex < 0 || objectIndex >= _window.Items.Count) return;
 
             if (_lastSelectedIndex != objectIndex)
             {
@@ -444,7 +438,7 @@ namespace MDEN.UI.Windows
                 return;
             }
 
-            var button = _window.ForumObjects[objectIndex];
+            var button = _window.Items[objectIndex];
             if (button == _btnLeave)
             {
                 if (!CanLeaveLobby(LobbyManager.CurrentLobby)) return;
@@ -574,7 +568,7 @@ namespace MDEN.UI.Windows
                 _window.ForceClose();
             }
 
-            var input = new InputWindow();
+            var input = new NativeInputDialog();
             input.OnCompletion += (w) =>
             {
                 var value = input.Result?.Trim();
@@ -748,59 +742,6 @@ namespace MDEN.UI.Windows
             }
         }
 
-        private void OnInternalShowInjectTitle(PopupLib.UI.Windows.Abstract.BaseWindow w)
-        {
-            var uiForward = GameObject.Find("UI/Forward");
-            if (uiForward == null) return;
-
-            var pnlBulletin = uiForward.transform.Find("Tips/PnlBulletinNew");
-            if (pnlBulletin == null) return;
-
-            var imgBase = pnlBulletin.Find("ImgBase");
-            if (imgBase == null) return;
-
-            var oldTitle = imgBase.Find("MDENTitle");
-            if (oldTitle != null) UnityEngine.Object.Destroy(oldTitle.gameObject);
-            var oldTitleInScroll = imgBase.Find("ScrollView/MDENTitle");
-            if (oldTitleInScroll != null) UnityEngine.Object.Destroy(oldTitleInScroll.gameObject);
-
-            var txtTittleObj = pnlBulletin.Find("TxtTittle");
-            if (txtTittleObj == null) return;
-
-            var newTitle = UnityEngine.Object.Instantiate(txtTittleObj.gameObject, imgBase);
-            newTitle.name = "MDENTitle";
-            newTitle.SetActive(true);
-
-            var loc = newTitle.GetComponent<Il2CppAssets.Scripts.PeroTools.GeneralLocalization.Localization>();
-            if (loc != null) UnityEngine.Object.Destroy(loc);
-
-            var txt = newTitle.GetComponent<UnityEngine.UI.Text>();
-            if (txt != null)
-            {
-                txt.text = "我的房间";
-                txt.alignment = TextAnchor.MiddleCenter;
-            }
-
-            var titleRect = newTitle.GetComponent<RectTransform>();
-            if (titleRect != null)
-            {
-                titleRect.anchorMin = new Vector2(0.5f, 1f);
-                titleRect.anchorMax = new Vector2(0.5f, 1f);
-                titleRect.pivot = new Vector2(0.5f, 0.5f);
-                titleRect.anchoredPosition = new Vector2(0f, 12f);
-            }
-        }
-
-        private void RemoveInjectedTitle()
-        {
-            var panel = GameObject.Find("UI/Forward/Tips/PnlBulletinNew");
-            if (panel == null) return;
-
-            var titleTrans = panel.transform.Find("ImgBase/ScrollView/MDENTitle");
-            if (titleTrans == null) titleTrans = panel.transform.Find("ImgBase/MDENTitle");
-            if (titleTrans != null) UnityEngine.Object.Destroy(titleTrans.gameObject);
-        }
-
         public override void Close()
         {
             _lastSelectedIndex = -1;
@@ -816,14 +757,13 @@ namespace MDEN.UI.Windows
             if (_window == null) return;
 
             _window.OnSelectionChanged -= OnSelectionChanged;
-            _window.OnInternalShow -= OnInternalShowInjectTitle;
             _window.ForceClose();
-            _window = new ForumWindow();
+            _window = new NativeListWindow();
             _window.AutoReset = true;
+            _window.Title = "我的房间";
             BuildList();
             _lastLobbyRefreshKey = BuildLobbyRefreshKey(LobbyManager.CurrentLobby);
             _window.OnSelectionChanged += OnSelectionChanged;
-            _window.OnInternalShow += OnInternalShowInjectTitle;
             _window.Show();
             _lastSelectedIndex = -1;
         }

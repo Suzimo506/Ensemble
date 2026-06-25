@@ -1,29 +1,26 @@
 using System;
 using System.Threading.Tasks;
 using Il2CppAssets.Scripts.UI.Controls;
-using LocalizeLib;
 using MDEN.Managers;
 using MDEN.Protocol.Enums;
 using MDEN.UI.Core;
 using MelonLoader;
-using PopupLib.UI.Components;
-using PopupLib.UI.Windows;
 using UnityEngine;
 
 namespace MDEN.UI.Windows
 {
     public class CreateRoomWindow : MDENWindowBase
     {
-        private ForumWindow _window;
-        private ForumObject _btnBack;
-        private ForumObject _btnName;
-        private ForumObject _btnMaxPlayers;
-        private ForumObject _btnPlayMode;
-        private ForumObject _btnPlaylistSize;
-        private ForumObject _btnGoal;
-        private ForumObject _btnSettlement;
-        private ForumObject _btnPassword;
-        private ForumObject _btnCreate;
+        private NativeListWindow _window;
+        private NativeListItem _btnBack;
+        private NativeListItem _btnName;
+        private NativeListItem _btnMaxPlayers;
+        private NativeListItem _btnPlayMode;
+        private NativeListItem _btnPlaylistSize;
+        private NativeListItem _btnGoal;
+        private NativeListItem _btnSettlement;
+        private NativeListItem _btnPassword;
+        private NativeListItem _btnCreate;
         private int _lastSelectedIndex = -1;
         private bool _createInProgress;
 
@@ -37,11 +34,11 @@ namespace MDEN.UI.Windows
 
         public override void Show()
         {
-            _window = new ForumWindow();
+            _window = new NativeListWindow();
             _window.AutoReset = true;
             BuildList();
             _window.OnSelectionChanged += OnSelectionChanged;
-            _window.OnInternalShow += OnInternalShowInjectTitle;
+            _window.Title = "创建房间";
             _window.Show();
             _lastSelectedIndex = -1;
 
@@ -50,51 +47,48 @@ namespace MDEN.UI.Windows
                 if (_window != null)
                 {
                     _window.OnSelectionChanged -= OnSelectionChanged;
-                    _window.OnInternalShow -= OnInternalShowInjectTitle;
                 }
-
-                RemoveInjectedTitle();
             });
         }
 
         private void BuildList()
         {
-            _window.ForumObjects.Clear();
+            _window.Items.Clear();
             _lastSelectedIndex = -1;
 
-            _btnBack = new ForumObject(new LocalString("- 返回 -"), new LocalString("回到房间列表"));
+            _btnBack = new NativeListItem("- 返回 -", "回到房间列表");
             _btnBack.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("OptionsPanel.png")?.texture;
-            _window.ForumObjects.Add(_btnBack);
+            _window.Items.Add(_btnBack);
 
-            _btnName = new ForumObject(new LocalString("房间名称"), new LocalString($"房间名称: {HighlightValue(EscapeRichText(_roomName))}\n点击后输入房间名称，24字上限"));
+            _btnName = new NativeListItem("房间名称", $"房间名称: {HighlightValue(EscapeRichText(_roomName))}\n点击后输入房间名称，24字上限");
             _btnName.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("HomePanel.png")?.texture;
-            _window.ForumObjects.Add(_btnName);
+            _window.Items.Add(_btnName);
 
-            _btnMaxPlayers = new ForumObject(new LocalString("人数"), new LocalString($"最多人数: {HighlightValue(_maxPlayers)}\n点击后输入人数，范围 2-10"));
+            _btnMaxPlayers = new NativeListItem("人数", $"最多人数: {HighlightValue(_maxPlayers)}\n点击后输入人数，范围 2-10");
             _btnMaxPlayers.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("PlayerCard.png")?.texture;
-            _window.ForumObjects.Add(_btnMaxPlayers);
+            _window.Items.Add(_btnMaxPlayers);
 
-            _btnPlayMode = new ForumObject(
-                new LocalString("游玩模式"),
-                new LocalString($"游玩模式: {FormatPlayMode(_playMode)}\n点击切换为{FormatPlayMode(LobbyRuleTextFormatter.GetNextPlayMode((byte)_playMode))}"));
+            _btnPlayMode = new NativeListItem(
+                "游玩模式",
+                $"游玩模式: {FormatPlayMode(_playMode)}\n点击切换为{FormatPlayMode(LobbyRuleTextFormatter.GetNextPlayMode((byte)_playMode))}");
             _btnPlayMode.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("OptionsPanel.png")?.texture;
-            _window.ForumObjects.Add(_btnPlayMode);
+            _window.Items.Add(_btnPlayMode);
 
-            _btnPlaylistSize = new ForumObject(new LocalString("歌曲列表长度"), new LocalString($"列表长度: {HighlightValue(_playlistSize)}\n点击后输入歌曲列表长度，范围 2-32"));
+            _btnPlaylistSize = new NativeListItem("歌曲列表长度", $"列表长度: {HighlightValue(_playlistSize)}\n点击后输入歌曲列表长度，范围 2-32");
             _btnPlaylistSize.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("RoomList.png")?.texture;
-            _window.ForumObjects.Add(_btnPlaylistSize);
+            _window.Items.Add(_btnPlaylistSize);
 
-            _btnGoal = new ForumObject(new LocalString("获胜方式"), new LocalString($"获胜方式: {HighlightValue(GetGoalName())}\n点击在准确率和分数间切换"));
+            _btnGoal = new NativeListItem("获胜方式", $"获胜方式: {HighlightValue(GetGoalName())}\n点击在准确率和分数间切换");
             _btnGoal.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("SocialNetwork.png")?.texture;
-            _window.ForumObjects.Add(_btnGoal);
+            _window.Items.Add(_btnGoal);
 
-            _btnSettlement = new ForumObject(new LocalString("结算功能"), new LocalString($"结算功能: {HighlightValue(GetSettlementNamePlain())}\n开启后每五首歌弹出一次结算"));
+            _btnSettlement = new NativeListItem("结算功能", $"结算功能: {HighlightValue(GetSettlementNamePlain())}\n开启后每五首歌弹出一次结算");
             _btnSettlement.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("OptionsPanel.png")?.texture;
-            _window.ForumObjects.Add(_btnSettlement);
+            _window.Items.Add(_btnSettlement);
 
-            _btnPassword = new ForumObject(new LocalString("房间密码"), new LocalString($"密码: {HighlightValue(string.IsNullOrWhiteSpace(_password) ? "无" : "已设置")}\n输入空内容可清除密码，16字上限"));
+            _btnPassword = new NativeListItem("房间密码", $"密码: {HighlightValue(string.IsNullOrWhiteSpace(_password) ? "无" : "已设置")}\n输入空内容可清除密码，16字上限");
             _btnPassword.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("SocialNetwork.png")?.texture;
-            _window.ForumObjects.Add(_btnPassword);
+            _window.Items.Add(_btnPassword);
 
             var createTitle = _createInProgress
                 ? $"<color={Constants.ColorYellow}>- 创建中... -</color>"
@@ -102,14 +96,14 @@ namespace MDEN.UI.Windows
             var createDescription = _createInProgress
                 ? $"请求已提交，正在等待服务器回应\n名称: {HighlightValue(EscapeRichText(_roomName))}"
                 : BuildSummary();
-            _btnCreate = new ForumObject(new LocalString(createTitle), new LocalString(createDescription));
+            _btnCreate = new NativeListItem(createTitle, createDescription);
             _btnCreate.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("RoomList.png")?.texture;
-            _window.ForumObjects.Add(_btnCreate);
+            _window.Items.Add(_btnCreate);
         }
 
-        private async void OnSelectionChanged(PopupLib.UI.Windows.Interfaces.IListWindow window, int objectIndex)
+        private async void OnSelectionChanged(INativeListWindow window, int objectIndex)
         {
-            if (_window == null || objectIndex < 0 || objectIndex >= _window.ForumObjects.Count) return;
+            if (_window == null || objectIndex < 0 || objectIndex >= _window.Items.Count) return;
 
             if (_createInProgress)
             {
@@ -123,7 +117,7 @@ namespace MDEN.UI.Windows
                 return;
             }
 
-            var button = _window.ForumObjects[objectIndex];
+            var button = _window.Items[objectIndex];
             if (button == _btnBack)
             {
                 Close();
@@ -173,7 +167,7 @@ namespace MDEN.UI.Windows
                 _window.ForceClose();
             }
 
-            var input = new InputWindow();
+            var input = new NativeInputDialog();
             input.OnCompletion += (w) =>
             {
                 var value = input.Result?.Trim();
@@ -198,7 +192,7 @@ namespace MDEN.UI.Windows
                 _window.ForceClose();
             }
 
-            var input = new InputWindow();
+            var input = new NativeInputDialog();
             input.OnCompletion += (w) =>
             {
                 var value = input.Result?.Trim();
@@ -233,7 +227,7 @@ namespace MDEN.UI.Windows
                 _window.ForceClose();
             }
 
-            var input = new InputWindow();
+            var input = new NativeInputDialog();
             input.OnCompletion += (w) =>
             {
                 var value = input.Result?.Trim();
@@ -374,68 +368,14 @@ namespace MDEN.UI.Windows
             if (_window == null) return;
 
             _window.OnSelectionChanged -= OnSelectionChanged;
-            _window.OnInternalShow -= OnInternalShowInjectTitle;
             _window.ForceClose();
-            _window = new ForumWindow();
+            _window = new NativeListWindow();
             _window.AutoReset = true;
+            _window.Title = "创建房间";
             BuildList();
             _window.OnSelectionChanged += OnSelectionChanged;
-            _window.OnInternalShow += OnInternalShowInjectTitle;
             _window.Show();
             _lastSelectedIndex = -1;
-        }
-
-        private void OnInternalShowInjectTitle(PopupLib.UI.Windows.Abstract.BaseWindow w)
-        {
-            var uiForward = GameObject.Find("UI/Forward");
-            if (uiForward == null) return;
-
-            var pnlBulletin = uiForward.transform.Find("Tips/PnlBulletinNew");
-            if (pnlBulletin == null) return;
-
-            var imgBase = pnlBulletin.Find("ImgBase");
-            if (imgBase == null) return;
-
-            var oldTitle = imgBase.Find("MDENTitle");
-            if (oldTitle != null) UnityEngine.Object.Destroy(oldTitle.gameObject);
-            var oldTitleInScroll = imgBase.Find("ScrollView/MDENTitle");
-            if (oldTitleInScroll != null) UnityEngine.Object.Destroy(oldTitleInScroll.gameObject);
-
-            var txtTittleObj = pnlBulletin.Find("TxtTittle");
-            if (txtTittleObj == null) return;
-
-            var newTitle = GameObject.Instantiate(txtTittleObj.gameObject, imgBase);
-            newTitle.name = "MDENTitle";
-            newTitle.SetActive(true);
-
-            var loc = newTitle.GetComponent<Il2CppAssets.Scripts.PeroTools.GeneralLocalization.Localization>();
-            if (loc != null) UnityEngine.Object.Destroy(loc);
-
-            var txt = newTitle.GetComponent<UnityEngine.UI.Text>();
-            if (txt != null)
-            {
-                txt.text = "创建房间";
-                txt.alignment = TextAnchor.MiddleCenter;
-            }
-
-            var titleRect = newTitle.GetComponent<RectTransform>();
-            if (titleRect != null)
-            {
-                titleRect.anchorMin = new Vector2(0.5f, 1f);
-                titleRect.anchorMax = new Vector2(0.5f, 1f);
-                titleRect.pivot = new Vector2(0.5f, 0.5f);
-                titleRect.anchoredPosition = new Vector2(0f, 12f);
-            }
-        }
-
-        private void RemoveInjectedTitle()
-        {
-            var panel = GameObject.Find("UI/Forward/Tips/PnlBulletinNew");
-            if (panel == null) return;
-
-            var titleTrans = panel.transform.Find("ImgBase/ScrollView/MDENTitle");
-            if (titleTrans == null) titleTrans = panel.transform.Find("ImgBase/MDENTitle");
-            if (titleTrans != null) UnityEngine.Object.Destroy(titleTrans.gameObject);
         }
 
         public override void Close()

@@ -1,14 +1,11 @@
 using System;
 using System.Threading.Tasks;
-using LocalizeLib;
 using MDEN.Managers;
 using MDEN.Protocol.Enums;
 using MDEN.Protocol.Messages.Player;
 using MDEN.Protocol.Models;
 using MDEN.UI.Core;
 using MelonLoader;
-using PopupLib.UI.Components;
-using PopupLib.UI.Windows;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -16,11 +13,9 @@ namespace MDEN.UI.Windows
 {
     public class RoomPlayerProfileWindow : MDENWindowBase
     {
-        private const string InjectedTitleName = "MDENPlayerProfileTitle";
-
         private readonly PlayerSyncEntry _player;
-        private ForumWindow _window;
-        private ForumObject _btnAddFriend;
+        private NativeListWindow _window;
+        private NativeListItem _btnAddFriend;
         private GetPlayerResponse _profile;
         private int _lastSelectedIndex = -1;
 
@@ -41,17 +36,16 @@ namespace MDEN.UI.Windows
         {
             if (IsDisposed) return;
 
-            _window = new ForumWindow();
+            _window = new NativeListWindow();
             _window.AutoReset = true;
             BuildList();
             _window.OnSelectionChanged += OnSelectionChanged;
-            _window.OnInternalShow += OnInternalShowInjectTitle;
+            _window.Title = EscapeRichText(GetDisplayName());
             _window.Show();
 
             RegisterEventCleanup(() =>
             {
                 UnbindWindowEvents();
-                RemoveInjectedObjects();
             });
         }
 
@@ -73,21 +67,21 @@ namespace MDEN.UI.Windows
 
         private void BuildList()
         {
-            _window.ForumObjects.Clear();
+            _window.Items.Clear();
             _btnAddFriend = AddButton("- 添加好友 -", BuildDetails());
         }
 
-        private ForumObject AddButton(string title, string description)
+        private NativeListItem AddButton(string title, string description)
         {
-            var button = new ForumObject(new LocalString(title), new LocalString(description));
+            var button = new NativeListItem(title, description);
             button.Texture = GetPlayerAvatarTexture();
-            _window.ForumObjects.Add(button);
+            _window.Items.Add(button);
             return button;
         }
 
-        private void OnSelectionChanged(PopupLib.UI.Windows.Interfaces.IListWindow window, int objectIndex)
+        private void OnSelectionChanged(INativeListWindow window, int objectIndex)
         {
-            if (_window == null || objectIndex < 0 || objectIndex >= _window.ForumObjects.Count) return;
+            if (_window == null || objectIndex < 0 || objectIndex >= _window.Items.Count) return;
 
             if (_lastSelectedIndex != objectIndex)
             {
@@ -95,7 +89,7 @@ namespace MDEN.UI.Windows
                 return;
             }
 
-            var button = _window.ForumObjects[objectIndex];
+            var button = _window.Items[objectIndex];
             if (button == _btnAddFriend)
             {
                 if (string.IsNullOrWhiteSpace(_player.Uid) || _player.Uid == PlayerManager.CurrentUid)
@@ -140,64 +134,10 @@ namespace MDEN.UI.Windows
             };
         }
 
-        private void OnInternalShowInjectTitle(PopupLib.UI.Windows.Abstract.BaseWindow w)
-        {
-            var uiForward = GameObject.Find("UI/Forward");
-            var pnlBulletin = uiForward?.transform.Find("Tips/PnlBulletinNew");
-            var imgBase = pnlBulletin?.Find("ImgBase");
-            var txtTitleObj = pnlBulletin?.Find("TxtTittle");
-            if (imgBase == null || txtTitleObj == null) return;
-
-            RemoveInjectedObjects(imgBase);
-            InjectTitle(imgBase, txtTitleObj);
-        }
-
-        private void InjectTitle(Transform imgBase, Transform txtTitleObj)
-        {
-            var newTitle = GameObject.Instantiate(txtTitleObj.gameObject, imgBase);
-            newTitle.name = InjectedTitleName;
-            newTitle.SetActive(true);
-
-            var loc = newTitle.GetComponent<Il2CppAssets.Scripts.PeroTools.GeneralLocalization.Localization>();
-            if (loc != null) UnityEngine.Object.Destroy(loc);
-
-            var text = newTitle.GetComponent<Text>();
-            if (text != null)
-            {
-                text.text = EscapeRichText(GetDisplayName());
-                text.alignment = TextAnchor.MiddleCenter;
-            }
-
-            var rect = newTitle.GetComponent<RectTransform>();
-            if (rect != null)
-            {
-                rect.anchorMin = new Vector2(0.5f, 1f);
-                rect.anchorMax = new Vector2(0.5f, 1f);
-                rect.pivot = new Vector2(0.5f, 0.5f);
-                rect.anchoredPosition = new Vector2(0f, 12f);
-            }
-        }
-
-        private void RemoveInjectedObjects()
-        {
-            var imgBase = GameObject.Find("UI/Forward/Tips/PnlBulletinNew/ImgBase")?.transform;
-            if (imgBase != null) RemoveInjectedObjects(imgBase);
-        }
-
         private void UnbindWindowEvents()
         {
             if (_window == null) return;
             _window.OnSelectionChanged -= OnSelectionChanged;
-            _window.OnInternalShow -= OnInternalShowInjectTitle;
-        }
-
-        private static void RemoveInjectedObjects(Transform imgBase)
-        {
-            var oldTitle = imgBase.Find(InjectedTitleName);
-            if (oldTitle != null) UnityEngine.Object.Destroy(oldTitle.gameObject);
-
-            var oldTitleInScroll = imgBase.Find("ScrollView/" + InjectedTitleName);
-            if (oldTitleInScroll != null) UnityEngine.Object.Destroy(oldTitleInScroll.gameObject);
         }
 
         private string BuildDetails()
@@ -273,13 +213,12 @@ namespace MDEN.UI.Windows
             if (_window == null) return;
 
             _window.OnSelectionChanged -= OnSelectionChanged;
-            _window.OnInternalShow -= OnInternalShowInjectTitle;
             _window.ForceClose();
-            _window = new ForumWindow();
+            _window = new NativeListWindow();
             _window.AutoReset = true;
             BuildList();
+            _window.Title = EscapeRichText(GetDisplayName());
             _window.OnSelectionChanged += OnSelectionChanged;
-            _window.OnInternalShow += OnInternalShowInjectTitle;
             _window.Show();
             _lastSelectedIndex = -1;
         }
@@ -287,7 +226,6 @@ namespace MDEN.UI.Windows
         public override void Close()
         {
             _lastSelectedIndex = -1;
-            RemoveInjectedObjects();
             if (_window != null)
             {
                 UnbindWindowEvents();

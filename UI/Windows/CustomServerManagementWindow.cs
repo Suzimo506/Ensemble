@@ -1,12 +1,9 @@
 using System;
 using System.Threading.Tasks;
-using LocalizeLib;
 using MDEN.Managers;
 using MDEN.Network;
 using MDEN.UI.Core;
 using MelonLoader;
-using PopupLib.UI.Components;
-using PopupLib.UI.Windows;
 using UnityEngine;
 
 namespace MDEN.UI.Windows
@@ -14,11 +11,11 @@ namespace MDEN.UI.Windows
     public class CustomServerManagementWindow : MDENWindowBase
     {
         private readonly int _customServerIndex;
-        private ForumWindow _window;
-        private ForumObject _btnBack;
-        private ForumObject _btnJoin;
-        private ForumObject _btnRename;
-        private ForumObject _btnDelete;
+        private NativeListWindow _window;
+        private NativeListItem _btnBack;
+        private NativeListItem _btnJoin;
+        private NativeListItem _btnRename;
+        private NativeListItem _btnDelete;
         private int _lastSelectedIndex = -1;
 
         public CustomServerManagementWindow(int customServerIndex)
@@ -28,11 +25,11 @@ namespace MDEN.UI.Windows
 
         public override void Show()
         {
-            _window = new ForumWindow();
+            _window = new NativeListWindow();
             _window.AutoReset = true;
             BuildList();
             _window.OnSelectionChanged += OnSelectionChanged;
-            _window.OnInternalShow += OnInternalShowInjectTitle;
+            _window.Title = "管理自定义节点";
             _window.Show();
             _lastSelectedIndex = -1;
 
@@ -41,42 +38,39 @@ namespace MDEN.UI.Windows
                 if (_window != null)
                 {
                     _window.OnSelectionChanged -= OnSelectionChanged;
-                    _window.OnInternalShow -= OnInternalShowInjectTitle;
                 }
-
-                RemoveInjectedTitle();
             });
         }
 
         private void BuildList()
         {
-            _window.ForumObjects.Clear();
+            _window.Items.Clear();
             _lastSelectedIndex = -1;
 
             var selectedServer = GetSelectedCustomServer();
             var serverName = selectedServer?.Name ?? "自定义节点";
             var serverAddress = selectedServer?.Address ?? "节点不存在";
 
-            _btnBack = new ForumObject(new LocalString("- 返回 -"), new LocalString("回到节点列表"));
+            _btnBack = new NativeListItem("- 返回 -", "回到节点列表");
             _btnBack.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("OptionsPanel.png")?.texture;
-            _window.ForumObjects.Add(_btnBack);
+            _window.Items.Add(_btnBack);
 
-            _btnJoin = new ForumObject(new LocalString("- 加入 -"), new LocalString($"加入节点: {serverAddress}"));
+            _btnJoin = new NativeListItem("- 加入 -", $"加入节点: {serverAddress}");
             _btnJoin.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("RoomList.png")?.texture;
-            _window.ForumObjects.Add(_btnJoin);
+            _window.Items.Add(_btnJoin);
 
-            _btnRename = new ForumObject(new LocalString("- 重命名 -"), new LocalString($"重命名节点: {serverName}"));
+            _btnRename = new NativeListItem("- 重命名 -", $"重命名节点: {serverName}");
             _btnRename.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("OptionsPanel.png")?.texture;
-            _window.ForumObjects.Add(_btnRename);
+            _window.Items.Add(_btnRename);
 
-            _btnDelete = new ForumObject(new LocalString("- 删除 -"), new LocalString($"从列表中删除节点: {serverName}"));
+            _btnDelete = new NativeListItem("- 删除 -", $"从列表中删除节点: {serverName}");
             _btnDelete.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("HomePanel.png")?.texture;
-            _window.ForumObjects.Add(_btnDelete);
+            _window.Items.Add(_btnDelete);
         }
 
-        private async void OnSelectionChanged(PopupLib.UI.Windows.Interfaces.IListWindow window, int objectIndex)
+        private async void OnSelectionChanged(INativeListWindow window, int objectIndex)
         {
-            if (_window == null || objectIndex < 0 || objectIndex >= _window.ForumObjects.Count) return;
+            if (_window == null || objectIndex < 0 || objectIndex >= _window.Items.Count) return;
 
             // 第一次点击只会选中并且展示右侧文本，第二次点击才生效
             if (_lastSelectedIndex != objectIndex)
@@ -85,7 +79,7 @@ namespace MDEN.UI.Windows
                 return;
             }
 
-            var button = _window.ForumObjects[objectIndex];
+            var button = _window.Items[objectIndex];
             var selectedServer = GetSelectedCustomServer();
 
             if (button == _btnBack)
@@ -121,7 +115,7 @@ namespace MDEN.UI.Windows
                 _window.ForceClose();
             }
 
-            var input = new InputWindow();
+            var input = new NativeInputDialog();
             input.OnCompletion += (w) =>
             {
                 var res = input.Result;
@@ -177,59 +171,6 @@ namespace MDEN.UI.Windows
             {
                 await MainThreadDispatcher.InvokeAsync(() => uiLock?.Dispose());
             }
-        }
-
-        private void OnInternalShowInjectTitle(PopupLib.UI.Windows.Abstract.BaseWindow w)
-        {
-            var uiForward = GameObject.Find("UI/Forward");
-            if (uiForward == null) return;
-
-            var pnlBulletin = uiForward.transform.Find("Tips/PnlBulletinNew");
-            if (pnlBulletin == null) return;
-
-            var imgBase = pnlBulletin.Find("ImgBase");
-            if (imgBase == null) return;
-
-            var oldTitle = imgBase.Find("MDENTitle");
-            if (oldTitle != null) UnityEngine.Object.Destroy(oldTitle.gameObject);
-            var oldTitleInScroll = imgBase.Find("ScrollView/MDENTitle");
-            if (oldTitleInScroll != null) UnityEngine.Object.Destroy(oldTitleInScroll.gameObject);
-
-            var txtTittleObj = pnlBulletin.Find("TxtTittle");
-            if (txtTittleObj == null) return;
-
-            var newTitle = GameObject.Instantiate(txtTittleObj.gameObject, imgBase);
-            newTitle.name = "MDENTitle";
-            newTitle.SetActive(true);
-
-            var loc = newTitle.GetComponent<Il2CppAssets.Scripts.PeroTools.GeneralLocalization.Localization>();
-            if (loc != null) UnityEngine.Object.Destroy(loc);
-
-            var txt = newTitle.GetComponent<UnityEngine.UI.Text>();
-            if (txt != null)
-            {
-                txt.text = "管理自定义节点";
-                txt.alignment = TextAnchor.MiddleCenter;
-            }
-
-            var titleRect = newTitle.GetComponent<RectTransform>();
-            if (titleRect != null)
-            {
-                titleRect.anchorMin = new Vector2(0.5f, 1f);
-                titleRect.anchorMax = new Vector2(0.5f, 1f);
-                titleRect.pivot = new Vector2(0.5f, 0.5f);
-                titleRect.anchoredPosition = new Vector2(0f, 12f);
-            }
-        }
-
-        private void RemoveInjectedTitle()
-        {
-            var panel = GameObject.Find("UI/Forward/Tips/PnlBulletinNew");
-            if (panel == null) return;
-
-            var titleTrans = panel.transform.Find("ImgBase/ScrollView/MDENTitle");
-            if (titleTrans == null) titleTrans = panel.transform.Find("ImgBase/MDENTitle");
-            if (titleTrans != null) UnityEngine.Object.Destroy(titleTrans.gameObject);
         }
 
         public override void Close()

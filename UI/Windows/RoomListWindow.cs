@@ -2,14 +2,11 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Il2CppAssets.Scripts.UI.Controls;
-using LocalizeLib;
 using MDEN.Managers;
 using MDEN.Protocol.Enums;
 using MDEN.Protocol.Models;
 using MDEN.UI.Core;
 using MelonLoader;
-using PopupLib.UI.Components;
-using PopupLib.UI.Windows;
 using UnityEngine;
 
 namespace MDEN.UI.Windows
@@ -21,10 +18,10 @@ namespace MDEN.UI.Windows
         private const string PlayingStatusColor = Constants.ColorRed;
         private const string LockedStatusColor = Constants.ColorYellow;
 
-        private ForumWindow _window;
-        private ForumObject _btnBack;
-        private ForumObject _btnRefresh;
-        private ForumObject _btnCreateRoom;
+        private NativeListWindow _window;
+        private NativeListItem _btnBack;
+        private NativeListItem _btnRefresh;
+        private NativeListItem _btnCreateRoom;
         private LobbyListEntry[] _lobbies = new LobbyListEntry[0];
         private CancellationTokenSource _autoRefreshCts;
         private bool _refreshInProgress;
@@ -55,12 +52,12 @@ namespace MDEN.UI.Windows
         {
             if (IsDisposed) return;
 
-            _window = new ForumWindow();
+            _window = new NativeListWindow();
             _window.AutoReset = true;
             BuildList();
             _window.OnSelectionChanged += OnSelectionChanged;
-            _window.OnInternalShow += OnInternalShowInjectTitle;
             _window.OnCompletion += OnWindowCompletion;
+            _window.Title = "选择房间";
             _window.Show();
             _lastSelectedIndex = -1;
 
@@ -69,11 +66,9 @@ namespace MDEN.UI.Windows
                 if (_window != null)
                 {
                     _window.OnSelectionChanged -= OnSelectionChanged;
-                    _window.OnInternalShow -= OnInternalShowInjectTitle;
                     _window.OnCompletion -= OnWindowCompletion;
                 }
 
-                RemoveInjectedTitle();
                 StopAutoRefresh();
             });
 
@@ -83,7 +78,7 @@ namespace MDEN.UI.Windows
             }
         }
 
-        private void OnWindowCompletion(PopupLib.UI.Windows.Abstract.BaseWindow w)
+        private void OnWindowCompletion(INativeBaseWindow w)
         {
             if (_suppressNextCompletion)
             {
@@ -94,84 +89,31 @@ namespace MDEN.UI.Windows
             WindowStackController.NotifyWindowCompleted(this);
         }
 
-        private void OnInternalShowInjectTitle(PopupLib.UI.Windows.Abstract.BaseWindow w)
-        {
-            var uiForward = GameObject.Find("UI/Forward");
-            if (uiForward == null) return;
-
-            var pnlBulletin = uiForward.transform.Find("Tips/PnlBulletinNew");
-            if (pnlBulletin == null) return;
-
-            var imgBase = pnlBulletin.Find("ImgBase");
-            if (imgBase == null) return;
-
-            var oldTitle = imgBase.Find("MDENTitle");
-            if (oldTitle != null) UnityEngine.Object.Destroy(oldTitle.gameObject);
-            var oldTitleInScroll = imgBase.Find("ScrollView/MDENTitle");
-            if (oldTitleInScroll != null) UnityEngine.Object.Destroy(oldTitleInScroll.gameObject);
-
-            var txtTittleObj = pnlBulletin.Find("TxtTittle");
-            if (txtTittleObj == null) return;
-
-            var newTitle = GameObject.Instantiate(txtTittleObj.gameObject, imgBase);
-            newTitle.name = "MDENTitle";
-            newTitle.SetActive(true);
-
-            var loc = newTitle.GetComponent<Il2CppAssets.Scripts.PeroTools.GeneralLocalization.Localization>();
-            if (loc != null) UnityEngine.Object.Destroy(loc);
-
-            var txt = newTitle.GetComponent<UnityEngine.UI.Text>();
-            if (txt != null)
-            {
-                txt.text = "选择房间";
-                txt.alignment = TextAnchor.MiddleCenter;
-            }
-
-            var titleRect = newTitle.GetComponent<RectTransform>();
-            if (titleRect != null)
-            {
-                titleRect.anchorMin = new Vector2(0.5f, 1f);
-                titleRect.anchorMax = new Vector2(0.5f, 1f);
-                titleRect.pivot = new Vector2(0.5f, 0.5f);
-                titleRect.anchoredPosition = new Vector2(0f, 12f);
-            }
-        }
-
-        private void RemoveInjectedTitle()
-        {
-            var panel = GameObject.Find("UI/Forward/Tips/PnlBulletinNew");
-            if (panel == null) return;
-
-            var titleTrans = panel.transform.Find("ImgBase/ScrollView/MDENTitle");
-            if (titleTrans == null) titleTrans = panel.transform.Find("ImgBase/MDENTitle");
-            if (titleTrans != null) UnityEngine.Object.Destroy(titleTrans.gameObject);
-        }
-
         private void BuildList()
         {
-            _window.ForumObjects.Clear();
+            _window.Items.Clear();
             _lastSelectedIndex = -1;
 
             if (!_readOnly)
             {
-                _btnBack = new ForumObject(new LocalString("- 返回 -"), new LocalString("回到节点列表"));
+                _btnBack = new NativeListItem("- 返回 -", "回到节点列表");
                 _btnBack.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("OptionsPanel.png")?.texture;
-                _window.ForumObjects.Add(_btnBack);
+                _window.Items.Add(_btnBack);
             }
             else
             {
                 _btnBack = null;
             }
 
-            _btnRefresh = new ForumObject(new LocalString("- 刷新 -"), new LocalString("重新获取当前服务器的房间列表"));
+            _btnRefresh = new NativeListItem("- 刷新 -", "重新获取当前服务器的房间列表");
             _btnRefresh.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("RoomList.png")?.texture;
-            _window.ForumObjects.Add(_btnRefresh);
+            _window.Items.Add(_btnRefresh);
 
             if (!_readOnly)
             {
-                _btnCreateRoom = new ForumObject(new LocalString("- 创建房间 -"), new LocalString("创建新的联机房间"));
+                _btnCreateRoom = new NativeListItem("- 创建房间 -", "创建新的联机房间");
                 _btnCreateRoom.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("HomePanel.png")?.texture;
-                _window.ForumObjects.Add(_btnCreateRoom);
+                _window.Items.Add(_btnCreateRoom);
             }
             else
             {
@@ -180,9 +122,9 @@ namespace MDEN.UI.Windows
 
             if (_lobbies.Length == 0)
             {
-                var empty = new ForumObject(new LocalString("暂无房间"), new LocalString("当前服务器没有公开房间，可以刷新或创建房间"));
+                var empty = new NativeListItem("暂无房间", "当前服务器没有公开房间，可以刷新或创建房间");
                 empty.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("PlayerCard.png")?.texture;
-                _window.ForumObjects.Add(empty);
+                _window.Items.Add(empty);
                 return;
             }
 
@@ -196,9 +138,9 @@ namespace MDEN.UI.Windows
                 var desc = joining
                     ? "请求已提交，正在等待服务器回应\n" + BuildLobbyDescription(lobby)
                     : BuildLobbyDescription(lobby);
-                var item = new ForumObject(new LocalString(name), new LocalString(desc));
+                var item = new NativeListItem(name, desc);
                 item.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("RoomList.png")?.texture;
-                _window.ForumObjects.Add(item);
+                _window.Items.Add(item);
             }
         }
 
@@ -268,9 +210,9 @@ namespace MDEN.UI.Windows
                 : value.Replace("&", "&amp;").Replace("<", "&lt;").Replace(">", "&gt;");
         }
 
-        private async void OnSelectionChanged(PopupLib.UI.Windows.Interfaces.IListWindow window, int objectIndex)
+        private async void OnSelectionChanged(INativeListWindow window, int objectIndex)
         {
-            if (_window == null || objectIndex < 0 || objectIndex >= _window.ForumObjects.Count) return;
+            if (_window == null || objectIndex < 0 || objectIndex >= _window.Items.Count) return;
 
             if (_joinInProgress)
             {
@@ -284,7 +226,7 @@ namespace MDEN.UI.Windows
                 return;
             }
 
-            var button = _window.ForumObjects[objectIndex];
+            var button = _window.Items[objectIndex];
             if (button == _btnBack)
             {
                 Close();
@@ -369,7 +311,7 @@ namespace MDEN.UI.Windows
                 _window.ForceClose();
             }
 
-            var input = new InputWindow();
+            var input = new NativeInputDialog();
             input.OnCompletion += (w) =>
             {
                 var password = input.Result?.Trim();
@@ -619,15 +561,14 @@ namespace MDEN.UI.Windows
             if (_window == null) return;
 
             _window.OnSelectionChanged -= OnSelectionChanged;
-            _window.OnInternalShow -= OnInternalShowInjectTitle;
             _window.OnCompletion -= OnWindowCompletion;
             ForceCloseWindowSafe();
             _suppressNextCompletion = false;
-            _window = new ForumWindow();
+            _window = new NativeListWindow();
             _window.AutoReset = true;
+            _window.Title = "选择房间";
             BuildList();
             _window.OnSelectionChanged += OnSelectionChanged;
-            _window.OnInternalShow += OnInternalShowInjectTitle;
             _window.OnCompletion += OnWindowCompletion;
             _window.Show();
             _lastSelectedIndex = -1;
@@ -642,7 +583,6 @@ namespace MDEN.UI.Windows
             if (_window != null)
             {
                 _window.OnSelectionChanged -= OnSelectionChanged;
-                _window.OnInternalShow -= OnInternalShowInjectTitle;
                 _window.OnCompletion -= OnWindowCompletion;
                 ForceCloseWindowSafe();
                 _window = null;

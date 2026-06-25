@@ -1,19 +1,16 @@
-using LocalizeLib;
 using Il2CppAssets.Scripts.UI.Controls;
 using MDEN.Managers;
 using MDEN.Protocol.Messages.Lobby;
 using MDEN.Protocol.Rules;
 using MDEN.UI.Core;
 using MelonLoader;
-using PopupLib.UI.Components;
-using PopupLib.UI.Windows;
 using UnityEngine;
 
 namespace MDEN.UI.Windows
 {
     public class RoomPlaylistWindow : MDENWindowBase
     {
-        private ForumWindow _window;
+        private NativeListWindow _window;
         private PlaylistEntryViewModel[] _items = new PlaylistEntryViewModel[0];
         private int _lastSelectedIndex = -1;
         private bool _closeQueued;
@@ -23,13 +20,13 @@ namespace MDEN.UI.Windows
         public override void Show()
         {
             _hudSuppression = RoomHudController.SuppressForPopupWindow("playlist window");
-            _window = new ForumWindow();
+            _window = new NativeListWindow();
             _window.AutoReset = true;
             BuildList();
             LobbyManager.CurrentLobbyChanged += HandleCurrentLobbyChanged;
             _window.OnSelectionChanged += OnSelectionChanged;
-            _window.OnInternalShow += OnInternalShowInjectTitle;
             _window.OnCompletion += OnWindowCompletion;
+            _window.Title = GetTitleText();
             _window.Show();
 
             RegisterEventCleanup(() =>
@@ -39,7 +36,6 @@ namespace MDEN.UI.Windows
                 if (_window != null)
                 {
                     _window.OnSelectionChanged -= OnSelectionChanged;
-                    _window.OnInternalShow -= OnInternalShowInjectTitle;
                     _window.OnCompletion -= OnWindowCompletion;
                 }
 
@@ -47,7 +43,7 @@ namespace MDEN.UI.Windows
             });
         }
 
-        private void OnWindowCompletion(PopupLib.UI.Windows.Abstract.BaseWindow w)
+        private void OnWindowCompletion(INativeBaseWindow w)
         {
             if (_suppressNextCompletion)
             {
@@ -75,7 +71,7 @@ namespace MDEN.UI.Windows
 
         private void BuildList()
         {
-            _window.ForumObjects.Clear();
+            _window.Items.Clear();
 
             var lobby = LobbyManager.CurrentLobby;
             _items = PlaylistManager.GetPlaylistItems();
@@ -100,11 +96,11 @@ namespace MDEN.UI.Windows
             }
         }
 
-        private ForumObject AddButton(string title, string desc)
+        private NativeListItem AddButton(string title, string desc)
         {
-            var obj = new ForumObject(new LocalString(title), new LocalString(desc));
+            var obj = new NativeListItem(title, desc);
             obj.Texture = ResourceManager.GetSprite("RoomList.png")?.texture;
-            _window.ForumObjects.Add(obj);
+            _window.Items.Add(obj);
             return obj;
         }
 
@@ -134,9 +130,9 @@ namespace MDEN.UI.Windows
             return value.Substring(0, length);
         }
 
-        private void OnSelectionChanged(PopupLib.UI.Windows.Interfaces.IListWindow window, int objectIndex)
+        private void OnSelectionChanged(INativeListWindow window, int objectIndex)
         {
-            if (_window == null || objectIndex < 0 || objectIndex >= _window.ForumObjects.Count) return;
+            if (_window == null || objectIndex < 0 || objectIndex >= _window.Items.Count) return;
             if (_lastSelectedIndex != objectIndex)
             {
                 _lastSelectedIndex = objectIndex;
@@ -221,41 +217,12 @@ namespace MDEN.UI.Windows
             }
         }
 
-        private void OnInternalShowInjectTitle(PopupLib.UI.Windows.Abstract.BaseWindow w)
-        {
-            var uiForward = GameObject.Find("UI/Forward");
-            var pnlBulletin = uiForward?.transform.Find("Tips/PnlBulletinNew");
-            var imgBase = pnlBulletin?.Find("ImgBase");
-            var txtTitleObj = pnlBulletin?.Find("TxtTittle");
-            if (imgBase == null || txtTitleObj == null) return;
-
-            var oldTitle = imgBase.Find("MDENTitle");
-            if (oldTitle != null) UnityEngine.Object.Destroy(oldTitle.gameObject);
-            var oldTenziTitle = imgBase.Find("MDENTenziDrawTitle");
-            if (oldTenziTitle != null) UnityEngine.Object.Destroy(oldTenziTitle.gameObject);
-
-            var newTitle = GameObject.Instantiate(txtTitleObj.gameObject, imgBase);
-            newTitle.name = "MDENTitle";
-            newTitle.SetActive(true);
-
-            var loc = newTitle.GetComponent<Il2CppAssets.Scripts.PeroTools.GeneralLocalization.Localization>();
-            if (loc != null) UnityEngine.Object.Destroy(loc);
-
-            var text = newTitle.GetComponent<UnityEngine.UI.Text>();
-            if (text != null)
-            {
-                text.text = GetTitleText();
-                text.alignment = TextAnchor.MiddleCenter;
-            }
-        }
-
         public override void Close()
         {
             _lastSelectedIndex = -1;
             if (_window != null)
             {
                 _window.OnSelectionChanged -= OnSelectionChanged;
-                _window.OnInternalShow -= OnInternalShowInjectTitle;
                 _window.OnCompletion -= OnWindowCompletion;
                 _suppressNextCompletion = true;
                 _window.ForceClose();
@@ -263,7 +230,6 @@ namespace MDEN.UI.Windows
             }
 
             ReleaseHudSuppression();
-            RemoveInjectedTitle();
         }
 
         private string GetTitleText()
@@ -274,30 +240,19 @@ namespace MDEN.UI.Windows
             return $"歌曲列表 {currentCount}/{maxCount}";
         }
 
-        private static void RemoveInjectedTitle()
-        {
-            var panel = GameObject.Find("UI/Forward/Tips/PnlBulletinNew");
-            var imgBase = panel?.transform.Find("ImgBase");
-            if (imgBase == null) return;
-
-            var title = imgBase.Find("MDENTitle");
-            if (title != null) UnityEngine.Object.Destroy(title.gameObject);
-        }
-
         private void RebuildWindow()
         {
             if (_window == null) return;
             _window.OnSelectionChanged -= OnSelectionChanged;
-            _window.OnInternalShow -= OnInternalShowInjectTitle;
             _window.OnCompletion -= OnWindowCompletion;
             _suppressNextCompletion = true;
             _window.ForceClose();
             _suppressNextCompletion = false;
-            _window = new ForumWindow();
+            _window = new NativeListWindow();
             _window.AutoReset = true;
             BuildList();
+            _window.Title = GetTitleText();
             _window.OnSelectionChanged += OnSelectionChanged;
-            _window.OnInternalShow += OnInternalShowInjectTitle;
             _window.OnCompletion += OnWindowCompletion;
             _window.Show();
             _lastSelectedIndex = -1;

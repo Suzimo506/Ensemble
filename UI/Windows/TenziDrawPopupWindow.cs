@@ -1,14 +1,10 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using Il2CppAssets.Scripts.UI.Panels.Bulletin;
-using LocalizeLib;
 using MDEN.Managers;
 using MDEN.Protocol.Messages.Lobby;
 using MDEN.UI.Core;
 using MelonLoader;
-using PopupLib.UI.Components;
-using PopupLib.UI.Windows;
 using UnityEngine;
 
 namespace MDEN.UI.Windows
@@ -20,9 +16,8 @@ namespace MDEN.UI.Windows
         private readonly TenziDrawItem[] _items;
         private readonly int _selectedIndex;
         private readonly long _drawSeed;
-        private readonly List<ForumObject> _objects = new List<ForumObject>();
-        private ForumWindow _window;
-        private bool _nativeRefreshFailed;
+        private readonly List<NativeListItem> _objects = new List<NativeListItem>();
+        private NativeListWindow _window;
         private bool _suppressNextCompletion;
         private int _generation;
 
@@ -42,10 +37,10 @@ namespace MDEN.UI.Windows
                 return;
             }
 
-            _window = new ForumWindow();
+            _window = new NativeListWindow();
             _window.AutoReset = true;
             BuildList();
-            _window.OnInternalShow += OnInternalShowInjectTitle;
+            _window.Title = "天子抽曲";
             _window.OnCompletion += OnWindowCompletion;
             _window.Show();
 
@@ -68,8 +63,6 @@ namespace MDEN.UI.Windows
                 _window.ForceClose();
                 _window = null;
             }
-
-            RemoveInjectedTitle();
         }
 
         private IEnumerator RunDraw(int generation)
@@ -87,12 +80,12 @@ namespace MDEN.UI.Windows
                 var activeIndex = (startIndex + step) % count;
                 var finished = step == totalSteps;
                 RefreshItems(activeIndex, finished);
-                RefreshNativeWindowItems();
+                _window.RefreshItems();
                 yield return new WaitForSecondsRealtime(GetStepDelay(step, totalSteps));
             }
 
             RefreshItems(_selectedIndex, true);
-            RefreshNativeWindowItems();
+            _window.RefreshItems();
             for (var frame = 0; frame < HoldFrames; frame++)
             {
                 if (generation != _generation || _window == null) yield break;
@@ -114,16 +107,16 @@ namespace MDEN.UI.Windows
 
         private void BuildList()
         {
-            _window.ForumObjects.Clear();
+            _window.Items.Clear();
             _objects.Clear();
             for (var i = 0; i < _items.Length; i++)
             {
-                var obj = new ForumObject(
-                    new LocalString(BuildTitle(i, -1, false)),
-                    new LocalString(BuildDescription(i, -1, false)));
+                var obj = new NativeListItem(
+                    BuildTitle(i, -1, false),
+                    BuildDescription(i, -1, false));
                 obj.Texture = ResourceManager.GetSprite("RoomList.png")?.texture ??
                               ResourceManager.GetRandomBannerTexture();
-                _window.ForumObjects.Add(obj);
+                _window.Items.Add(obj);
                 _objects.Add(obj);
             }
         }
@@ -135,61 +128,9 @@ namespace MDEN.UI.Windows
                 var obj = _objects[i];
                 if (obj == null) continue;
 
-                obj.Titles = new LocalString(BuildTitle(i, activeIndex, finished));
-                obj.Contents = new LocalString(BuildDescription(i, activeIndex, finished));
+                obj.Title = BuildTitle(i, activeIndex, finished);
+                obj.Content = BuildDescription(i, activeIndex, finished);
             }
-        }
-
-        private void RefreshNativeWindowItems()
-        {
-            if (_nativeRefreshFailed || _window == null || !_window.Activated) return;
-
-            try
-            {
-                var panel = GameObject.Find("UI/Forward/Tips/PnlBulletinNew");
-                var controller = panel?.GetComponent<PnlStageBulletinController>();
-                if (controller == null) return;
-
-                controller.m_BulletinDataModels = BuildBulletinModels();
-                controller.m_BulletinView.languageChangDirty = true;
-                controller.RefreshUI();
-            }
-            catch (Exception ex)
-            {
-                _nativeRefreshFailed = true;
-                ClientLogManager.Warning($"Tenzi draw window refresh failed: {ex.Message}");
-            }
-        }
-
-        private Il2CppSystem.Collections.Generic.Dictionary<string, Il2CppSystem.Collections.Generic.List<PnlStageBulletinDataModel>> BuildBulletinModels()
-        {
-            var models = new Il2CppSystem.Collections.Generic.Dictionary<string, Il2CppSystem.Collections.Generic.List<PnlStageBulletinDataModel>>();
-            for (var i = 0; i < _objects.Count; i++)
-            {
-                var obj = _objects[i];
-                if (obj == null) continue;
-
-                foreach (var content in LocalString.GetContents(obj.Titles, obj.Contents))
-                {
-                    var language = content[0] ?? string.Empty;
-                    if (!models.ContainsKey(language))
-                    {
-                        models[language] = new Il2CppSystem.Collections.Generic.List<PnlStageBulletinDataModel>();
-                    }
-
-                    models[language].Add(new PnlStageBulletinDataModel
-                    {
-                        title = content[1] ?? string.Empty,
-                        content = content[2] ?? string.Empty,
-                        imageUrl = obj.TextureURL ?? $"PopupLib://{i}",
-                        uid = i.ToString(),
-                        force = true,
-                        isNew = obj.IsNew
-                    });
-                }
-            }
-
-            return models;
         }
 
         private string BuildTitle(int index, int activeIndex, bool finished)
@@ -225,7 +166,7 @@ namespace MDEN.UI.Windows
             return $"状态: {state}\n谱面: {EscapeRichText(item.Name)}\n难度: {LobbyRuleTextFormatter.FormatDifficulty(item.Difficulty, false)}\n添加者: {EscapeRichText(item.OwnerName)}";
         }
 
-        private void OnWindowCompletion(PopupLib.UI.Windows.Abstract.BaseWindow w)
+        private void OnWindowCompletion(INativeBaseWindow w)
         {
             if (_suppressNextCompletion)
             {
@@ -238,57 +179,6 @@ namespace MDEN.UI.Windows
             _window = null;
             TenziDrawController.NotifyWindowClosed(this);
             Dispose();
-        }
-
-        private void OnInternalShowInjectTitle(PopupLib.UI.Windows.Abstract.BaseWindow w)
-        {
-            var uiForward = GameObject.Find("UI/Forward");
-            var pnlBulletin = uiForward?.transform.Find("Tips/PnlBulletinNew");
-            var imgBase = pnlBulletin?.Find("ImgBase");
-            var txtTitleObj = pnlBulletin?.Find("TxtTittle");
-            if (imgBase == null || txtTitleObj == null) return;
-
-            RemoveInjectedTitle(imgBase);
-
-            var newTitle = GameObject.Instantiate(txtTitleObj.gameObject, imgBase);
-            newTitle.name = "MDENTenziDrawTitle";
-            newTitle.SetActive(true);
-
-            var loc = newTitle.GetComponent<Il2CppAssets.Scripts.PeroTools.GeneralLocalization.Localization>();
-            if (loc != null) UnityEngine.Object.Destroy(loc);
-
-            var text = newTitle.GetComponent<UnityEngine.UI.Text>();
-            if (text != null)
-            {
-                text.text = "天子抽曲";
-                text.alignment = TextAnchor.MiddleCenter;
-            }
-        }
-
-        private static void RemoveInjectedTitle()
-        {
-            var panel = GameObject.Find("UI/Forward/Tips/PnlBulletinNew");
-            var imgBase = panel?.transform.Find("ImgBase");
-            if (imgBase == null) return;
-
-            RemoveInjectedTitle(imgBase);
-        }
-
-        private static void RemoveInjectedTitle(Transform imgBase)
-        {
-            RemoveTitle(imgBase, "MDENTenziDrawTitle");
-            RemoveTitle(imgBase, "MDENTitle");
-            var scrollView = imgBase.Find("ScrollView");
-            if (scrollView == null) return;
-
-            RemoveTitle(scrollView, "MDENTenziDrawTitle");
-            RemoveTitle(scrollView, "MDENTitle");
-        }
-
-        private static void RemoveTitle(Transform parent, string name)
-        {
-            var title = parent?.Find(name);
-            if (title != null) UnityEngine.Object.Destroy(title.gameObject);
         }
 
         private static TenziDrawItem[] BuildItems(LobbySyncPush lobby)
@@ -330,7 +220,6 @@ namespace MDEN.UI.Windows
         {
             if (_window == null) return;
 
-            _window.OnInternalShow -= OnInternalShowInjectTitle;
             _window.OnCompletion -= OnWindowCompletion;
         }
 

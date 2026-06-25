@@ -73,17 +73,11 @@
     <Reference Include="Il2CppSystem">
       <HintPath>$(MD_NET6_DIRECTORY)\MelonLoader\Il2CppAssemblies\Il2CppSystem.dll</HintPath>
     </Reference>
-    <Reference Include="LocalizeLib">
-      <HintPath>$(MD_NET6_DIRECTORY)\Mods\LocalizeLib.dll</HintPath>
-    </Reference>
     <Reference Include="MelonLoader">
       <HintPath>$(MD_NET6_DIRECTORY)\MelonLoader\net6\MelonLoader.dll</HintPath>
     </Reference>
     <Reference Include="Newtonsoft.Json">
       <HintPath>$(MD_NET6_DIRECTORY)\MelonLoader\Dependencies\Il2CppAssemblyGenerator\Cpp2IL\cpp2il_out\Newtonsoft.Json.dll</HintPath>
-    </Reference>
-    <Reference Include="PopupLib">
-      <HintPath>$(MD_NET6_DIRECTORY)\Mods\PopupLib.dll</HintPath>
     </Reference>
     <Reference Include="Tomlet">
       <HintPath>$(MD_NET6_DIRECTORY)\MelonLoader\net6\Tomlet.dll</HintPath>

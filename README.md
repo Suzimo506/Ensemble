@@ -8,7 +8,7 @@ MDEN（Muse Dash Ensemble）是一个基于 MelonLoader 的 Muse Dash 联机模�
 
 ## 安装教程
 
-请将 `Ensemble.dll` 放入 `Mods`，安装前置模组 `PopupLib.dll`（作者：`PBalint817`）和 `LocalizeLib.dll`，并将 `MDEN.Protocol.dll` 放入 `UserLibs`。
+请将 `Ensemble.dll` 放入 `Mods`，并将 `MDEN.Protocol.dll` 放入 `UserLibs`。
 
 ---
 
@@ -40,7 +40,7 @@ MDEN（Muse Dash Ensemble）是一个基于 MelonLoader 的 Muse Dash 联机模�
 | `Network/` | TCP 连接、封包拆包、请求响应配对、Push 派发与重连。 |
 | `Threading/` | 网络层到主线程队列的边界适配，避免网络层直接依赖 UI。 |
 | `Managers/` | 房间、玩家、聊天、对战、配置等业务状态与网络调用。 |
-| `UI/` | PopupLib 窗口、游戏内 HUD、房间显示、结算显示与 UI 生命周期控制。 |
+| `UI/` | 原生窗口、游戏内 HUD、房间显示、结算显示与 UI 生命周期控制。 |
 | `Patches/` | Harmony Patch，负责把入口和游戏流程接入原版 Muse Dash。 |
 | `MDEN.Protocol/` | 客户端和服务端共享的 OpCode、Envelope、DTO 与协议模型。 |
 | `Assets/` | 模组内嵌或运行时加载的图片资源。 |
@@ -51,7 +51,7 @@ MDEN（Muse Dash Ensemble）是一个基于 MelonLoader 的 Muse Dash 联机模�
 
 - .NET 6 SDK
 - Muse Dash + MelonLoader net6 环境
-- `PopupLib.dll`、`LocalizeLib.dll`、`CustomAlbums.dll` 等项目引用中声明的运行时依赖
+- `CustomAlbums.dll` 等项目引用中声明的运行时依赖
 - 环境变量或 MSBuild 属性 `MD_NET6_DIRECTORY` 指向 Muse Dash 的 MelonLoader net6 根目录
 
 常用构建命令：
