@@ -90,7 +90,7 @@ namespace MDEN.UI.Core
 
             if (!BattleResultFlowManager.IsBattleResultFlowPending)
             {
-                BattleResultBannerDisplay.RefreshIfVisible(players);
+                SettlementOverlayController.RefreshBattleResultIfVisible(players);
             }
 
             using (PerfTrace.Measure("MDEN.BattleHud.Refresh"))

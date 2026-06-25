@@ -99,7 +99,7 @@ namespace MDEN.UI.Windows
         {
             return lobby?.IsPlaying == true ||
                    BattleResultFlowManager.IsBattleResultFlowPending ||
-                   BattleResultBannerDisplay.IsConsumingKeyboard;
+                   SettlementOverlayController.IsAnyMdenOverlayActive;
         }
 
         private static string BuildLobbyRefreshKey(LobbySyncPush lobby)

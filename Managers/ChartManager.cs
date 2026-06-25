@@ -35,20 +35,10 @@ namespace MDEN.Managers
             get
             {
                 var diff = GlobalDataBase.dbMusicTag.selectedDiffTglIndex;
-                if (diff == 3)
+                var musicInfo = GlobalDataBase.dbMusicTag.m_CurSelectedMusicInfo;
+                if (musicInfo != null && HiddenDifficultyController.IsHiddenDifficultySelected(musicInfo, diff))
                 {
-                    var musicInfo = GlobalDataBase.dbMusicTag.m_CurSelectedMusicInfo;
-                    if (musicInfo != null)
-                    {
-                        var checkUid = GetHiddenCheckUid(musicInfo);
-                        if (string.IsNullOrEmpty(checkUid)) return diff;
-
-                        var specialSongManager = Il2CppAssets.Scripts.PeroTools.Commons.Singleton<Il2Cpp.SpecialSongManager>.instance;
-                        if (specialSongManager != null && specialSongManager.IsInvokeHideBms(checkUid))
-                        {
-                            return 4;
-                        }
-                    }
+                    return 4;
                 }
 
                 return diff;

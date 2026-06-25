@@ -39,7 +39,7 @@ namespace MDEN
             {
                 WindowStackController.ForceUnlock();
                 NativeInputBlocker.ClearAll();
-                BattleResultBannerDisplay.ClearAll();
+                SettlementOverlayController.Reset();
                 BattleHealthBarController.Reset();
                 Patches.BattleFlowPatch.ResetBattleSceneState();
                 RoomHudController.SetBattleSceneActive(false);
@@ -62,7 +62,7 @@ namespace MDEN
                 WindowStackController.ForceUnlock();
                 CustomAlbumsWindowGuard.CloseIfOpen("GameMain scene load");
                 NativeInputBlocker.ClearAll();
-                BattleResultBannerDisplay.ClearAll();
+                SettlementOverlayController.Reset();
                 BattleHealthBarController.Reset();
                 RoomHudController.SetBattleSceneActive(true);
                 PerfTrace.SetGameMain(true);
@@ -89,10 +89,8 @@ namespace MDEN
 
             MainThreadWatchdog.Heartbeat("BattleFlowPatch.UpdateBattleUiState");
             Patches.BattleFlowPatch.UpdateBattleUiState();
-            MainThreadWatchdog.Heartbeat("BattleResultBannerDisplay.Update");
-            BattleResultBannerDisplay.Update();
-            MainThreadWatchdog.Heartbeat("SettlementResultDialog.Update");
-            SettlementResultDialog.Update();
+            MainThreadWatchdog.Heartbeat("SettlementOverlayController.Update");
+            SettlementOverlayController.Update();
             MainThreadWatchdog.Heartbeat("RoomHudController.Update");
             RoomHudController.Update();
 
@@ -104,7 +102,7 @@ namespace MDEN
         public override void OnDeinitializeMelon()
         {
             NativeInputBlocker.ClearAll();
-            BattleResultBannerDisplay.ClearAll();
+            SettlementOverlayController.ClearAll();
             PerfTrace.SetGameMain(false);
             RoomHudController.SetBattleSceneActive(false);
             BattleHudController.Deinitialize();

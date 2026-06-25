@@ -26,6 +26,7 @@ namespace MDEN.UI.Core
         private const float AwardNamesViewportHeight = 78f;
         private const float ChartViewportHeight = 290f;
         private const float CloseSoundVolume = 1.35f;
+        private const float CloseButtonHitPadding = 18f;
 
         private static GameObject _root;
         private static RectTransform _panelRoot;
@@ -34,6 +35,10 @@ namespace MDEN.UI.Core
         private static Sprite _roundedSprite;
         private static bool _closing;
         private static bool _enterWasDown;
+        private static bool _mouseWasDown;
+        private static int _ignoreMouseInputUntilFrame;
+
+        public static bool IsVisible => _root != null;
 
         public static void Show(SettlementResultPush result)
         {
@@ -58,6 +63,8 @@ namespace MDEN.UI.Core
                 }
 
                 _enterWasDown = IsEnterKeyDown();
+                _mouseWasDown = Input.GetMouseButton(0);
+                _ignoreMouseInputUntilFrame = Time.frameCount + 1;
             }
             catch (Exception ex)
             {
@@ -73,7 +80,7 @@ namespace MDEN.UI.Core
             HandleEnterKeyFallback();
             if (_root == null || _closing) return;
 
-            HandleCloseButtonMouseFallback();
+            HandleMouseFallback();
         }
 
         public static void Destroy()
@@ -88,6 +95,8 @@ namespace MDEN.UI.Core
             _closeButtonRect = null;
             _closing = false;
             _enterWasDown = false;
+            _mouseWasDown = false;
+            _ignoreMouseInputUntilFrame = 0;
         }
 
         private static void CloseWithSound()
@@ -127,13 +136,64 @@ namespace MDEN.UI.Core
             _enterWasDown = enterDown;
         }
 
-        private static void HandleCloseButtonMouseFallback()
+        private static void HandleMouseFallback()
         {
-            if (_closeButtonRect == null || !_closeButtonRect.gameObject.activeInHierarchy) return;
-            if (!Input.GetMouseButtonDown(0)) return;
-            if (!RectTransformUtility.RectangleContainsScreenPoint(_closeButtonRect, Input.mousePosition, null)) return;
+            var mouseDown = Input.GetMouseButton(0);
+            if (Time.frameCount <= _ignoreMouseInputUntilFrame)
+            {
+                _mouseWasDown = mouseDown;
+                return;
+            }
 
-            CloseWithSound();
+            if (!mouseDown)
+            {
+                _mouseWasDown = false;
+                return;
+            }
+
+            if (_mouseWasDown) return;
+
+            _mouseWasDown = true;
+
+            var mousePosition = Input.mousePosition;
+            if (IsCloseButtonPoint(mousePosition))
+            {
+                CloseWithSound();
+                return;
+            }
+
+            if (!IsPanelPoint(mousePosition))
+            {
+                CloseWithSound();
+            }
+        }
+
+        private static bool IsCloseButtonPoint(Vector2 screenPoint)
+        {
+            return _closeButtonRect != null &&
+                   _closeButtonRect.gameObject.activeInHierarchy &&
+                   ContainsScreenPoint(_closeButtonRect, screenPoint, CloseButtonHitPadding);
+        }
+
+        private static bool IsPanelPoint(Vector2 screenPoint)
+        {
+            return _panelRoot != null &&
+                   _panelRoot.gameObject.activeInHierarchy &&
+                   ContainsScreenPoint(_panelRoot, screenPoint, 0f);
+        }
+
+        private static bool ContainsScreenPoint(RectTransform rect, Vector2 screenPoint, float padding)
+        {
+            var corners = new Vector3[4];
+            rect.GetWorldCorners(corners);
+            var minX = Mathf.Min(corners[0].x, corners[1].x, corners[2].x, corners[3].x) - padding;
+            var maxX = Mathf.Max(corners[0].x, corners[1].x, corners[2].x, corners[3].x) + padding;
+            var minY = Mathf.Min(corners[0].y, corners[1].y, corners[2].y, corners[3].y) - padding;
+            var maxY = Mathf.Max(corners[0].y, corners[1].y, corners[2].y, corners[3].y) + padding;
+            return screenPoint.x >= minX &&
+                   screenPoint.x <= maxX &&
+                   screenPoint.y >= minY &&
+                   screenPoint.y <= maxY;
         }
 
         private static bool IsEnterKeyDown()
@@ -175,12 +235,7 @@ namespace MDEN.UI.Core
 
             var shadeImage = shade.AddComponent<Image>();
             shadeImage.color = new Color(0f, 0f, 0f, 0.62f);
-            shadeImage.raycastTarget = true;
-
-            var shadeButton = shade.AddComponent<Button>();
-            shadeButton.targetGraphic = shadeImage;
-            shadeButton.transition = Selectable.Transition.None;
-            shadeButton.onClick.AddListener((UnityAction)new Action(CloseWithSound));
+            shadeImage.raycastTarget = false;
 
             return root;
         }
@@ -199,16 +254,12 @@ namespace MDEN.UI.Core
 
             var shadeImage = shade.AddComponent<Image>();
             shadeImage.color = new Color(0f, 0f, 0f, 0.68f);
-            shadeImage.raycastTarget = true;
-
-            var shadeButton = shade.AddComponent<Button>();
-            shadeButton.targetGraphic = shadeImage;
-            shadeButton.transition = Selectable.Transition.None;
-            shadeButton.onClick.AddListener((UnityAction)new Action(CloseWithSound));
+            shadeImage.raycastTarget = false;
 
             var panel = new GameObject("FallbackPanel");
             panel.transform.SetParent(root, false);
             var panelRect = panel.AddComponent<RectTransform>();
+            _panelRoot = panelRect;
             panelRect.anchorMin = new Vector2(0.5f, 0.5f);
             panelRect.anchorMax = new Vector2(0.5f, 0.5f);
             panelRect.pivot = new Vector2(0.5f, 0.5f);
@@ -584,6 +635,7 @@ namespace MDEN.UI.Core
             image.sprite = GetRoundedSprite();
             image.type = image.sprite != null ? Image.Type.Sliced : Image.Type.Simple;
             image.color = new Color(1f, 0.46f, 0.86f, 0.92f);
+            image.raycastTarget = true;
 
             var button = buttonObj.AddComponent<Button>();
             button.targetGraphic = image;

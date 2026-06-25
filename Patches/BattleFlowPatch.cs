@@ -3,6 +3,7 @@ using System.Linq;
 using System.Reflection;
 using System.Threading.Tasks;
 using HarmonyLib;
+using Il2CppFormulaBase;
 using Il2Cpp;
 using Il2CppArcadeController.UI.Panel.PnlHome;
 using Il2CppAssets.Scripts.Database;
@@ -42,6 +43,7 @@ namespace MDEN.Patches
             _pauseButton = null;
             _pnlVictory = null;
             _lastWaitingHintUtc = default;
+            SettlementOverlayController.ResetShortcutState();
         }
 
         internal static void ResetBattleSceneState()
@@ -53,6 +55,7 @@ namespace MDEN.Patches
             _pauseButton = null;
             _pnlVictory = null;
             _lastWaitingHintUtc = default;
+            SettlementOverlayController.Reset();
         }
 
         internal static void UpdateBattleUiState()
@@ -178,6 +181,12 @@ namespace MDEN.Patches
         {
             private static bool Prefix(KeyCode key, ref bool __result)
             {
+                if (key == KeyCode.R && SettlementOverlayController.ShouldBlockNativeRestartShortcut())
+                {
+                    __result = false;
+                    return false;
+                }
+
                 if (key != KeyCode.Escape || !IsMultiplayerBattleContext) return true;
 
                 __result = false;
@@ -191,7 +200,19 @@ namespace MDEN.Patches
         {
             private static bool Prefix()
             {
+                if (SettlementOverlayController.ShouldBlockNativeRestartShortcut()) return false;
+
                 return !IsMultiplayerBattleContext;
+            }
+        }
+
+        [HarmonyPatch(typeof(StageBattleComponent), nameof(StageBattleComponent.GameRestart))]
+        [HarmonyPriority(Priority.First)]
+        internal static class StageBattleRestartPatch
+        {
+            private static bool Prefix()
+            {
+                return !SettlementOverlayController.ShouldBlockNativeRestartShortcut();
             }
         }
 
@@ -201,11 +222,14 @@ namespace MDEN.Patches
         {
             private static bool Prefix()
             {
-                if (!IsMultiplayerBattleContext || BattleResultFlowManager.CanExitBattleResult)
+                if (!IsMultiplayerBattleContext ||
+                    BattleResultFlowManager.CanExitBattleResult ||
+                    TryReleaseNativeResultExitIfReported())
                 {
                     return true;
                 }
 
+                TryStartResultFlowFromNativePanel();
                 ShowWaitingForOthersHint();
                 return false;
             }
@@ -222,48 +246,90 @@ namespace MDEN.Patches
 
         private static void TryShowBattleResultByKeyboard()
         {
-            if (!LobbyManager.IsInLobby) return;
-            if (BattleResultBannerDisplay.IsConsumingKeyboard) return;
-            if (BattleResultFlowManager.GetLastBattleResultSnapshot().Length == 0) return;
-            if (!Input.GetKeyDown(KeyCode.R)) return;
-
-            if (BattleResultFlowManager.IsBattleResultFlowPending)
-            {
-                ShowWaitingForOthersHint();
-                return;
-            }
-
-            BattleResultBannerDisplay.ShowOrRefresh(GetBattleResultSnapshot());
+            SettlementOverlayController.UpdateBattleResultShortcut(
+                BattleResultFlowManager.GetLastBattleResultSnapshot,
+                GetBattleResultSnapshot,
+                ShowWaitingForOthersHint);
         }
 
         private static void RecoverNativeResultInputIfReady()
         {
             if (!LobbyManager.IsInLobby) return;
-            if (BattleResultBannerDisplay.IsConsumingKeyboard) return;
-            if (!IsNativeResultPanelVisible()) return;
+            if (SettlementOverlayController.IsBattleResultActive) return;
+            if (!SettlementOverlayController.IsNativeBattleResultPanelVisible()) return;
 
             if (!BattleResultFlowManager.CanExitBattleResult)
             {
-                if (LobbyManager.CurrentLobby?.IsPlaying == true) return;
+                if (TryStartResultFlowFromNativePanel()) return;
+                if (LobbyManager.CurrentLobby?.IsPlaying == true && !BattleManager.HasReportedBattleFinished) return;
 
-                BattleResultFlowManager.SetCanExitBattleResult(true);
-                BattleResultFlowManager.SetBattleResultFlowPending(false);
-                SetVictoryButtons(true);
+                AllowBattleResultExit(LobbyManager.CurrentLobby?.IsPlaying != true);
             }
 
             NativeInputBlocker.ForceUnblockIfIdle();
         }
 
-        private static bool IsNativeResultPanelVisible()
+        private static bool TryReleaseNativeResultExitIfReported()
         {
-            return IsVisible("UI_2D/Standard/PnlVictory") ||
-                   IsVisible("UI_2D/Standard/PnlFail");
+            if (!SettlementOverlayController.IsNativeBattleResultPanelVisible()) return false;
+            if (!BattleManager.HasReportedBattleFinished) return false;
+
+            AllowBattleResultExit(false);
+            return true;
         }
 
-        private static bool IsVisible(string path)
+        private static bool TryStartResultFlowFromNativePanel()
         {
-            var obj = GameObject.Find(path);
-            return obj != null && obj.activeInHierarchy;
+            if (BattleResultFlowManager.IsBattleResultFlowPending) return false;
+            if (BattleManager.HasReportedBattleFinished) return false;
+
+            var victoryVisible = SettlementOverlayController.IsNativeVictoryPanelVisible();
+            if (!victoryVisible && !SettlementOverlayController.IsNativeFailPanelVisible()) return false;
+
+            MDEN.Managers.ClientLogManager.Warning("Recovering multiplayer result flow from visible native result panel.");
+            SetVictoryButtons(false);
+            ChartPreviewController.HoldPreviewUntilResultPanelCloses();
+            _ = FinishBattleAndShowResultsAsync(victoryVisible);
+            return true;
+        }
+
+        private static void AllowBattleResultExit(bool clearPending)
+        {
+            if (BattleManager.HasReportedBattleFinished)
+            {
+                BattleManager.StopSyncLoop();
+            }
+
+            BattleResultFlowManager.SetCanExitBattleResult(true);
+            if (clearPending)
+            {
+                BattleResultFlowManager.SetBattleResultFlowPending(false);
+            }
+
+            SetVictoryButtons(true);
+            ClearResultInputBlocks();
+        }
+
+        private static void AllowBattleResultExitOnMainThread(bool clearPending)
+        {
+            BattleResultFlowManager.SetCanExitBattleResult(true);
+            if (clearPending)
+            {
+                BattleResultFlowManager.SetBattleResultFlowPending(false);
+            }
+
+            MainThreadDispatcher.Enqueue(() => AllowBattleResultExit(clearPending));
+        }
+
+        private static void ClearResultInputBlocks()
+        {
+            if (SettlementOverlayController.IsBattleResultActive)
+            {
+                NativeInputBlocker.ClearKnown("RoomChat", "RoomChatInput");
+                return;
+            }
+
+            NativeInputBlocker.ClearKnown("BattleResult", "RoomChat", "RoomChatInput");
         }
 
         private static bool HidePauseButton()
@@ -317,7 +383,7 @@ namespace MDEN.Patches
         {
             BattleResultFlowManager.SetCanExitBattleResult(false);
             BattleResultFlowManager.SetBattleResultFlowPending(true);
-            BattleResultBannerDisplay.ClearAll();
+            SettlementOverlayController.CloseBattleResult();
             BattleManager.MarkLocalBattleFinished(alive);
             MainThreadDispatcher.Enqueue(() => SetVictoryButtons(false));
             RememberBattleResultSnapshot(BattleManager.GetBattleDataSnapshot());
@@ -333,10 +399,14 @@ namespace MDEN.Patches
             {
                 await BattleManager.ReportBattleFinishedAsync(alive);
                 RememberBattleResultSnapshot(BattleManager.GetBattleDataSnapshot());
+                if (BattleManager.HasReportedBattleFinished)
+                {
+                    AllowBattleResultExitOnMainThread(!IsSameBattleStillPlaying(finishingBattleId));
+                }
 
                 if (alive)
                 {
-                    BattleResultBannerDisplay.ShowOrRefresh(GetBattleResultSnapshot());
+                    SettlementOverlayController.ShowBattleResult(GetBattleResultSnapshot());
                 }
                 else
                 {
@@ -356,7 +426,7 @@ namespace MDEN.Patches
                     var resultSnapshot = GetBattleResultSnapshot();
                     if (resultSnapshot.Length > 0)
                     {
-                        BattleResultBannerDisplay.ShowOrRefresh(resultSnapshot);
+                        SettlementOverlayController.ShowBattleResult(resultSnapshot);
                     }
                     else
                     {
@@ -375,9 +445,13 @@ namespace MDEN.Patches
             }
             finally
             {
-                var canExit = alive || resultFlowComplete || !IsSameBattleStillPlaying(finishingBattleId);
+                var battleStillPlaying = IsSameBattleStillPlaying(finishingBattleId);
+                var canExit = alive ||
+                              BattleManager.HasReportedBattleFinished ||
+                              resultFlowComplete ||
+                              !battleStillPlaying;
                 BattleResultFlowManager.SetCanExitBattleResult(canExit);
-                BattleResultFlowManager.SetBattleResultFlowPending(!canExit);
+                BattleResultFlowManager.SetBattleResultFlowPending(!resultFlowComplete && battleStillPlaying);
                 MainThreadDispatcher.Enqueue(() => SetVictoryButtons(canExit));
                 if (!canExit)
                 {
@@ -397,7 +471,7 @@ namespace MDEN.Patches
                 var resultSnapshot = GetBattleResultSnapshot();
                 if (resultSnapshot.Length > 0)
                 {
-                    BattleResultBannerDisplay.ShowOrRefresh(resultSnapshot);
+                    SettlementOverlayController.ShowBattleResult(resultSnapshot);
                 }
             }
             catch (System.Exception ex)
@@ -475,7 +549,7 @@ namespace MDEN.Patches
             _lastWaitingHintUtc = now;
             MainThreadDispatcher.Enqueue(() =>
             {
-                BattleResultBannerDisplay.AllowNativeMessagesBriefly();
+                SettlementOverlayController.AllowNativeMessagesBriefly();
                 Il2CppAssets.Scripts.UI.Controls.ShowText.ShowInfo("等待其他人完成游戏中...");
             });
         }
@@ -512,7 +586,7 @@ namespace MDEN.Patches
                     btnReset.onClick = new Button.ButtonClickedEvent();
                     btnReset.onClick.AddListener((UnityAction)(() =>
                     {
-                        BattleResultBannerDisplay.ShowOrRefresh(GetBattleResultSnapshot());
+                        SettlementOverlayController.ShowBattleResult(GetBattleResultSnapshot());
                     }));
                 }
             }
@@ -541,8 +615,8 @@ namespace MDEN.Patches
         private static BattlePlayerEntry[] GetBattleResultSnapshot()
         {
             if (BattleResultFlowManager.IsBattleResultFlowPending ||
-                BattleResultBannerDisplay.IsVisible ||
-                BattleResultBannerDisplay.ShowingResults)
+                SettlementOverlayController.IsBattleResultVisible ||
+                SettlementOverlayController.IsBattleResultShowing)
             {
                 var lastSnapshot = BattleResultFlowManager.GetLastBattleResultSnapshot();
                 if (lastSnapshot.Length > 0) return lastSnapshot;

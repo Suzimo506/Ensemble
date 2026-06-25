@@ -211,6 +211,12 @@ namespace MDEN.UI.Core
                 return false;
             }
 
+            if (Managers.PlaylistManager.IsRookieMode() &&
+                !IsRookieDifficultySelectionReady(musicInfo, entry.Difficulty))
+            {
+                return false;
+            }
+
             if (CustomAlbumsWindowGuard.CloseIfOpen("battle start"))
             {
                 ShowText.ShowInfo("已关闭自制谱窗口，正在重新尝试进入多人游戏");
@@ -230,10 +236,28 @@ namespace MDEN.UI.Core
 
         private static void SyncSelectedChart(MusicInfo musicInfo, int difficulty)
         {
-            HiddenDifficultyController.Sync(musicInfo, difficulty);
-            GlobalDataBase.dbMusicTag.selectedDiffTglIndex = difficulty == 4 ? 3 : difficulty;
+            var nativeDifficulty = HiddenDifficultyController.Sync(musicInfo, difficulty);
+            GlobalDataBase.dbMusicTag.selectedDiffTglIndex = nativeDifficulty;
             GlobalDataBase.dbMusicTag.pnlSelectMusicUid = musicInfo.uid;
             GlobalDataBase.dbMusicTag.m_CurSelectedMusicInfo = musicInfo;
+        }
+
+        private static bool IsRookieDifficultySelectionReady(MusicInfo musicInfo, int difficulty)
+        {
+            if (difficulty == 4)
+            {
+                return HiddenDifficultyController.IsHiddenDifficultySelected(
+                    musicInfo,
+                    GlobalDataBase.dbMusicTag.selectedDiffTglIndex);
+            }
+
+            if (difficulty == 3)
+            {
+                return GlobalDataBase.dbMusicTag.selectedDiffTglIndex == 3 &&
+                       !HiddenDifficultyController.IsHiddenInvoked(musicInfo);
+            }
+
+            return GlobalDataBase.dbMusicTag.selectedDiffTglIndex == difficulty;
         }
 
         private static bool IsNativeChartSelectionReady(MusicInfo musicInfo)

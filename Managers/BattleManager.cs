@@ -38,6 +38,7 @@ namespace MDEN.Managers
         public static bool Synchronizing => _synchronizing;
         public static bool IsActiveMultiplayerBattle =>
             LobbyManager.IsInLobby && (_multiplayerBattleActive || LobbyManager.CurrentLobby?.IsPlaying == true);
+        public static bool HasReportedBattleFinished => _finishReported;
         public static event Action<BattlePlayerEntry[]> BattleDataChanged;
 
         public static void Init()

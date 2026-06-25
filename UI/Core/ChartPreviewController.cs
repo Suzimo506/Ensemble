@@ -1,6 +1,5 @@
 using System.Collections;
 using Il2CppAssets.Scripts.Database;
-using Il2CppAssets.Scripts.UI.Panels;
 using MDEN.Managers;
 using MDEN.Protocol.Messages.Lobby;
 using MelonLoader;
@@ -79,7 +78,7 @@ namespace MDEN.UI.Core
                 return;
             }
 
-            if (!IsNativeResultPanelVisible())
+            if (!SettlementOverlayController.IsNativeResultOverlayVisible())
             {
                 Preview(entry);
             }
@@ -166,37 +165,7 @@ namespace MDEN.UI.Core
 
         private static bool ShouldDelayPreviewForBattleResult()
         {
-            return BattleResultFlowManager.IsBattleResultFlowPending ||
-                   BattleResultBannerDisplay.IsVisible ||
-                   BattleResultBannerDisplay.ShowingResults ||
-                   IsNativeResultPanelVisible();
-        }
-
-        private static bool IsNativeResultPanelVisible()
-        {
-            return IsVisible("UI_2D/Standard/PnlVictory") ||
-                   IsVisible("UI_2D/Standard/PnlFail") ||
-                   IsVisible("UI_2D/Standard/PnlRank") ||
-                   IsActiveRankPanelVisible();
-        }
-
-        private static bool IsVisible(string path)
-        {
-            var obj = GameObject.Find(path);
-            return obj != null && obj.activeInHierarchy;
-        }
-
-        private static bool IsActiveRankPanelVisible()
-        {
-            try
-            {
-                var panel = GameObject.FindObjectOfType<PnlRank>();
-                return panel != null && panel.gameObject != null && panel.gameObject.activeInHierarchy;
-            }
-            catch
-            {
-                return false;
-            }
+            return SettlementOverlayController.ShouldDelayChartPreviewForResult();
         }
 
         internal static void Preview(PlaylistEntryViewModel entry)
@@ -208,14 +177,31 @@ namespace MDEN.UI.Core
                 return;
             }
 
+            var difficulty = ResolvePreviewDifficulty(entry);
             NativeChartNavigator.JumpToChart(musicInfo);
-            HiddenDifficultyController.Sync(musicInfo, entry.Difficulty);
-            SyncSelectedChart(musicInfo, entry.Difficulty);
+            SyncSelectedChart(musicInfo, difficulty);
+        }
+
+        private static int ResolvePreviewDifficulty(PlaylistEntryViewModel entry)
+        {
+            if (!PlaylistManager.IsRookieMode() || !PlaylistManager.IsLocalPlayerReady()) return entry.Difficulty;
+
+            var currentBattleDifficulty = LobbyManager.GetCurrentBattleDifficulty(PlayerManager.CurrentUid);
+            if (MDEN.Protocol.Rules.DifficultyDisplayRules.IsKnownDifficulty(currentBattleDifficulty))
+            {
+                return currentBattleDifficulty;
+            }
+
+            var readyDifficulty = LobbyManager.GetReadyDifficulty(PlayerManager.CurrentUid);
+            return MDEN.Protocol.Rules.DifficultyDisplayRules.IsKnownDifficulty(readyDifficulty)
+                ? readyDifficulty
+                : entry.Difficulty;
         }
 
         private static void SyncSelectedChart(MusicInfo musicInfo, int difficulty)
         {
-            GlobalDataBase.dbMusicTag.selectedDiffTglIndex = difficulty == 4 ? 3 : difficulty;
+            var nativeDifficulty = HiddenDifficultyController.Sync(musicInfo, difficulty);
+            GlobalDataBase.dbMusicTag.selectedDiffTglIndex = nativeDifficulty;
             GlobalDataBase.dbMusicTag.pnlSelectMusicUid = musicInfo.uid;
             GlobalDataBase.dbMusicTag.m_CurSelectedMusicInfo = musicInfo;
         }

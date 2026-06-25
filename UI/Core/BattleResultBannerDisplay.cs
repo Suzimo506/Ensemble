@@ -7,7 +7,6 @@ using MDEN.Managers;
 using MDEN.Protocol.Models;
 using MDEN.UI.Displays;
 using UnityEngine;
-using UnityEngine.Events;
 using UnityEngine.UI;
 
 namespace MDEN.UI.Core
@@ -43,17 +42,17 @@ namespace MDEN.UI.Core
         private static BattlePlayerEntry[] _pendingRefreshPlayers;
         private static int _resultGeneration;
         private static int _suppressNativeMessagesUntilFrame;
-        private static bool _keyboardBlocked;
         private static bool _enterWasDown;
+        private static int _ignoreMouseInputUntilFrame;
 
         public static bool ShowingResults { get; private set; }
         public static bool IsVisible => _root != null;
-        public static bool IsConsumingKeyboard => IsVisible || ShowingResults;
+        public static bool IsActive => IsVisible || ShowingResults;
         private static bool IsSuppressingNativeMessages => IsVisible || Time.frameCount <= _suppressNativeMessagesUntilFrame;
 
         public static void RefreshIfVisible(BattlePlayerEntry[] players)
         {
-            if (!IsVisible && !ShowingResults) return;
+            if (!IsActive) return;
             if (ShowingResults)
             {
                 _pendingRefreshPlayers = CloneBattleEntries(players);
@@ -67,7 +66,7 @@ namespace MDEN.UI.Core
 
         public static void ShowOrRefresh(BattlePlayerEntry[] players)
         {
-            if (IsVisible || ShowingResults)
+            if (IsActive)
             {
                 RefreshIfVisible(players);
                 return;
@@ -78,8 +77,7 @@ namespace MDEN.UI.Core
 
         public static void Update()
         {
-            UpdateKeyboardBlock();
-            HandleEnterKeyEdge();
+            HandleOverlayInput();
             UpdateEntryAnimations();
             if (IsSuppressingNativeMessages && Time.frameCount >= _nextNativeMessageSuppressFrame)
             {
@@ -155,31 +153,17 @@ namespace MDEN.UI.Core
                 if (generation == 0 || generation == _resultGeneration)
                 {
                     ShowingResults = false;
-                    UpdateKeyboardBlock();
+                    ReleaseBattleResultInputBlock();
                 }
             }
         }
 
         public static void CloseWithSound()
         {
-            if (!IsVisible && !ShowingResults) return;
+            if (!IsActive) return;
 
             UiSoundManager.Play(UiSound.Yes, ClickSoundVolumeScale);
             ClearAll();
-        }
-
-        public static bool ShouldConsumeKeyDown(KeyCode key)
-        {
-            if (!IsConsumingKeyboard) return false;
-            return key == KeyCode.R || key == KeyCode.Return || key == KeyCode.KeypadEnter;
-        }
-
-        public static void HandleConsumedKeyDown(KeyCode key)
-        {
-            if (key == KeyCode.Return || key == KeyCode.KeypadEnter)
-            {
-                CloseWithSound();
-            }
         }
 
         public static void ClearAll()
@@ -192,8 +176,9 @@ namespace MDEN.UI.Core
             _nextNativeMessageSuppressFrame = 0;
             ShowingResults = false;
             _enterWasDown = false;
+            _ignoreMouseInputUntilFrame = 0;
             _allowNativeMessagesUntilFrame = 0;
-            SetKeyboardBlocked(false);
+            ReleaseBattleResultInputBlock();
             MainThreadDispatcher.Enqueue(ClearAllOnMainThread);
         }
 
@@ -220,7 +205,7 @@ namespace MDEN.UI.Core
         {
             DestroyRoot();
             ClearNativeEntries();
-            UpdateKeyboardBlock();
+            ReleaseBattleResultInputBlock();
         }
 
         private static async Task AddOneAsync(BattlePlayerEntry player, int rank, int index, int count, int generation, EntryLayout layout)
@@ -269,6 +254,8 @@ namespace MDEN.UI.Core
             _entryRoot.anchoredPosition = new Vector2(0f, 18f);
             _entryRoot.sizeDelta = new Vector2(EntryWidth, 720f);
             _enterWasDown = IsEnterKeyDown();
+            _ignoreMouseInputUntilFrame = Time.frameCount + 1;
+            ReleaseBattleResultInputBlock();
         }
 
         private static void CreateShade(RectTransform rootRect)
@@ -284,11 +271,7 @@ namespace MDEN.UI.Core
 
             var image = shade.AddComponent<Image>();
             image.color = new Color(0f, 0f, 0f, 0.56f);
-            image.raycastTarget = true;
-
-            var button = shade.AddComponent<Button>();
-            button.transition = Selectable.Transition.None;
-            button.onClick.AddListener((UnityAction)CloseWithSound);
+            image.raycastTarget = false;
         }
 
         private static void AddEntry(
@@ -671,43 +654,17 @@ namespace MDEN.UI.Core
 
             DestroyRoot();
             CreateRoot();
-            UpdateKeyboardBlock();
+            ReleaseBattleResultInputBlock();
             StartNativeMessageSuppression();
             return _root != null && _entryRoot != null;
         }
 
-        private static void UpdateKeyboardBlock()
+        private static void ReleaseBattleResultInputBlock()
         {
-            var shouldBlock = IsConsumingKeyboard;
-            if (_keyboardBlocked == shouldBlock) return;
-
-            SetKeyboardBlocked(shouldBlock);
+            NativeInputBlocker.ClearAndForceUnblockIfIdle("BattleResult");
         }
 
-        private static void SetKeyboardBlocked(bool blocked)
-        {
-            if (_keyboardBlocked == blocked)
-            {
-                if (!blocked)
-                {
-                    NativeInputBlocker.ClearAndForceUnblockIfIdle("BattleResult");
-                }
-
-                return;
-            }
-
-            _keyboardBlocked = blocked;
-            if (blocked)
-            {
-                NativeInputBlocker.SetBlocked("BattleResult", true);
-            }
-            else
-            {
-                NativeInputBlocker.ClearAndForceUnblockIfIdle("BattleResult");
-            }
-        }
-
-        private static void HandleEnterKeyEdge()
+        private static void HandleOverlayInput()
         {
             if (!IsVisible)
             {
@@ -722,6 +679,38 @@ namespace MDEN.UI.Core
             }
 
             _enterWasDown = enterDown;
+            if (IsVisible)
+            {
+                HandleBlankAreaClick();
+            }
+        }
+
+        private static void HandleBlankAreaClick()
+        {
+            if (Time.frameCount <= _ignoreMouseInputUntilFrame) return;
+            if (!Input.GetMouseButtonDown(0)) return;
+            if (IsPointerOverResultEntry(Input.mousePosition)) return;
+
+            CloseWithSound();
+        }
+
+        private static bool IsPointerOverResultEntry(Vector2 screenPosition)
+        {
+            if (_entryRoot == null) return false;
+
+            for (var i = 0; i < _entryRoot.childCount; i++)
+            {
+                var child = _entryRoot.GetChild(i);
+                if (child == null || !child.gameObject.activeInHierarchy) continue;
+
+                var rect = child.GetComponent<RectTransform>();
+                if (rect != null && RectTransformUtility.RectangleContainsScreenPoint(rect, screenPosition, null))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private static bool IsEnterKeyDown()

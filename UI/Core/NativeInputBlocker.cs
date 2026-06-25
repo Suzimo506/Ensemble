@@ -54,6 +54,26 @@ namespace MDEN.UI.Core
             }
         }
 
+        public static void ClearKnown(params string[] reasons)
+        {
+            if (reasons != null)
+            {
+                for (var i = 0; i < reasons.Length; i++)
+                {
+                    var reason = reasons[i];
+                    if (!string.IsNullOrWhiteSpace(reason))
+                    {
+                        Reasons.Remove(reason);
+                    }
+                }
+            }
+
+            if (Reasons.Count == 0)
+            {
+                ForceUnblock();
+            }
+        }
+
         public static void ClearAll()
         {
             Reasons.Clear();

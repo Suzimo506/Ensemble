@@ -39,7 +39,7 @@ namespace MDEN.UI.Core
             _loggedWaitingForLobby = false;
             _retryScheduled = false;
             _pendingSinceUtc = default;
-            SettlementResultDialog.Destroy();
+            SettlementOverlayController.ClearAll();
             _initialized = false;
         }
 
@@ -123,7 +123,7 @@ namespace MDEN.UI.Core
                 MDEN.Managers.ClientLogManager.Msg(string.IsNullOrEmpty(waitReason)
                     ? "Showing settlement result dialog."
                     : $"Showing settlement result dialog after wait override: {waitReason}");
-                SettlementResultDialog.Show(result);
+                SettlementOverlayController.ShowFinalSettlement(result);
             }
         }
 
