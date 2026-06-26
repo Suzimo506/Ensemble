@@ -10,8 +10,8 @@ permissions:
   contents: read
 
 jobs:
-  build-protocol:
-    name: Build MDEN.Protocol
+  protocol:
+    name: Build Protocol
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -20,24 +20,75 @@ jobs:
       - name: Setup .NET 6
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '6.0.x'
-
-      - name: Cache NuGet
-        uses: actions/cache@v4
-        with:
-          path: ~/.nuget/packages
-          key: ${{ runner.os }}-nuget-${{ hashFiles('MDEN.Protocol/MDEN.Protocol.csproj') }}
-          restore-keys: ${{ runner.os }}-nuget-
-
-      - name: Restore
-        run: dotnet restore MDEN.Protocol/MDEN.Protocol.csproj
+          dotnet-version: 6.0.x
 
       - name: Build
-        run: dotnet build MDEN.Protocol/MDEN.Protocol.csproj -c Release --no-restore
+        run: dotnet build MDEN.Protocol/MDEN.Protocol.csproj -c Release
 
-      - name: Upload MDEN.Protocol
+      - name: Upload Protocol
         uses: actions/upload-artifact@v4
         with:
           name: MDEN.Protocol
           path: MDEN.Protocol/bin/Release/net6.0/MDEN.Protocol.dll
+          if-no-files-found: error
+
+  mod:
+    name: Build Mod
+    runs-on: windows-latest
+    env:
+      GAME_ASSETS_URL: ${{ secrets.GAME_ASSETS_URL }}
+    steps:
+      - name: Skip without game assets
+        if: ${{ env.GAME_ASSETS_URL == '' }}
+        run: echo "GAME_ASSETS_URL is not configured; skipping full mod build."
+
+      - name: Checkout
+        if: ${{ env.GAME_ASSETS_URL != '' }}
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 6
+        if: ${{ env.GAME_ASSETS_URL != '' }}
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 6.0.x
+
+      - name: Download game assets
+        if: ${{ env.GAME_ASSETS_URL != '' }}
+        run: |
+          $ProgressPreference = 'SilentlyContinue'
+          Invoke-WebRequest -Uri $env:GAME_ASSETS_URL -OutFile game-assets.zip
+          Expand-Archive -Path game-assets.zip -DestinationPath musedash -Force
+
+      - name: Validate game assets
+        if: ${{ env.GAME_ASSETS_URL != '' }}
+        run: |
+          $required = @(
+            'musedash\MelonLoader\net6\MelonLoader.dll',
+            'musedash\MelonLoader\net6\0Harmony.dll',
+            'musedash\MelonLoader\Il2CppAssemblies\Assembly-CSharp.dll',
+            'musedash\MelonLoader\Il2CppAssemblies\UnityEngine.CoreModule.dll',
+            'musedash\Mods\CustomAlbums.dll',
+            'musedash\Mods\LocalizeLib.dll',
+            'musedash\Mods\PopupLib.dll'
+          )
+          foreach ($path in $required) {
+            if (-not (Test-Path -LiteralPath $path)) {
+              throw "Missing required game asset: $path"
+            }
+          }
+
+      - name: Build
+        if: ${{ env.GAME_ASSETS_URL != '' }}
+        run: dotnet build MDEN.csproj -c Release -p:CopyToMuseDash=false
+        env:
+          MD_NET6_DIRECTORY: ${{ github.workspace }}\musedash
+
+      - name: Upload Mod
+        if: ${{ env.GAME_ASSETS_URL != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: Ensemble-Mod
+          path: |
+            bin/Release/net6.0/Ensemble.dll
+            bin/Release/net6.0/MDEN.Protocol.dll
           if-no-files-found: error

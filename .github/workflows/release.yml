@@ -1,0 +1,79 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build Release
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 6
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 6.0.x
+
+      - name: Require game assets
+        env:
+          GAME_ASSETS_URL: ${{ secrets.GAME_ASSETS_URL }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:GAME_ASSETS_URL)) {
+            Write-Error "GAME_ASSETS_URL secret is required to build the Muse Dash mod release."
+            exit 1
+          }
+
+      - name: Download game assets
+        env:
+          GAME_ASSETS_URL: ${{ secrets.GAME_ASSETS_URL }}
+        run: |
+          $ProgressPreference = 'SilentlyContinue'
+          Invoke-WebRequest -Uri $env:GAME_ASSETS_URL -OutFile game-assets.zip
+          Expand-Archive -Path game-assets.zip -DestinationPath musedash -Force
+
+      - name: Validate game assets
+        run: |
+          $required = @(
+            'musedash\MelonLoader\net6\MelonLoader.dll',
+            'musedash\MelonLoader\net6\0Harmony.dll',
+            'musedash\MelonLoader\Il2CppAssemblies\Assembly-CSharp.dll',
+            'musedash\MelonLoader\Il2CppAssemblies\UnityEngine.CoreModule.dll',
+            'musedash\Mods\CustomAlbums.dll',
+            'musedash\Mods\LocalizeLib.dll',
+            'musedash\Mods\PopupLib.dll'
+          )
+          foreach ($path in $required) {
+            if (-not (Test-Path -LiteralPath $path)) {
+              throw "Missing required game asset: $path"
+            }
+          }
+
+      - name: Build
+        run: dotnet build MDEN.csproj -c Release -p:CopyToMuseDash=false
+        env:
+          MD_NET6_DIRECTORY: ${{ github.workspace }}\musedash
+
+      - name: Stage release
+        run: |
+          New-Item -ItemType Directory -Force release | Out-Null
+          Copy-Item bin\Release\net6.0\Ensemble.dll release\
+          Copy-Item bin\Release\net6.0\MDEN.Protocol.dll release\
+
+      - name: Zip release
+        run: |
+          Compress-Archive -Path release\* -DestinationPath Ensemble-${{ github.ref_name }}.zip -Force
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: Ensemble-${{ github.ref_name }}.zip
+          generate_release_notes: true
+          draft: false
+          prerelease: false
