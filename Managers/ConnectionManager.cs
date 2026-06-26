@@ -36,7 +36,15 @@ namespace MDEN.Managers
 
         public static async Task<LoginResponse> ConnectAndLoginAsync(string address, string serverDisplayName = null, bool isOfficialServer = false)
         {
-            return await ConnectAndLoginAsync(address, serverDisplayName, isOfficialServer, false);
+            try
+            {
+                return await ConnectAndLoginAsync(address, serverDisplayName, isOfficialServer, false);
+            }
+            catch (Exception ex)
+            {
+                UiNotificationManager.RequestToast(FormatConnectFailureMessage(ex));
+                throw;
+            }
         }
 
         public static async Task<bool> ReconnectToCurrentServerAsync()
@@ -295,6 +303,27 @@ namespace MDEN.Managers
         private static string GetClientVersion()
         {
             return MelonBase.FindMelon("Ensemble", "MDENTeam")?.Info?.Version ?? "unknown";
+        }
+
+        private static string FormatConnectFailureMessage(Exception ex)
+        {
+            var reason = ex?.Message;
+            if (string.IsNullOrWhiteSpace(reason))
+            {
+                reason = "未知错误";
+            }
+
+            if (reason == "名字最多16字")
+            {
+                return "请先前往个人信息将名字改短";
+            }
+
+            if (reason == "Failed to connect to server.")
+            {
+                reason = "无法连接到服务器";
+            }
+
+            return $"进入服务器失败：{reason}";
         }
 
         private readonly struct ServerEndpoint
