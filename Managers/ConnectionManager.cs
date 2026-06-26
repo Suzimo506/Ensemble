@@ -162,7 +162,7 @@ namespace MDEN.Managers
                     {
                         MarkReconnectFailed();
                     }
-                    throw new ProtocolException("服务器版本过旧，请更换节点或等待服务器更新。");
+                    throw new ProtocolException(I18nManager.T("connection.version_old"));
                 }
 
                 PlayerManager.SetCurrentIdentity(account.Uid, displayName);
@@ -219,17 +219,17 @@ namespace MDEN.Managers
         {
             if (IsReconnecting)
             {
-                throw new InvalidOperationException("正在重连服务器，请稍候。");
+                throw new InvalidOperationException(I18nManager.T("connection.reconnecting"));
             }
 
             if (!NetworkClient.Instance.IsConnected)
             {
-                throw new InvalidOperationException("未连接服务器。");
+                throw new InvalidOperationException(I18nManager.T("connection.not_connected"));
             }
 
             if (!IsLoggedIn)
             {
-                throw new InvalidOperationException("尚未登录服务器。");
+                throw new InvalidOperationException(I18nManager.T("connection.not_logged_in"));
             }
         }
 
@@ -310,20 +310,20 @@ namespace MDEN.Managers
             var reason = ex?.Message;
             if (string.IsNullOrWhiteSpace(reason))
             {
-                reason = "未知错误";
+                reason = I18nManager.T("common.unknown_error");
             }
 
             if (reason == "名字最多16字")
             {
-                return "请先前往个人信息将名字改短";
+                return I18nManager.T("connection.name_too_long");
             }
 
             if (reason == "Failed to connect to server.")
             {
-                reason = "无法连接到服务器";
+                reason = I18nManager.T("connection.connect_failed_reason");
             }
 
-            return $"进入服务器失败：{reason}";
+            return I18nManager.Tf("connection.join_failed", reason);
         }
 
         private readonly struct ServerEndpoint

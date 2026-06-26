@@ -74,7 +74,7 @@ namespace MDEN.UI.Windows
         private void BuildList()
         {
             _window.ForumObjects.Clear();
-            _btnAddFriend = AddButton("- 添加好友 -", BuildDetails());
+            _btnAddFriend = AddButton(I18nManager.T("player.add_friend"), BuildDetails());
         }
 
         private ForumObject AddButton(string title, string description)
@@ -100,7 +100,7 @@ namespace MDEN.UI.Windows
             {
                 if (string.IsNullOrWhiteSpace(_player.Uid) || _player.Uid == PlayerManager.CurrentUid)
                 {
-                    Il2CppAssets.Scripts.UI.Controls.ShowText.ShowInfo("目标玩家无效");
+                    Il2CppAssets.Scripts.UI.Controls.ShowText.ShowInfo(I18nManager.T("player.invalid"));
                     return;
                 }
 
@@ -110,7 +110,7 @@ namespace MDEN.UI.Windows
 
         private async Task SendFriendRequestAsync()
         {
-            IDisposable uiLock = WindowStackController.LockUI("处理中...");
+            IDisposable uiLock = WindowStackController.LockUI(I18nManager.T("common.processing"));
             try
             {
                 var response = await SocialManager.SendFriendRequestAsync(_player.Uid);
@@ -132,11 +132,11 @@ namespace MDEN.UI.Windows
         {
             return action switch
             {
-                1 => "好友请求已发送",
-                2 => "已添加好友",
-                3 => "已删除好友",
-                4 => "已取消好友请求",
-                _ => "好友状态未变化"
+                1 => I18nManager.T("friend.request_sent"),
+                2 => I18nManager.T("friend.added"),
+                3 => I18nManager.T("friend.removed"),
+                4 => I18nManager.T("friend.request_cancelled"),
+                _ => I18nManager.T("friend.unchanged")
             };
         }
 
@@ -202,34 +202,34 @@ namespace MDEN.UI.Windows
 
         private string BuildDetails()
         {
-            return $"头衔\n{EscapeRichText(GetDisplayTitle())}\n\n" +
+            return $"{I18nManager.T("player.profile.title_label")}\n{EscapeRichText(GetDisplayTitle())}\n\n" +
                 $"UID\n{EscapeRichText(_player.Uid)}\n\n" +
-                $"状态\n{GetStatusText(_player.Status)}\n\n" +
-                $"名字颜色\n{EscapeRichText(GetDisplayColor())}\n\n" +
-                $"入场提示\n{EscapeRichText(GetDisplayEntranceMessage())}\n\n" +
-                $"个人介绍\n{EscapeRichText(GetDisplayBio())}";
+                $"{I18nManager.T("player.profile.status_label")}\n{GetStatusText(_player.Status)}\n\n" +
+                $"{I18nManager.T("player.profile.color_label")}\n{EscapeRichText(GetDisplayColor())}\n\n" +
+                $"{I18nManager.T("player.profile.entrance_label")}\n{EscapeRichText(GetDisplayEntranceMessage())}\n\n" +
+                $"{I18nManager.T("player.profile.bio_label")}\n{EscapeRichText(GetDisplayBio())}";
         }
 
         private string GetDisplayName()
         {
             if (!string.IsNullOrWhiteSpace(_profile?.Name)) return _profile.Name;
-            return string.IsNullOrWhiteSpace(_player.Name) ? _player.Uid ?? "玩家资料" : _player.Name;
+            return string.IsNullOrWhiteSpace(_player.Name) ? _player.Uid ?? I18nManager.T("player.profile.fallback_title") : _player.Name;
         }
 
         private string GetDisplayTitle()
         {
             if (!string.IsNullOrWhiteSpace(_profile?.Title)) return _profile.Title;
-            return string.IsNullOrWhiteSpace(_player.Title) ? "暂无头衔" : _player.Title;
+            return string.IsNullOrWhiteSpace(_player.Title) ? I18nManager.T("player.profile.no_title") : _player.Title;
         }
 
         private string GetDisplayBio()
         {
-            return string.IsNullOrWhiteSpace(_profile?.Bio) ? "暂无介绍" : _profile.Bio;
+            return string.IsNullOrWhiteSpace(_profile?.Bio) ? I18nManager.T("player.profile.no_bio") : _profile.Bio;
         }
 
         private string GetDisplayEntranceMessage()
         {
-            return string.IsNullOrWhiteSpace(_profile?.EntranceMessage) ? "暂无入场提示" : _profile.EntranceMessage;
+            return string.IsNullOrWhiteSpace(_profile?.EntranceMessage) ? I18nManager.T("player.profile.no_entrance") : _profile.EntranceMessage;
         }
 
         private string GetDisplayColor()
@@ -253,13 +253,13 @@ namespace MDEN.UI.Windows
             switch ((PlayerStatus)status)
             {
                 case PlayerStatus.Online:
-                    return "在线";
+                    return I18nManager.T("player.status.online");
                 case PlayerStatus.InLobby:
-                    return "房间中";
+                    return I18nManager.T("player.status.in_lobby");
                 case PlayerStatus.InBattle:
-                    return "游戏中";
+                    return I18nManager.T("player.status.in_battle");
                 default:
-                    return "未知";
+                    return I18nManager.T("common.unknown");
             }
         }
 

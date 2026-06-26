@@ -27,7 +27,7 @@ namespace MDEN.UI.Windows
         private int _lastSelectedIndex = -1;
         private bool _createInProgress;
 
-        private string _roomName = "联机房间";
+        private string _roomName = I18nManager.T("create.default_room_name");
         private ushort _maxPlayers = 4;
         private LobbyPlayMode _playMode = LobbyPlayMode.Normal;
         private ushort _playlistSize = 12;
@@ -62,45 +62,45 @@ namespace MDEN.UI.Windows
             _window.ForumObjects.Clear();
             _lastSelectedIndex = -1;
 
-            _btnBack = new ForumObject(new LocalString("- 返回 -"), new LocalString("回到房间列表"));
+            _btnBack = new ForumObject(new LocalString(I18nManager.T("common.back.button")), new LocalString(I18nManager.T("common.back.room_list")));
             _btnBack.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("OptionsPanel.png")?.texture;
             _window.ForumObjects.Add(_btnBack);
 
-            _btnName = new ForumObject(new LocalString("房间名称"), new LocalString($"房间名称: {HighlightValue(EscapeRichText(_roomName))}\n点击后输入房间名称，24字上限"));
+            _btnName = new ForumObject(new LocalString(I18nManager.T("create.name.title")), new LocalString(I18nManager.Tf("create.name.desc", HighlightValue(EscapeRichText(_roomName)))));
             _btnName.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("HomePanel.png")?.texture;
             _window.ForumObjects.Add(_btnName);
 
-            _btnMaxPlayers = new ForumObject(new LocalString("人数"), new LocalString($"最多人数: {HighlightValue(_maxPlayers)}\n点击后输入人数，范围 2-10"));
+            _btnMaxPlayers = new ForumObject(new LocalString(I18nManager.T("create.players.title")), new LocalString(I18nManager.Tf("create.players.desc", HighlightValue(_maxPlayers))));
             _btnMaxPlayers.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("PlayerCard.png")?.texture;
             _window.ForumObjects.Add(_btnMaxPlayers);
 
             _btnPlayMode = new ForumObject(
-                new LocalString("游玩模式"),
-                new LocalString($"游玩模式: {FormatPlayMode(_playMode)}\n点击切换为{FormatPlayMode(LobbyRuleTextFormatter.GetNextPlayMode((byte)_playMode))}"));
+                new LocalString(I18nManager.T("create.play_mode.title")),
+                new LocalString(I18nManager.Tf("create.play_mode.desc", FormatPlayMode(_playMode), FormatPlayMode(LobbyRuleTextFormatter.GetNextPlayMode((byte)_playMode)))));
             _btnPlayMode.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("OptionsPanel.png")?.texture;
             _window.ForumObjects.Add(_btnPlayMode);
 
-            _btnPlaylistSize = new ForumObject(new LocalString("歌曲列表长度"), new LocalString($"列表长度: {HighlightValue(_playlistSize)}\n点击后输入歌曲列表长度，范围 2-32"));
+            _btnPlaylistSize = new ForumObject(new LocalString(I18nManager.T("create.playlist_size.title")), new LocalString(I18nManager.Tf("create.playlist_size.desc", HighlightValue(_playlistSize))));
             _btnPlaylistSize.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("RoomList.png")?.texture;
             _window.ForumObjects.Add(_btnPlaylistSize);
 
-            _btnGoal = new ForumObject(new LocalString("获胜方式"), new LocalString($"获胜方式: {HighlightValue(GetGoalName())}\n点击在准确率和分数间切换"));
+            _btnGoal = new ForumObject(new LocalString(I18nManager.T("create.goal.title")), new LocalString(I18nManager.Tf("create.goal.desc", HighlightValue(GetGoalName()))));
             _btnGoal.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("SocialNetwork.png")?.texture;
             _window.ForumObjects.Add(_btnGoal);
 
-            _btnSettlement = new ForumObject(new LocalString("结算功能"), new LocalString($"结算功能: {HighlightValue(GetSettlementNamePlain())}\n开启后每五首歌弹出一次结算"));
+            _btnSettlement = new ForumObject(new LocalString(I18nManager.T("create.settlement.title")), new LocalString(I18nManager.Tf("create.settlement.desc", HighlightValue(GetSettlementNamePlain()))));
             _btnSettlement.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("OptionsPanel.png")?.texture;
             _window.ForumObjects.Add(_btnSettlement);
 
-            _btnPassword = new ForumObject(new LocalString("房间密码"), new LocalString($"密码: {HighlightValue(string.IsNullOrWhiteSpace(_password) ? "无" : "已设置")}\n输入空内容可清除密码，16字上限"));
+            _btnPassword = new ForumObject(new LocalString(I18nManager.T("create.password.title")), new LocalString(I18nManager.Tf("create.password.desc", HighlightValue(string.IsNullOrWhiteSpace(_password) ? I18nManager.T("common.no") : I18nManager.T("common.set")))));
             _btnPassword.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("SocialNetwork.png")?.texture;
             _window.ForumObjects.Add(_btnPassword);
 
             var createTitle = _createInProgress
-                ? $"<color={Constants.ColorYellow}>- 创建中... -</color>"
-                : $"<color={Constants.ColorYellow}>- 确认创建 -</color>";
+                ? $"<color={Constants.ColorYellow}>{I18nManager.T("create.creating.button")}</color>"
+                : $"<color={Constants.ColorYellow}>{I18nManager.T("create.confirm.button")}</color>";
             var createDescription = _createInProgress
-                ? $"请求已提交，正在等待服务器回应\n名称: {HighlightValue(EscapeRichText(_roomName))}"
+                ? I18nManager.Tf("create.creating.desc", HighlightValue(EscapeRichText(_roomName)))
                 : BuildSummary();
             _btnCreate = new ForumObject(new LocalString(createTitle), new LocalString(createDescription));
             _btnCreate.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("RoomList.png")?.texture;
@@ -113,7 +113,7 @@ namespace MDEN.UI.Windows
 
             if (_createInProgress)
             {
-                ShowText.ShowInfo("正在创建房间，请稍候");
+                ShowText.ShowInfo(I18nManager.T("create.in_progress"));
                 return;
             }
 
@@ -218,12 +218,12 @@ namespace MDEN.UI.Windows
 
         private void ShowMaxPlayersInput()
         {
-            ShowNumberInput("人数", 2, 10, value => _maxPlayers = value);
+            ShowNumberInput(I18nManager.T("create.players.title"), 2, 10, value => _maxPlayers = value);
         }
 
         private void ShowPlaylistSizeInput()
         {
-            ShowNumberInput("歌曲列表长度", 2, 32, value => _playlistSize = value);
+            ShowNumberInput(I18nManager.T("create.playlist_size.title"), 2, 32, value => _playlistSize = value);
         }
 
         private void ShowNumberInput(string fieldName, int min, int max, Action<ushort> applyValue)
@@ -243,7 +243,7 @@ namespace MDEN.UI.Windows
                 }
                 else
                 {
-                    ShowText.ShowInfo($"{fieldName}必须在 {min}-{max} 之间");
+                    ShowText.ShowInfo(I18nManager.Tf("create.number_range", fieldName, min, max));
                 }
 
                 RebuildWindow();
@@ -255,15 +255,15 @@ namespace MDEN.UI.Windows
         {
             if (_createInProgress)
             {
-                ShowText.ShowInfo("正在创建房间，请稍候");
+                ShowText.ShowInfo(I18nManager.T("create.in_progress"));
                 return;
             }
 
             if (!ConnectionManager.CanSendRequests)
             {
                 var message = ConnectionManager.IsReconnecting
-                    ? "正在重连服务器，请稍候"
-                    : "未连接服务器，请重新选择节点";
+                    ? I18nManager.T("create.reconnecting")
+                    : I18nManager.T("create.not_connected");
                 MDEN.Managers.ClientLogManager.Warning($"Create lobby skipped: {message}");
                 ShowText.ShowInfo(message);
                 if (!ConnectionManager.IsReconnecting)
@@ -275,11 +275,11 @@ namespace MDEN.UI.Windows
             }
 
             _createInProgress = true;
-            ShowText.ShowInfo("正在创建房间...");
+            ShowText.ShowInfo(I18nManager.T("create.creating.toast"));
             RebuildWindow();
 
             var keepPending = false;
-            IDisposable uiLock = WindowStackController.LockUI("Creating lobby...");
+            IDisposable uiLock = WindowStackController.LockUI(I18nManager.T("create.creating.toast"));
 
             try
             {
@@ -307,7 +307,7 @@ namespace MDEN.UI.Windows
             catch (Exception ex)
             {
                 MDEN.Managers.ClientLogManager.Warning($"Create lobby failed: {ex.Message}");
-                MainThreadDispatcher.Enqueue(() => ShowText.ShowInfo($"创建失败：{ex.Message}"));
+                MainThreadDispatcher.Enqueue(() => ShowText.ShowInfo(I18nManager.Tf("create.failed", ex.Message)));
             }
             finally
             {
@@ -332,24 +332,32 @@ namespace MDEN.UI.Windows
 
         private string BuildSummary()
         {
-            return $"名称: {HighlightValue(EscapeRichText(_roomName))}\n人数: {HighlightValue(_maxPlayers)}\n游玩模式: {FormatPlayMode(_playMode)}\n歌曲列表长度: {HighlightValue(_playlistSize)}\n获胜方式: {HighlightValue(GetGoalName())}\n结算功能: {HighlightValue(GetSettlementNamePlain())}\n密码: {HighlightValue(string.IsNullOrWhiteSpace(_password) ? "无" : "已设置")}";
+            return I18nManager.Tf(
+                "create.summary",
+                HighlightValue(EscapeRichText(_roomName)),
+                HighlightValue(_maxPlayers),
+                FormatPlayMode(_playMode),
+                HighlightValue(_playlistSize),
+                HighlightValue(GetGoalName()),
+                HighlightValue(GetSettlementNamePlain()),
+                HighlightValue(string.IsNullOrWhiteSpace(_password) ? I18nManager.T("common.no") : I18nManager.T("common.set")));
         }
 
         private string GetGoalName()
         {
-            return _goal == LobbyGoal.Score ? "分数" : "准确率";
+            return _goal == LobbyGoal.Score ? I18nManager.T("lobby.goal.score") : I18nManager.T("lobby.goal.accuracy");
         }
 
         private string GetSettlementName()
         {
             return _settlementEnabled
-                ? $"<color={Constants.ColorYellow}>开启</color>"
-                : "关闭";
+                ? $"<color={Constants.ColorYellow}>{I18nManager.T("common.enabled")}</color>"
+                : I18nManager.T("common.disabled");
         }
 
         private string GetSettlementNamePlain()
         {
-            return _settlementEnabled ? "开启" : "关闭";
+            return _settlementEnabled ? I18nManager.T("common.enabled") : I18nManager.T("common.disabled");
         }
 
         private static string HighlightValue(object value)
@@ -414,7 +422,7 @@ namespace MDEN.UI.Windows
             var txt = newTitle.GetComponent<UnityEngine.UI.Text>();
             if (txt != null)
             {
-                txt.text = "创建房间";
+                txt.text = I18nManager.T("create.title");
                 txt.alignment = TextAnchor.MiddleCenter;
             }
 

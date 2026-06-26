@@ -325,7 +325,7 @@ namespace MDEN.Managers
 
             if (string.IsNullOrEmpty(CurrentUid))
             {
-                throw new System.InvalidOperationException("Not logged in.");
+                throw new System.InvalidOperationException(I18nManager.T("account.not_logged_in"));
             }
         }
 

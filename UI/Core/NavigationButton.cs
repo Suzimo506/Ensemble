@@ -146,16 +146,16 @@ namespace MDEN.UI.Core
 
             if (currentState == ConnectionLifecycleState.Reconnecting)
             {
-                ShowText.ShowInfo("连接中断，正在重连...");
+                ShowText.ShowInfo(I18nManager.T("connection.interrupted"));
             }
             else if (currentState == ConnectionLifecycleState.Connected &&
                      previousState == ConnectionLifecycleState.Reconnecting)
             {
-                ShowText.ShowInfo("已重新连接服务器");
+                ShowText.ShowInfo(I18nManager.T("connection.reconnected"));
             }
             else if (currentState == ConnectionLifecycleState.ReconnectFailed)
             {
-                ShowText.ShowInfo("重连失败，请重新选择节点");
+                ShowText.ShowInfo(I18nManager.T("connection.reconnect_failed"));
             }
         }
 
@@ -203,7 +203,7 @@ namespace MDEN.UI.Core
             var serverName = EscapeRichText(ConnectionManager.CurrentServerDisplayName);
             if (ConnectionManager.IsReconnecting)
             {
-                _serverLabel.text = $"<color=#{Constants.ColorYellow}>{serverName} 重连中...</color>";
+                _serverLabel.text = $"<color=#{Constants.ColorYellow}>{I18nManager.Tf("connection.reconnecting.label", serverName)}</color>";
             }
             else
             {
@@ -430,7 +430,7 @@ namespace MDEN.UI.Core
         {
             if (_playlistBtn == null)
             {
-                _playlistBtn = CreateTopActionButton("BtnMDENPlaylist", 1, "歌曲列表", () =>
+                _playlistBtn = CreateTopActionButton("BtnMDENPlaylist", 1, I18nManager.T("navigation.playlist"), () =>
                 {
                     WindowStackController.OpenWindow(new RoomPlaylistWindow());
                 });
@@ -438,16 +438,16 @@ namespace MDEN.UI.Core
 
             if (_startBtn == null)
             {
-                _startBtn = CreateTopActionButton("BtnMDENStartGame", 2, "开始游戏", () =>
+                _startBtn = CreateTopActionButton("BtnMDENStartGame", 2, I18nManager.T("navigation.start_game"), () =>
                 {
                     if (LobbyManager.CurrentLobby?.HostUid != PlayerManager.CurrentUid)
                     {
-                        ShowText.ShowInfo("只有房主可以开始游戏哦");
+                        ShowText.ShowInfo(I18nManager.T("navigation.host_only_start"));
                         MDEN.Managers.ClientLogManager.Warning("No permission to start lobby.");
                         return;
                     }
 
-                    NativeConfirmDialog.Show("开始游戏", "确认开始多人准备吗？", confirmed =>
+                    NativeConfirmDialog.Show(I18nManager.T("navigation.start_game"), I18nManager.T("navigation.start_confirm"), confirmed =>
                     {
                         if (!confirmed) return;
                         _ = StartPrepareAsync();
@@ -460,11 +460,11 @@ namespace MDEN.UI.Core
         {
             if (CustomAlbumsWindowGuard.CloseIfOpen("start prepare"))
             {
-                MainThreadDispatcher.Enqueue(() => ShowText.ShowInfo("已关闭自制谱窗口，请重新开始准备"));
+                MainThreadDispatcher.Enqueue(() => ShowText.ShowInfo(I18nManager.T("navigation.custom_closed_start")));
                 return;
             }
 
-            IDisposable uiLock = WindowStackController.LockUI("Starting lobby...");
+            IDisposable uiLock = WindowStackController.LockUI(I18nManager.T("common.starting"));
 
             try
             {
@@ -473,7 +473,7 @@ namespace MDEN.UI.Core
             catch (Exception ex)
             {
                 MDEN.Managers.ClientLogManager.Warning($"Start lobby prepare failed: {ex.Message}");
-                MainThreadDispatcher.Enqueue(() => ShowText.ShowInfo($"开始失败：{ex.Message}"));
+                MainThreadDispatcher.Enqueue(() => ShowText.ShowInfo(I18nManager.Tf("navigation.start_failed", ex.Message)));
             }
             finally
             {

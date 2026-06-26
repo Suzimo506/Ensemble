@@ -515,15 +515,15 @@ namespace MDEN.UI.Core
                 $"<color=#{Constants.ColorYellow}>【{roomName}】</color> " +
                 LobbyRuleTextFormatter.FormatPlayMode(lobby.PlayMode, true);
             _roomMeta.text =
-                $"房主：<color=#{GetPlayerColor(lobby.HostUid)}>{hostName}</color>  " +
-                $"人数：<color=#{Constants.ColorCyan}>{GetPlayerCount(lobby)}/{lobby.MaxPlayers}</color>  " +
-                $"观众：<color=#{Constants.ColorCyan}>{lobby.WatcherCount}</color>";
+                $"{I18nManager.T("room.host.meta")}<color=#{GetPlayerColor(lobby.HostUid)}>{hostName}</color>  " +
+                $"{I18nManager.T("room.players.meta")}<color=#{Constants.ColorCyan}>{GetPlayerCount(lobby)}/{lobby.MaxPlayers}</color>  " +
+                $"{I18nManager.T("room.watchers")}<color=#{Constants.ColorCyan}>{lobby.WatcherCount}</color>";
             UpdatePlayerScrollHint(showScrollHint, players.Length - maxVisibleRows, PlayerListTop + playerListHeight);
 
             if (players.Length == 0)
             {
                 EnsurePlayerRowCount(1);
-                PlayerRows[0].Set(PlayerListTop, null, null, null, "暂无玩家", "ffffffff", string.Empty, "ffffffff");
+                PlayerRows[0].Set(PlayerListTop, null, null, null, I18nManager.T("room.no_players"), "ffffffff", string.Empty, "ffffffff");
                 HidePlayerRowsFrom(1);
                 return;
             }
@@ -562,7 +562,7 @@ namespace MDEN.UI.Core
             }
 
             _playerScrollHint.text =
-                $"<color=#{Constants.ColorCyan}>还有 {Math.Max(0, hiddenPlayerCount)} 位玩家未显示，滚动查看</color>";
+                $"<color=#{Constants.ColorCyan}>{I18nManager.Tf("room.hidden_players_hint", Math.Max(0, hiddenPlayerCount))}</color>";
         }
 
         private static void HandlePlayerListPointerInput(LobbySyncPush lobby)
@@ -665,20 +665,20 @@ namespace MDEN.UI.Core
         {
             if (lobby.IsPlaying)
             {
-                return new PlayerStateText("游戏中", PlayerPlayingColor);
+                return new PlayerStateText(I18nManager.T("lobby.status.playing"), PlayerPlayingColor);
             }
 
             if (!lobby.Locked)
             {
-                return new PlayerStateText("选歌中", PlayerSelectingColor);
+                return new PlayerStateText(I18nManager.T("room.player.selecting"), PlayerSelectingColor);
             }
 
             var ready = !string.IsNullOrEmpty(uid) &&
                         lobby.ReadyPlayers != null &&
                         Array.IndexOf(lobby.ReadyPlayers, uid) >= 0;
             var state = ready
-                ? new PlayerStateText("已准备", PlayerReadyColor)
-                : new PlayerStateText("未准备", PlayerNotReadyColor);
+                ? new PlayerStateText(I18nManager.T("room.player.ready"), PlayerReadyColor)
+                : new PlayerStateText(I18nManager.T("room.player.not_ready"), PlayerNotReadyColor);
 
             if (LobbyPlayModeRules.IsRookie(lobby.PlayMode))
             {

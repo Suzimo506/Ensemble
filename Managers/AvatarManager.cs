@@ -99,19 +99,19 @@ namespace MDEN.Managers
             var safePath = NormalizeSourcePath(sourcePath);
             if (string.IsNullOrWhiteSpace(safePath) || !File.Exists(safePath))
             {
-                throw new InvalidOperationException("头像文件不存在");
+                throw new InvalidOperationException(I18nManager.T("avatar.file_missing"));
             }
 
             var extension = Path.GetExtension(safePath)?.ToLowerInvariant();
             if (extension != ".png" && extension != ".jpg" && extension != ".jpeg")
             {
-                throw new InvalidOperationException("头像只支持 png、jpg、jpeg");
+                throw new InvalidOperationException(I18nManager.T("avatar.unsupported_type"));
             }
 
             var info = new FileInfo(safePath);
             if (info.Length <= 0 || info.Length > MaxSourceBytes)
             {
-                throw new InvalidOperationException("头像文件过大，最大支持 4MB");
+                throw new InvalidOperationException(I18nManager.T("avatar.file_too_large"));
             }
 
             var sourceBytes = File.ReadAllBytes(safePath);
@@ -121,7 +121,7 @@ namespace MDEN.Managers
                 sourceWidth > MaxSourceDimension ||
                 sourceHeight > MaxSourceDimension)
             {
-                throw new InvalidOperationException("头像尺寸无效，最大支持 2048x2048");
+                throw new InvalidOperationException(I18nManager.T("avatar.invalid_size"));
             }
 
             var sourceTexture = new Texture2D(2, 2, TextureFormat.RGBA32, false);
@@ -130,7 +130,7 @@ namespace MDEN.Managers
             {
                 if (!ImageConversion.LoadImage(sourceTexture, sourceBytes))
                 {
-                    throw new InvalidOperationException("头像图片读取失败");
+                    throw new InvalidOperationException(I18nManager.T("avatar.read_failed"));
                 }
 
                 if (sourceTexture.width <= 0 ||
@@ -138,19 +138,19 @@ namespace MDEN.Managers
                     sourceTexture.width > MaxSourceDimension ||
                     sourceTexture.height > MaxSourceDimension)
                 {
-                    throw new InvalidOperationException("头像尺寸无效，最大支持 2048x2048");
+                    throw new InvalidOperationException(I18nManager.T("avatar.invalid_size"));
                 }
 
                 if (!TryCreateEncodedAvatar(sourceTexture, out circular, out var pngBytes))
                 {
-                    throw new InvalidOperationException("头像压缩后仍太大，请换一张尺寸更小或细节更少的图片");
+                    throw new InvalidOperationException(I18nManager.T("avatar.compress_too_large"));
                 }
 
                 var avatarName = BuildAvatarName(pngBytes);
                 var avatarPath = GetAvatarPath(avatarName);
                 if (avatarPath == null)
                 {
-                    throw new InvalidOperationException("头像保存路径无效");
+                    throw new InvalidOperationException(I18nManager.T("avatar.save_path_invalid"));
                 }
 
                 Directory.CreateDirectory(Path.GetDirectoryName(avatarPath));
@@ -209,7 +209,7 @@ namespace MDEN.Managers
             var items = new List<AvatarLibraryItem>();
             items.Add(new AvatarLibraryItem(
                 AvatarLibraryItem.DefaultId,
-                "默认头像",
+                I18nManager.T("avatar.default.name"),
                 null,
                 loadPreviewTextures ? GetTexture(GetDefaultAvatarSprite()) : null));
 
@@ -289,13 +289,13 @@ namespace MDEN.Managers
 
             if (string.IsNullOrWhiteSpace(normalizedPath))
             {
-                error = "头像文件夹路径不能为空";
+                error = I18nManager.T("avatar.folder_empty");
                 return false;
             }
 
             if (!Directory.Exists(normalizedPath))
             {
-                error = "头像文件夹不存在";
+                error = I18nManager.T("avatar.folder_missing");
                 return false;
             }
 
@@ -937,7 +937,7 @@ namespace MDEN.Managers
         public AvatarLibraryItem(string id, string displayName, string path, Texture2D texture)
         {
             Id = id;
-            DisplayName = string.IsNullOrWhiteSpace(displayName) ? "头像" : displayName;
+            DisplayName = string.IsNullOrWhiteSpace(displayName) ? I18nManager.T("avatar.generic_name") : displayName;
             Path = path;
             Texture = texture;
         }

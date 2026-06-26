@@ -55,7 +55,7 @@ namespace MDEN.Managers
         {
             if (!_hasCachedAccount || string.IsNullOrWhiteSpace(_cachedAccount.Uid))
             {
-                throw new InvalidOperationException("PeroUid is not available. Please log in to the game account first.");
+                throw new InvalidOperationException(I18nManager.T("account.pero_uid_missing"));
             }
 
             return _cachedAccount;

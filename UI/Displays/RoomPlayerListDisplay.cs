@@ -31,7 +31,7 @@ namespace MDEN.UI.Displays
 
             var activeKeys = new List<string> { "title" };
             var watcherInfo = lobby.WatcherCount > 0
-                ? $"观众：<color=#{Constants.ColorCyan}>{lobby.WatcherCount}</color> "
+                ? $"{I18nManager.T("room.watchers")}<color=#{Constants.ColorCyan}>{lobby.WatcherCount}</color> "
                 : string.Empty;
             SetEntry(
                 "title",
@@ -42,7 +42,7 @@ namespace MDEN.UI.Displays
                 var key = $"player:{player.Uid}";
                 activeKeys.Add(key);
 
-                var hostPrefix = player.Uid == lobby.HostUid ? $"<color=#{Constants.ColorYellow}>[Host]</color> " : string.Empty;
+                var hostPrefix = player.Uid == lobby.HostUid ? $"<color=#{Constants.ColorYellow}>{I18nManager.T("room.host.badge")}</color> " : string.Empty;
                 var localColorStart = player.Uid == PlayerManager.CurrentUid ? $"<color=#{Constants.ColorCyan}>" : string.Empty;
                 var localColorEnd = player.Uid == PlayerManager.CurrentUid ? "</color>" : string.Empty;
                 var readyState = GetReadyStateText(lobby, player.Uid);
@@ -80,7 +80,7 @@ namespace MDEN.UI.Displays
 
             var isReady = lobby.ReadyPlayers != null && lobby.ReadyPlayers.Contains(uid);
             var color = isReady ? Constants.ColorGreen : NotReadyColor;
-            var text = isReady ? "已准备" : "未准备";
+            var text = isReady ? I18nManager.T("room.player.ready") : I18nManager.T("room.player.not_ready");
             return $" <size=22><color=#{color}>{text}</color></size>";
         }
 

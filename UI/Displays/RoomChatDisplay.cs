@@ -374,7 +374,7 @@ namespace MDEN.UI.Displays
             var placeholderTxt = inputField.placeholder?.GetComponent<Text>();
             if (placeholderTxt != null)
             {
-                placeholderTxt.text = "按\"/\"或点击输入框输入消息";
+                placeholderTxt.text = I18nManager.T("chat.placeholder");
                 placeholderTxt.fontSize = inputField.textComponent != null ? inputField.textComponent.fontSize : 22;
                 placeholderTxt.color = new Color(1f, 1f, 1f, 0.45f);
                 placeholderTxt.alignment = TextAnchor.MiddleLeft;
@@ -644,13 +644,13 @@ namespace MDEN.UI.Displays
                 var mdtReply = ParseMdtReply(message);
                 if (IsMdtCommand(message) && mdtReply == null)
                 {
-                    throw new InvalidOperationException("请输入 /mdt yes 或 /mdt no");
+                    throw new InvalidOperationException(I18nManager.T("chat.mdt.reply_usage"));
                 }
 
                 if (mdtReply != null)
                 {
                     await ChatManager.SendMdtHostReplyAsync(mdtReply);
-                    MainThreadDispatcher.Enqueue(() => ShowText.ShowInfo("回应成功"));
+                    MainThreadDispatcher.Enqueue(() => ShowText.ShowInfo(I18nManager.T("chat.mdt.reply_success")));
                 }
                 else
                 {
@@ -720,7 +720,7 @@ namespace MDEN.UI.Displays
 
             if (msg.Message == "房主可以输入/mdt yes/no 来回应同意或拒绝")
             {
-                return $"{SystemPrefix()} {ColorText("房主可以输入/mdt yes/no 来回应同意或拒绝", Constants.ColorYellow)}";
+                return $"{SystemPrefix()} {ColorText(I18nManager.T("chat.mdt.host_reply_tip"), Constants.ColorYellow)}";
             }
 
             if (msg.Message == "PlayerMissingChart")
@@ -728,15 +728,15 @@ namespace MDEN.UI.Displays
                 var missing = ParsePlayerMissingChart(msg);
                 if (missing.HasValue)
                 {
-                    return $"{SystemPrefix()} {ColorText(EscapeRichText(missing.Value.PlayerName), RedTextColor)} 未下载该谱面: {FormatMissingChartNameForDisplay(missing.Value.ChartName)}";
+                    return $"{SystemPrefix()} {ColorText(EscapeRichText(missing.Value.PlayerName), RedTextColor)} {I18nManager.Tf("chat.player_missing_chart", FormatMissingChartNameForDisplay(missing.Value.ChartName))}";
                 }
             }
 
             var textMissing = ParseTextMissingChart(msg.Message);
             if (textMissing.HasValue)
             {
-                var playerName = string.IsNullOrWhiteSpace(textMissing.Value.Players) ? "Unknown" : textMissing.Value.Players;
-                return $"{SystemPrefix()} {ColorText(EscapeRichText(playerName), RedTextColor)} 未下载该谱面: {FormatMissingChartNameForDisplay(textMissing.Value.ChartName)}";
+                var playerName = string.IsNullOrWhiteSpace(textMissing.Value.Players) ? I18nManager.T("common.unknown") : textMissing.Value.Players;
+                return $"{SystemPrefix()} {ColorText(EscapeRichText(playerName), RedTextColor)} {I18nManager.Tf("chat.player_missing_chart", FormatMissingChartNameForDisplay(textMissing.Value.ChartName))}";
             }
 
             if ((msg.Message == "PlaylistAdd" || msg.Message == "PlaylistRemove") &&
@@ -747,7 +747,7 @@ namespace MDEN.UI.Displays
                 {
                     var playerName = playlistEvent.Value.PlayerName;
                     var chartName = playlistEvent.Value.ChartName;
-                    var action = msg.Message == "PlaylistAdd" ? "添加了" : "移除了";
+                    var action = msg.Message == "PlaylistAdd" ? I18nManager.T("chat.playlist_added") : I18nManager.T("chat.playlist_removed");
                     return $"{SystemPrefix()} {ColorText(EscapeRichText(playerName), GetPlayerColorByName(playerName))} {action} {ColorText(EscapeRichText(CleanChartNameForDisplay(chartName)), Constants.ColorYellow)}";
                 }
             }
@@ -757,7 +757,7 @@ namespace MDEN.UI.Displays
                 var player = ParsePlayerEventData(msg);
                 if (player.HasValue)
                 {
-                    return $"{SystemPrefix()} {ColorText(EscapeRichText(player.Value.Text), GetPlayerColor(player.Value.Uid, player.Value.Text))} 加入了房间";
+                    return $"{SystemPrefix()} {ColorText(EscapeRichText(player.Value.Text), GetPlayerColor(player.Value.Uid, player.Value.Text))} {I18nManager.T("chat.player_joined")}";
                 }
             }
 
@@ -766,7 +766,7 @@ namespace MDEN.UI.Displays
                 var player = ParsePlayerEventData(msg);
                 if (player.HasValue)
                 {
-                    return $"{SystemPrefix()} {ColorText(EscapeRichText(player.Value.Text), GetPlayerColor(player.Value.Uid, player.Value.Text))} 离开了房间";
+                    return $"{SystemPrefix()} {ColorText(EscapeRichText(player.Value.Text), GetPlayerColor(player.Value.Uid, player.Value.Text))} {I18nManager.T("chat.player_left")}";
                 }
             }
 
@@ -781,39 +781,39 @@ namespace MDEN.UI.Displays
 
             if (msg.Message == "房主已开始游戏，请准备")
             {
-                return $"{SystemPrefix()} {ColorText("房主已开始游戏，请准备", GreenTextColor)}";
+                return $"{SystemPrefix()} {ColorText(I18nManager.T("chat.host_started"), GreenTextColor)}";
             }
 
             if (msg.Message == "所有玩家已准备，开始游戏")
             {
-                return $"{SystemPrefix()} {ColorText("所有玩家已准备，开始游戏", GreenTextColor)}";
+                return $"{SystemPrefix()} {ColorText(I18nManager.T("chat.all_ready"), GreenTextColor)}";
             }
 
             if (msg.Message == "房主已停止游戏")
             {
-                return $"{SystemPrefix()} {ColorText("房主已停止游戏", RedTextColor)}";
+                return $"{SystemPrefix()} {ColorText(I18nManager.T("chat.host_stopped"), RedTextColor)}";
             }
 
             if (!string.IsNullOrWhiteSpace(msg.Message) && TryParsePlayerFinishedMessage(msg.Message, out var finishedPlayerName))
             {
-                return $"{SystemPrefix()} {ColorText(EscapeRichText(finishedPlayerName), OrangeTextColor)} {ColorText("已完成", OrangeTextColor)}";
+                return $"{SystemPrefix()} {ColorText(EscapeRichText(finishedPlayerName), OrangeTextColor)} {ColorText(I18nManager.T("chat.finished"), OrangeTextColor)}";
             }
 
             if (!string.IsNullOrWhiteSpace(msg.Message) && TryParseChartFinishedMessage(msg.Message, out var finishedChartName))
             {
-                return $"{SystemPrefix()} {ColorText("已完成", PinkTextColor)} {ColorText(EscapeRichText(CleanChartNameForDisplay(finishedChartName)), PinkTextColor)}";
+                return $"{SystemPrefix()} {ColorText(I18nManager.T("chat.finished"), PinkTextColor)} {ColorText(EscapeRichText(CleanChartNameForDisplay(finishedChartName)), PinkTextColor)}";
             }
 
             if (!string.IsNullOrWhiteSpace(msg.Message) && msg.Message.EndsWith(" 已准备"))
             {
                 var playerName = msg.Message.Substring(0, msg.Message.Length - " 已准备".Length);
-                return $"{SystemPrefix()} {ColorText(EscapeRichText(playerName), GetPlayerColorByName(playerName))} {ColorText("已准备", GreenTextColor)}";
+                return $"{SystemPrefix()} {ColorText(EscapeRichText(playerName), GetPlayerColorByName(playerName))} {ColorText(I18nManager.T("room.player.ready"), GreenTextColor)}";
             }
 
             if (!string.IsNullOrWhiteSpace(msg.Message) && msg.Message.EndsWith(" 取消准备"))
             {
                 var playerName = msg.Message.Substring(0, msg.Message.Length - " 取消准备".Length);
-                return $"{SystemPrefix()} {ColorText(EscapeRichText(playerName), GetPlayerColorByName(playerName))} {ColorText("取消准备", RedTextColor)}";
+                return $"{SystemPrefix()} {ColorText(EscapeRichText(playerName), GetPlayerColorByName(playerName))} {ColorText(I18nManager.T("chat.cancel_ready"), RedTextColor)}";
             }
 
             return $"{SystemPrefix()} {EscapeRichText(msg.Message)}";
@@ -884,7 +884,7 @@ namespace MDEN.UI.Displays
             var target = FindPlaylistEntryForPreview(chartName, chartKey, difficulty);
             if (target == null)
             {
-                ShowText.ShowInfo("未在歌曲列表找到该谱面");
+                ShowText.ShowInfo(I18nManager.T("chat.chart_not_in_playlist"));
                 return;
             }
 
@@ -1097,7 +1097,7 @@ namespace MDEN.UI.Displays
 
         private static string SystemPrefix()
         {
-            return ColorText("[系统]", Constants.ColorYellow);
+            return ColorText(I18nManager.T("chat.system_prefix"), Constants.ColorYellow);
         }
 
         private string GetPlayerColorByName(string playerName)

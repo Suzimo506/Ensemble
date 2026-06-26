@@ -45,22 +45,22 @@ namespace MDEN.UI.Windows
             _window.ForumObjects.Clear();
             _avatarItems.Clear();
 
-            _btnBack = AddButton("- 返回 -", "回到个人信息");
+            _btnBack = AddButton(I18nManager.T("common.back.button"), I18nManager.T("profile.avatar.back"));
 
             var items = AvatarManager.GetAvatarLibraryItems(false);
             foreach (var item in items)
             {
-                var title = item.IsDefault ? "默认头像" : item.DisplayName;
+                var title = item.IsDefault ? I18nManager.T("avatar.default.name") : item.DisplayName;
                 var description = item.IsDefault
-                    ? "使用 Ensemble 默认头像"
-                    : $"使用这个头像\n{EscapeRichText(Path.GetFileName(item.Path))}";
+                    ? I18nManager.T("avatar.default.desc")
+                    : I18nManager.Tf("avatar.use.desc", EscapeRichText(Path.GetFileName(item.Path)));
                 var button = AddButton(title, description);
                 _avatarItems[button] = item;
             }
 
             if (items.Length <= 1)
             {
-                AddButton("暂无头像文件", BuildEmptyGuideText());
+                AddButton(I18nManager.T("avatar.empty.title"), BuildEmptyGuideText());
             }
         }
 
@@ -80,8 +80,10 @@ namespace MDEN.UI.Windows
 
         private static string BuildEmptyGuideText()
         {
-            return $"<color={Constants.ColorGreen}>把 png、jpg 或 jpeg 图片放入头像文件夹后，重新进入这个页面即可选择。\n" +
-                   $"当前头像文件夹：{EscapeRichText(AvatarManager.GetAvatarLibraryFolder())}</color>";
+            return I18nManager.Tf(
+                "avatar.empty.guide",
+                Constants.ColorGreen,
+                EscapeRichText(AvatarManager.GetAvatarLibraryFolder()));
         }
 
         private async void OnSelectionChanged(PopupLib.UI.Windows.Interfaces.IListWindow window, int objectIndex)
@@ -109,13 +111,13 @@ namespace MDEN.UI.Windows
 
         private async Task SelectAvatarAsync(AvatarLibraryItem item)
         {
-            IDisposable uiLock = WindowStackController.LockUI("Saving avatar...");
+            IDisposable uiLock = WindowStackController.LockUI(I18nManager.T("common.saving"));
             try
             {
                 var avatarName = AvatarManager.ImportAvatarFromLibraryItem(item);
                 await PlayerManager.UpdateAvatarAsync(avatarName);
                 await TrySyncLocalProfileToServerAsync();
-                ShowText.ShowInfo("头像已更新");
+                ShowText.ShowInfo(I18nManager.T("avatar.updated"));
                 GoBack();
             }
             catch (Exception ex)
@@ -200,7 +202,7 @@ namespace MDEN.UI.Windows
             var text = newTitle.GetComponent<UnityEngine.UI.Text>();
             if (text != null)
             {
-                text.text = "选择头像";
+                text.text = I18nManager.T("avatar.title");
                 text.alignment = TextAnchor.MiddleCenter;
             }
 

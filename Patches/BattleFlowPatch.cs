@@ -593,7 +593,7 @@ namespace MDEN.Patches
             MainThreadDispatcher.Enqueue(() =>
             {
                 SettlementOverlayController.AllowNativeMessagesBriefly();
-                Il2CppAssets.Scripts.UI.Controls.ShowText.ShowInfo("等待其他人完成游戏中...");
+                Il2CppAssets.Scripts.UI.Controls.ShowText.ShowInfo(I18nManager.T("battle.wait_others"));
             });
         }
 
@@ -610,7 +610,7 @@ namespace MDEN.Patches
                 var txtContinue = btnContinue.transform.Find("TxtContinue")?.GetComponent<Text>();
                 if (txtContinue != null)
                 {
-                    txtContinue.text = canContinue ? "继续" : "等待中";
+                    txtContinue.text = canContinue ? I18nManager.T("battle.continue") : I18nManager.T("battle.waiting");
                 }
 
                 var imgBtnA = btnContinue.transform.Find("TxtContinue/ImgBtnA");
@@ -624,7 +624,7 @@ namespace MDEN.Patches
                 if (canContinue)
                 {
                     var txtRestart = btnReset.transform.Find("TxtRestart")?.GetComponent<Text>();
-                    if (txtRestart != null) txtRestart.text = "排行榜";
+                    if (txtRestart != null) txtRestart.text = I18nManager.T("battle.leaderboard");
 
                     btnReset.onClick = new Button.ButtonClickedEvent();
                     btnReset.onClick.AddListener((UnityAction)(() =>

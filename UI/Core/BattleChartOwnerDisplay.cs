@@ -78,11 +78,11 @@ namespace MDEN.UI.Core
         private static string FormatOwnerText()
         {
             var entry = PlaylistManager.GetCurrentPlaylistEntry();
-            var owner = string.IsNullOrWhiteSpace(entry?.OwnerName) ? "Unknown" : entry.OwnerName;
-            var text = $"<size=22>选谱人: <color=#{Constants.ColorCyan}>{EscapeRichText(owner)}</color></size>";
+            var owner = string.IsNullOrWhiteSpace(entry?.OwnerName) ? I18nManager.T("common.unknown") : entry.OwnerName;
+            var text = $"<size=22>{I18nManager.T("room.battle_owner")}<color=#{Constants.ColorCyan}>{EscapeRichText(owner)}</color></size>";
             if (ConnectionManager.IsReconnecting)
             {
-                text += $"\n<size=20><color=#{Constants.ColorRed}>网络质量差，尝试重连中...</color></size>";
+                text += $"\n<size=20><color=#{Constants.ColorRed}>{I18nManager.T("room.reconnecting_quality")}</color></size>";
             }
 
             return text;

@@ -1,6 +1,7 @@
 using Il2Cpp;
 using Il2CppAssets.Scripts.Database;
 using Il2CppAssets.Scripts.UI.Controls;
+using MDEN.Managers;
 using MDEN.Protocol.Rules;
 using UnityEngine;
 
@@ -120,7 +121,7 @@ namespace MDEN.UI.Core
                     battleId,
                     entryText,
                     "SelectionNotReady",
-                    "本地选歌界面未准备好，未能进入联机游戏。");
+                    I18nManager.T("battle.start.selection_not_ready"));
                 if (_startedLobbyId == lobbyId && _startedBattleId == battleId && _startedBattleEntry == entryText)
                 {
                     _startedLobbyId = 0;
@@ -147,7 +148,7 @@ namespace MDEN.UI.Core
                     Managers.LobbyManager.CurrentLobby?.CurrentBattleId,
                     entryText,
                     "InvalidPlaylistEntry",
-                    "联机歌曲信息无效，未能进入游戏。");
+                    I18nManager.T("battle.start.invalid_entry"));
                 return true;
             }
 
@@ -170,7 +171,7 @@ namespace MDEN.UI.Core
                     Managers.LobbyManager.CurrentLobby?.CurrentBattleId,
                     entryText,
                     "ChartMissing",
-                    $"本地缺少谱面 {entry.ChartKey}，未能进入联机游戏。");
+                    I18nManager.Tf("battle.start.chart_missing", entry.ChartKey));
                 return true;
             }
 
@@ -184,7 +185,7 @@ namespace MDEN.UI.Core
                         Managers.LobbyManager.CurrentLobby?.CurrentBattleId,
                         entryText,
                         "DifficultyMissing",
-                        "本局未选择难度，未能进入联机游戏。");
+                        I18nManager.T("battle.start.difficulty_missing"));
                     return true;
                 }
 
@@ -219,7 +220,7 @@ namespace MDEN.UI.Core
 
             if (CustomAlbumsWindowGuard.CloseIfOpen("battle start"))
             {
-                ShowText.ShowInfo("已关闭自制谱窗口，正在重新尝试进入多人游戏");
+                ShowText.ShowInfo(I18nManager.T("battle.start.custom_closed_retry"));
                 return false;
             }
 
@@ -309,7 +310,7 @@ namespace MDEN.UI.Core
                     battleId,
                     entryText,
                     "ChartMissing",
-                    $"本地缺少谱面 {chartKey}，未能进入联机游戏。");
+                    I18nManager.Tf("battle.start.chart_missing", chartKey));
             });
         }
     }

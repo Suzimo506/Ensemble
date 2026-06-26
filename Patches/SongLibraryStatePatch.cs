@@ -30,7 +30,7 @@ namespace MDEN.Patches
             {
                 if (!LobbyManager.IsInLobby) return true;
 
-                ShowText.ShowInfo("不能在游戏房间中隐藏或解除隐藏谱面！");
+                ShowText.ShowInfo(I18nManager.T("patch.song_hide_disabled"));
                 return false;
             }
 

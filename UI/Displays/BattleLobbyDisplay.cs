@@ -344,7 +344,7 @@ namespace MDEN.UI.Displays
         {
             if (!player.Alive)
             {
-                return ColorText("Down", ColorRed);
+                return ColorText(I18nManager.T("battle.down"), ColorRed);
             }
 
             var lobby = LobbyManager.CurrentLobby;
@@ -389,7 +389,7 @@ namespace MDEN.UI.Displays
                 return PlayerManager.CurrentProfile.Name;
             }
 
-            return uid ?? "Unknown";
+            return uid ?? I18nManager.T("common.unknown");
         }
 
         private void ShowBattlePopupIfNeeded(BattlePlayerEntry player)
@@ -399,19 +399,19 @@ namespace MDEN.UI.Displays
 
             if (previous.FC && !player.FC)
             {
-                TryPopup(ColorText("失去FC!", Constants.ColorBlue), player.Uid, "fc", StatePopupCooldownFrames, false);
+                TryPopup(ColorText(I18nManager.T("battle.lost_fc"), Constants.ColorBlue), player.Uid, "fc", StatePopupCooldownFrames, false);
             }
             else if (previous.AP && !IsAp(player))
             {
-                TryPopup(ColorText("失去AP!", ColorGold), player.Uid, "ap", StatePopupCooldownFrames, false);
+                TryPopup(ColorText(I18nManager.T("battle.lost_ap"), ColorGold), player.Uid, "ap", StatePopupCooldownFrames, false);
             }
             else if (previous.Alive && !player.Alive)
             {
-                TryPopup(ColorText("Down", ColorRed), player.Uid, "down", StatePopupCooldownFrames, false);
+                TryPopup(ColorText(I18nManager.T("battle.down"), ColorRed), player.Uid, "down", StatePopupCooldownFrames, false);
             }
             else if (player.Misses > previous.Misses)
             {
-                TryPopup("Missed!", player.Uid, "miss", MissPopupCooldownFrames, true);
+                TryPopup(I18nManager.T("battle.missed"), player.Uid, "miss", MissPopupCooldownFrames, true);
             }
         }
 

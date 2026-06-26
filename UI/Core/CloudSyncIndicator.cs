@@ -68,7 +68,7 @@ namespace MDEN.UI.Core
 
             if (_pendingText != null)
             {
-                _pendingText.text = string.IsNullOrEmpty(text) ? "同步中..." : text;
+                _pendingText.text = string.IsNullOrEmpty(text) ? I18nManager.T("cloud.syncing") : text;
             }
 
             CancelHide();

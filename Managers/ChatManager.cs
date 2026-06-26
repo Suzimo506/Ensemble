@@ -24,7 +24,7 @@ namespace MDEN.Managers
 
             if (!LobbyManager.IsInLobby)
             {
-                throw new InvalidOperationException("Not in lobby.");
+                throw new InvalidOperationException(I18nManager.T("player.not_in_room"));
             }
 
             await NetworkClient.Instance.SendNotifyAsync(
@@ -39,7 +39,7 @@ namespace MDEN.Managers
 
             if (!LobbyManager.IsInLobby)
             {
-                throw new InvalidOperationException("Not in lobby.");
+                throw new InvalidOperationException(I18nManager.T("player.not_in_room"));
             }
 
             await NetworkClient.Instance.SendNotifyAsync(

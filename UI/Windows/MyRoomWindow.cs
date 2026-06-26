@@ -211,30 +211,30 @@ namespace MDEN.UI.Windows
 
             var lobby = LobbyManager.CurrentLobby;
             var summary = lobby == null
-                ? "Not in lobby."
+                ? I18nManager.T("room.not_in_lobby")
                 : BuildRoomSummary(lobby);
 
-            _btnLeave = new ForumObject(new LocalString("- 退出房间 -"), new LocalString("离开当前联机房间"));
+            _btnLeave = new ForumObject(new LocalString(I18nManager.T("room.leave.button")), new LocalString(I18nManager.T("room.leave.desc")));
             _btnLeave.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("HomePanel.png")?.texture;
             _window.ForumObjects.Add(_btnLeave);
 
             if (lobby != null)
             {
                 _btnPlayMode = new ForumObject(
-                    new LocalString("游玩模式"),
-                    new LocalString($"当前: {Highlight(LobbyRuleTextFormatter.GetPlayModeName(lobby.PlayMode), LobbyRuleTextFormatter.GetPlayModeColor(lobby.PlayMode))}\n点击切换为{Highlight(LobbyRuleTextFormatter.GetPlayModeName((byte)LobbyRuleTextFormatter.GetNextPlayMode(lobby.PlayMode)), LobbyRuleTextFormatter.GetPlayModeColor((byte)LobbyRuleTextFormatter.GetNextPlayMode(lobby.PlayMode)))}"));
+                    new LocalString(I18nManager.T("create.play_mode.title")),
+                    new LocalString(I18nManager.Tf("room.setting.desc", Highlight(LobbyRuleTextFormatter.GetPlayModeName(lobby.PlayMode), LobbyRuleTextFormatter.GetPlayModeColor(lobby.PlayMode)), Highlight(LobbyRuleTextFormatter.GetPlayModeName((byte)LobbyRuleTextFormatter.GetNextPlayMode(lobby.PlayMode)), LobbyRuleTextFormatter.GetPlayModeColor((byte)LobbyRuleTextFormatter.GetNextPlayMode(lobby.PlayMode))))));
                 _btnPlayMode.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("OptionsPanel.png")?.texture;
                 _window.ForumObjects.Add(_btnPlayMode);
 
                 _btnGoal = new ForumObject(
-                    new LocalString("获胜方式"),
-                    new LocalString($"当前: {Highlight(GetGoalName(lobby.Goal), Constants.ColorYellow)}\n点击切换为{Highlight(GetGoalName(GetNextGoal(lobby.Goal)), Constants.ColorCyan)}"));
+                    new LocalString(I18nManager.T("create.goal.title")),
+                    new LocalString(I18nManager.Tf("room.setting.desc", Highlight(GetGoalName(lobby.Goal), Constants.ColorYellow), Highlight(GetGoalName(GetNextGoal(lobby.Goal)), Constants.ColorCyan))));
                 _btnGoal.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("SocialNetwork.png")?.texture;
                 _window.ForumObjects.Add(_btnGoal);
 
                 _btnSettlement = new ForumObject(
-                    new LocalString("结算功能"),
-                    new LocalString($"当前: {Highlight(lobby.SettlementEnabled ? "开启" : "关闭", Constants.ColorYellow)}\n点击{Highlight(lobby.SettlementEnabled ? "关闭" : "开启", Constants.ColorCyan)}每五首结算"));
+                    new LocalString(I18nManager.T("create.settlement.title")),
+                    new LocalString(I18nManager.Tf("room.settlement.desc", Highlight(lobby.SettlementEnabled ? I18nManager.T("common.enabled") : I18nManager.T("common.disabled"), Constants.ColorYellow), Highlight(lobby.SettlementEnabled ? I18nManager.T("common.disabled") : I18nManager.T("common.enabled"), Constants.ColorCyan))));
                 _btnSettlement.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("OptionsPanel.png")?.texture;
                 _window.ForumObjects.Add(_btnSettlement);
             }
@@ -248,14 +248,14 @@ namespace MDEN.UI.Windows
             if (lobby?.HostUid == PlayerManager.CurrentUid)
             {
                 _btnJoinLock = new ForumObject(
-                    new LocalString(lobby.JoinLocked ? "- 手动解锁 -" : "- 手动上锁 -"),
-                    new LocalString(lobby.JoinLocked ? "解锁后其他玩家可以加入房间" : "上锁后其他玩家不能加入房间"));
+                    new LocalString(lobby.JoinLocked ? I18nManager.T("room.unlock.button") : I18nManager.T("room.lock.button")),
+                    new LocalString(lobby.JoinLocked ? I18nManager.T("room.unlock.desc") : I18nManager.T("room.lock.desc")));
                 _btnJoinLock.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("OptionsPanel.png")?.texture;
                 _window.ForumObjects.Add(_btnJoinLock);
 
                 _btnPassword = new ForumObject(
-                    new LocalString(lobby.IsPrivate ? "- 修改/清除密码 -" : "- 设置密码 -"),
-                    new LocalString(lobby.IsPrivate ? "当前房间需要密码加入，输入空内容可清除密码" : "设置后房间列表会显示（私密），加入时需要输入密码"));
+                    new LocalString(lobby.IsPrivate ? I18nManager.T("room.password.change.button") : I18nManager.T("room.password.set.button")),
+                    new LocalString(lobby.IsPrivate ? I18nManager.T("room.password.change.desc") : I18nManager.T("room.password.set.desc")));
                 _btnPassword.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("SocialNetwork.png")?.texture;
                 _window.ForumObjects.Add(_btnPassword);
             }
@@ -265,7 +265,7 @@ namespace MDEN.UI.Windows
                 _btnPassword = null;
             }
 
-            var roomName = Highlight(EscapeRichText(lobby?.Name ?? "我的房间"), Constants.ColorYellow);
+            var roomName = Highlight(EscapeRichText(lobby?.Name ?? I18nManager.T("room.title")), Constants.ColorYellow);
             var info = new ForumObject(new LocalString(roomName), new LocalString(summary));
             info.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("RoomList.png")?.texture;
             _window.ForumObjects.Add(info);
@@ -375,16 +375,18 @@ namespace MDEN.UI.Windows
 
         private static string BuildRoomSummary(MDEN.Protocol.Messages.Lobby.LobbySyncPush lobby)
         {
-            var hostName = EscapeRichText(lobby.HostName ?? lobby.HostUid ?? "Unknown");
-            return $"房主: {Highlight(hostName, Constants.ColorPink)}\n" +
-                   $"人数: {Highlight($"{GetPlayerCount(lobby)}/{lobby.MaxPlayers}", Constants.ColorCyan)}\n" +
-                   $"游玩模式: {Highlight(LobbyRuleTextFormatter.GetPlayModeName(lobby.PlayMode), LobbyRuleTextFormatter.GetPlayModeColor(lobby.PlayMode))}\n" +
-                   $"歌曲列表: {Highlight($"{GetPlaylistCount(lobby)}/{lobby.PlaylistSize}", Constants.ColorYellow)}\n" +
-                   $"获胜方式: {Highlight(GetGoalName(lobby.Goal), Constants.ColorYellow)}\n" +
-                   $"结算功能: {Highlight(lobby.SettlementEnabled ? "开启" : "关闭", Constants.ColorYellow)}\n" +
-                   $"加入限制: {Highlight(lobby.JoinLocked ? "已上锁" : "开放", lobby.JoinLocked ? Constants.ColorYellow : RoomListWindow.WaitingStatusColor)}\n" +
-                   $"密码: {Highlight(lobby.IsPrivate ? "已设置" : "无", lobby.IsPrivate ? Constants.ColorYellow : RoomListWindow.WaitingStatusColor)}\n" +
-                   $"状态: {RoomListWindow.GetColoredLobbyStatus(lobby.IsPlaying, lobby.Locked, lobby.JoinLocked)}";
+            var hostName = EscapeRichText(lobby.HostName ?? lobby.HostUid ?? I18nManager.T("common.unknown"));
+            return I18nManager.Tf(
+                "room.summary",
+                Highlight(hostName, Constants.ColorPink),
+                Highlight($"{GetPlayerCount(lobby)}/{lobby.MaxPlayers}", Constants.ColorCyan),
+                Highlight(LobbyRuleTextFormatter.GetPlayModeName(lobby.PlayMode), LobbyRuleTextFormatter.GetPlayModeColor(lobby.PlayMode)),
+                Highlight($"{GetPlaylistCount(lobby)}/{lobby.PlaylistSize}", Constants.ColorYellow),
+                Highlight(GetGoalName(lobby.Goal), Constants.ColorYellow),
+                Highlight(lobby.SettlementEnabled ? I18nManager.T("common.enabled") : I18nManager.T("common.disabled"), Constants.ColorYellow),
+                Highlight(lobby.JoinLocked ? I18nManager.T("common.locked") : I18nManager.T("common.open"), lobby.JoinLocked ? Constants.ColorYellow : RoomListWindow.WaitingStatusColor),
+                Highlight(lobby.IsPrivate ? I18nManager.T("common.set") : I18nManager.T("common.no"), lobby.IsPrivate ? Constants.ColorYellow : RoomListWindow.WaitingStatusColor),
+                RoomListWindow.GetColoredLobbyStatus(lobby.IsPlaying, lobby.Locked, lobby.JoinLocked));
         }
 
         private static int GetPlayerCount(MDEN.Protocol.Messages.Lobby.LobbySyncPush lobby)
@@ -416,9 +418,9 @@ namespace MDEN.UI.Windows
         {
             return (LobbyGoal)goal switch
             {
-                LobbyGoal.Score => "分数",
-                LobbyGoal.Custom => "自定义",
-                _ => "准确率"
+                LobbyGoal.Score => I18nManager.T("lobby.goal.score"),
+                LobbyGoal.Custom => I18nManager.T("lobby.goal.custom"),
+                _ => I18nManager.T("lobby.goal.accuracy")
             };
         }
 
@@ -451,7 +453,7 @@ namespace MDEN.UI.Windows
 
                 NativeConfirmDialog.Show(
                     string.Empty,
-                    "是否退出房间？",
+                    I18nManager.T("room.leave.confirm"),
                     confirmed =>
                     {
                         if (confirmed)
@@ -531,7 +533,7 @@ namespace MDEN.UI.Windows
             if (lobby == null) return false;
             if (lobby.HostUid == PlayerManager.CurrentUid) return true;
 
-            Il2CppAssets.Scripts.UI.Controls.ShowText.ShowInfo("只有房主能进行该操作");
+            Il2CppAssets.Scripts.UI.Controls.ShowText.ShowInfo(I18nManager.T("room.host_only"));
             return false;
         }
 
@@ -540,7 +542,7 @@ namespace MDEN.UI.Windows
             if (!CanChangeRoomSettings(lobby)) return false;
             if (!lobby.Locked && !lobby.IsPlaying) return true;
 
-            Il2CppAssets.Scripts.UI.Controls.ShowText.ShowInfo("游戏准备或进行中，不能修改房间规则");
+            Il2CppAssets.Scripts.UI.Controls.ShowText.ShowInfo(I18nManager.T("room.rules_locked"));
             return false;
         }
 
@@ -550,7 +552,7 @@ namespace MDEN.UI.Windows
             if (!lobby.Locked && !lobby.IsPlaying) return true;
             if (IsHostKnownOffline(lobby)) return true;
 
-            Il2CppAssets.Scripts.UI.Controls.ShowText.ShowInfo("请先停止游戏");
+            Il2CppAssets.Scripts.UI.Controls.ShowText.ShowInfo(I18nManager.T("room.stop_first"));
             return false;
         }
 
@@ -594,7 +596,7 @@ namespace MDEN.UI.Windows
 
         private async Task UpdateLobbySettingsAsync(Func<Task> updateAsync, LocalLobbySettingsChange localChange)
         {
-            IDisposable uiLock = WindowStackController.LockUI("处理中...");
+            IDisposable uiLock = WindowStackController.LockUI(I18nManager.T("common.processing"));
 
             try
             {
@@ -722,7 +724,7 @@ namespace MDEN.UI.Windows
 
         private async System.Threading.Tasks.Task LeaveLobbyAsync()
         {
-            IDisposable uiLock = WindowStackController.LockUI("Leaving lobby...");
+            IDisposable uiLock = WindowStackController.LockUI(I18nManager.T("room.leaving"));
 
             try
             {
@@ -777,7 +779,7 @@ namespace MDEN.UI.Windows
             var txt = newTitle.GetComponent<UnityEngine.UI.Text>();
             if (txt != null)
             {
-                txt.text = "我的房间";
+                txt.text = I18nManager.T("room.title");
                 txt.alignment = TextAnchor.MiddleCenter;
             }
 

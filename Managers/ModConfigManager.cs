@@ -97,7 +97,7 @@ namespace MDEN.Managers
         {
             if (string.IsNullOrEmpty(name))
             {
-                name = $"节点{CustomServers.Count + 1}";
+                name = I18nManager.Tf("config.custom_server.default_name", CustomServers.Count + 1);
             }
             CustomServers.Add(new CustomServerInfo { Address = address, Name = name });
             SaveConfig();

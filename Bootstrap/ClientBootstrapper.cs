@@ -14,6 +14,7 @@ namespace MDEN.Bootstrap
             ClientLogManager.Msg("Mod is initializing...");
             ClientThreadDispatcher.Configure(action => MainThreadDispatcher.Enqueue(action));
             ModConfigManager.LoadConfig();
+            I18nManager.Initialize();
             PushDispatcher.Instance.Init();
             ReconnectionManager.Instance.Init();
             LobbyManager.Init();

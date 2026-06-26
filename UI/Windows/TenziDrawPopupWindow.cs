@@ -212,17 +212,22 @@ namespace MDEN.UI.Windows
         private string BuildDescription(int index, int activeIndex, bool finished)
         {
             var item = _items[index];
-            var state = "等待抽取";
+            var state = I18nManager.T("tenzi.state.waiting");
             if (finished && index == _selectedIndex)
             {
-                state = $"<color={Constants.ColorGreen}>已抽中</color>";
+                state = $"<color={Constants.ColorGreen}>{I18nManager.T("tenzi.state.selected")}</color>";
             }
             else if (!finished && index == activeIndex)
             {
-                state = $"<color={Constants.ColorYellow}>抽取中</color>";
+                state = $"<color={Constants.ColorYellow}>{I18nManager.T("tenzi.state.drawing")}</color>";
             }
 
-            return $"状态: {state}\n谱面: {EscapeRichText(item.Name)}\n难度: {LobbyRuleTextFormatter.FormatDifficulty(item.Difficulty, false)}\n添加者: {EscapeRichText(item.OwnerName)}";
+            return I18nManager.Tf(
+                "tenzi.desc",
+                state,
+                EscapeRichText(item.Name),
+                LobbyRuleTextFormatter.FormatDifficulty(item.Difficulty, false),
+                EscapeRichText(item.OwnerName));
         }
 
         private void OnWindowCompletion(PopupLib.UI.Windows.Abstract.BaseWindow w)
@@ -260,7 +265,7 @@ namespace MDEN.UI.Windows
             var text = newTitle.GetComponent<UnityEngine.UI.Text>();
             if (text != null)
             {
-                text.text = "天子抽曲";
+                text.text = I18nManager.T("tenzi.title");
                 text.alignment = TextAnchor.MiddleCenter;
             }
         }

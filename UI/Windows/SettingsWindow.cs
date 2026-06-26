@@ -42,16 +42,16 @@ namespace MDEN.UI.Windows
         {
             _window.ForumObjects.Clear();
 
-            _btnBack = CreateButton("- 返回 -", "回到主菜单");
+            _btnBack = CreateButton(I18nManager.T("common.back.button"), I18nManager.T("common.back.main_menu"));
             _btnFavGirlDisplayForOthers = CreateButton(
                 "FavGirl",
-                $"将我的 FavGirl 角色和精灵显示给其他玩家\n当前设置：{FormatSwitchState(ModConfigManager.EnableFavGirlDisplayForOthers)}");
+                $"{I18nManager.T("settings.favgirl.desc")}\n{I18nManager.Tf("common.current_setting", Constants.ColorYellow, FormatSwitchState(ModConfigManager.EnableFavGirlDisplayForOthers))}");
             _btnHideBattleHealthBar = CreateButton(
-                "隐藏血量",
-                $"隐藏游戏内血量条和 Fever 条\n当前设置：{FormatSwitchState(ModConfigManager.HideBattleHealthBar)}");
+                I18nManager.T("settings.hide_health.title"),
+                $"{I18nManager.T("settings.hide_health.desc")}\n{I18nManager.Tf("common.current_setting", Constants.ColorYellow, FormatSwitchState(ModConfigManager.HideBattleHealthBar))}");
             _btnVerboseLogs = CreateButton(
-                "Debug日志",
-                $"显示客户端调试日志和警告日志\n当前设置：{FormatSwitchState(ModConfigManager.EnableVerboseLogs)}");
+                I18nManager.T("settings.debug_logs.title"),
+                $"{I18nManager.T("settings.debug_logs.desc")}\n{I18nManager.Tf("common.current_setting", Constants.ColorYellow, FormatSwitchState(ModConfigManager.EnableVerboseLogs))}");
         }
 
         private ForumObject CreateButton(string title, string description)
@@ -65,8 +65,8 @@ namespace MDEN.UI.Windows
         private static string FormatSwitchState(bool enabled)
         {
             return enabled
-                ? "<color=00ff00ff>开启</color>"
-                : "<color=ff4444ff>关闭</color>";
+                ? I18nManager.T("common.enabled.popup")
+                : I18nManager.T("common.disabled.popup");
         }
 
         private void OnSelectionChanged(PopupLib.UI.Windows.Interfaces.IListWindow window, int objectIndex)
@@ -146,7 +146,7 @@ namespace MDEN.UI.Windows
             var text = newTitle.GetComponent<UnityEngine.UI.Text>();
             if (text != null)
             {
-                text.text = "设置";
+                text.text = I18nManager.T("settings.title");
                 text.alignment = TextAnchor.MiddleCenter;
             }
 

@@ -25,8 +25,6 @@ namespace MDEN.Managers
         private const int LockSuccess = 0;
         private const int LockNotSynced = 5;
         private const int LockUnsupported = 6;
-        private const string UnsupportedChartMessage = "该谱面暂不支持联机";
-        private const string FearlessDifficultyMessage = "无畏模式只能选择大触或隐藏难度";
         private static int _cachedEntryLobbyId;
         private static string _cachedEntryBattleId;
         private static int _cachedEntryIndex = -1;
@@ -118,31 +116,31 @@ namespace MDEN.Managers
 
         public static string GetPreparationButtonText()
         {
-            if (!LobbyManager.IsInLobby) return "PLAY!";
+            if (!LobbyManager.IsInLobby) return I18nManager.T("prepare.play");
             if (IsRookieReadySelectionActive())
             {
-                return IsLocalPlayerReady() ? "已准备" : "选择并准备";
+                return IsLocalPlayerReady() ? I18nManager.T("playlist.ready") : I18nManager.T("playlist.select_and_ready");
             }
 
-            if (!CanChangePlaylist) return LobbyManager.CurrentLobby?.Locked == true ? "等待准备" : "等待房主选歌";
+            if (!CanChangePlaylist) return LobbyManager.CurrentLobby?.Locked == true ? I18nManager.T("playlist.wait_ready") : I18nManager.T("playlist.wait_host");
             var entry = ChartManager.GetCurrentEntry();
-            if (string.IsNullOrEmpty(entry)) return "未选择谱面";
+            if (string.IsNullOrEmpty(entry)) return I18nManager.T("playlist.no_chart");
             if (ContainsEntry(entry))
             {
                 var actualEntry = FindActualEntry(entry) ?? entry;
                 if (IsTenziMode() && !IsTenziEntryOwner(actualEntry, PlayerManager.CurrentUid))
                 {
-                    return "只能移除自己的谱面";
+                    return I18nManager.T("playlist.remove_own_only");
                 }
 
-                return "移除歌曲列表";
+                return I18nManager.T("playlist.remove");
             }
 
             if (IsCurrentChartUnsupported()) return GetCurrentChartUnsupportedMessage(entry);
-            if (IsTenziMode() && HasLocalTenziEntry()) return "先移除自己的谱面";
-            if (IsTenziRoundClosed()) return "本轮已封盘";
-            if (IsPlaylistFull()) return "歌曲列表已满";
-            return "加入歌曲列表";
+            if (IsTenziMode() && HasLocalTenziEntry()) return I18nManager.T("playlist.remove_own_first");
+            if (IsTenziRoundClosed()) return I18nManager.T("playlist.round_closed");
+            if (IsPlaylistFull()) return I18nManager.T("playlist.full");
+            return I18nManager.T("playlist.add");
         }
 
         public static bool CanUsePreparationButton()
@@ -173,7 +171,7 @@ namespace MDEN.Managers
             var entry = ChartManager.GetCurrentEntry();
             if (string.IsNullOrEmpty(entry))
             {
-                throw new System.InvalidOperationException("No chart selected.");
+                throw new System.InvalidOperationException(I18nManager.T("playlist.no_chart"));
             }
 
             if (ContainsEntry(entry))
@@ -181,7 +179,7 @@ namespace MDEN.Managers
                 var actualEntry = FindActualEntry(entry) ?? entry;
                 if (IsTenziMode() && !IsTenziEntryOwner(actualEntry, PlayerManager.CurrentUid))
                 {
-                    throw new System.InvalidOperationException("天子模式只能移除自己选择的谱面");
+                    throw new System.InvalidOperationException(I18nManager.T("playlist.remove_own_only"));
                 }
 
                 await RemoveAsync(entry);
@@ -211,20 +209,20 @@ namespace MDEN.Managers
 
             if (result == AddHidden)
             {
-                throw new System.InvalidOperationException("有人隐藏了该谱面");
+                throw new System.InvalidOperationException(I18nManager.T("playlist.hidden_by_someone"));
             }
 
             if (result == AddNotSynced)
             {
-                throw new System.InvalidOperationException("有人未下载该谱面");
+                throw new System.InvalidOperationException(I18nManager.T("playlist.missing_by_someone"));
             }
 
             if (result == AddUnsupported)
             {
-                throw new System.InvalidOperationException(UnsupportedChartMessage);
+                throw new System.InvalidOperationException(I18nManager.T("playlist.unsupported"));
             }
 
-            throw new System.InvalidOperationException($"添加歌曲失败，错误码 {result}。");
+            throw new System.InvalidOperationException(I18nManager.Tf("playlist.add_failed", result));
         }
 
         public static async Task RemoveAsync(string entry)
@@ -253,17 +251,17 @@ namespace MDEN.Managers
 
             if (response.Result == LockNotSynced)
             {
-                throw new System.InvalidOperationException("有人未下载该谱面");
+                throw new System.InvalidOperationException(I18nManager.T("playlist.missing_by_someone"));
             }
 
             if (response.Result == LockUnsupported)
             {
-                throw new System.InvalidOperationException("歌曲列表包含暂不支持联机的谱面");
+                throw new System.InvalidOperationException(I18nManager.T("playlist.lock_unsupported"));
             }
 
             if (response.Result != LockSuccess)
             {
-                throw new System.InvalidOperationException($"开始准备失败，错误码 {response.Result}。");
+                throw new System.InvalidOperationException(I18nManager.Tf("playlist.start_failed", response.Result));
             }
         }
 
@@ -339,7 +337,7 @@ namespace MDEN.Managers
                     ChartKey = entry ?? string.Empty,
                     Difficulty = 0,
                     OwnerName = "Unknown",
-                    ChartName = "无法显示的谱面"
+                    ChartName = I18nManager.T("playlist.invalid.title")
                 };
             }
         }
@@ -368,7 +366,7 @@ namespace MDEN.Managers
         {
             if (ChartSelectionRules.IsUnsupportedPlaylistEntry(entry))
             {
-                throw new System.InvalidOperationException(UnsupportedChartMessage);
+                throw new System.InvalidOperationException(I18nManager.T("playlist.unsupported"));
             }
         }
 
@@ -378,7 +376,7 @@ namespace MDEN.Managers
 
             if (!IsEntryAllowedByFearlessMode(entry))
             {
-                throw new System.InvalidOperationException(FearlessDifficultyMessage);
+                throw new System.InvalidOperationException(I18nManager.T("playlist.fearless_difficulty"));
             }
         }
 
@@ -389,12 +387,12 @@ namespace MDEN.Managers
 
             if (playlist.Any(ChartSelectionRules.IsUnsupportedPlaylistEntry))
             {
-                throw new System.InvalidOperationException("歌曲列表包含暂不支持联机的谱面");
+                throw new System.InvalidOperationException(I18nManager.T("playlist.lock_unsupported"));
             }
 
             if (IsFearlessMode() && playlist.Any(entry => !IsEntryAllowedByFearlessMode(entry)))
             {
-                throw new System.InvalidOperationException(FearlessDifficultyMessage);
+                throw new System.InvalidOperationException(I18nManager.T("playlist.fearless_difficulty"));
             }
         }
 
@@ -410,10 +408,10 @@ namespace MDEN.Managers
         {
             if (IsFearlessMode() && !IsEntryAllowedByFearlessMode(entry))
             {
-                return FearlessDifficultyMessage;
+                return I18nManager.T("playlist.fearless_difficulty");
             }
 
-            return UnsupportedChartMessage;
+            return I18nManager.T("playlist.unsupported");
         }
 
         private static bool IsEntryAllowedByFearlessMode(string entry)
@@ -454,13 +452,13 @@ namespace MDEN.Managers
         public static string GetPlaylistRemoveBlockedMessage(PlaylistEntryViewModel item)
         {
             var lobby = LobbyManager.CurrentLobby;
-            if (lobby?.IsPlaying == true) return "游戏进行中，不能修改歌曲列表";
+            if (lobby?.IsPlaying == true) return I18nManager.T("playlist.playing_blocked");
             if (IsTenziMode() && !IsTenziEntryOwner(item?.Entry, PlayerManager.CurrentUid))
             {
-                return "天子模式只能移除自己选择的谱面";
+                return I18nManager.T("playlist.remove_own_only");
             }
 
-            return "游戏准备或进行中，不能修改歌曲列表";
+            return I18nManager.T("playlist.locked_blocked");
         }
 
         public static bool IsRookieReadySelectionActive()
@@ -478,7 +476,7 @@ namespace MDEN.Managers
 
             if (!LobbyManager.IsInLobby)
             {
-                throw new System.InvalidOperationException("Not in lobby.");
+                throw new System.InvalidOperationException(I18nManager.T("player.not_in_room"));
             }
         }
 
@@ -486,12 +484,12 @@ namespace MDEN.Managers
         {
             if (IsTenziMode() && HasLocalTenziEntry())
             {
-                throw new System.InvalidOperationException("天子模式请先移除自己选择的谱面");
+                throw new System.InvalidOperationException(I18nManager.T("playlist.tenzi_remove_first"));
             }
 
             if (IsTenziRoundClosed())
             {
-                throw new System.InvalidOperationException("天子模式本轮已封盘，请先移除本轮谱面");
+                throw new System.InvalidOperationException(I18nManager.T("playlist.tenzi_round_remove"));
             }
         }
 

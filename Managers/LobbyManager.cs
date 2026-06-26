@@ -476,7 +476,7 @@ namespace MDEN.Managers
 
         private static void OnLobbyKicked(LobbyKickedPush push)
         {
-            var reason = string.IsNullOrWhiteSpace(push?.Reason) ? "你已被移出房间" : push.Reason;
+            var reason = string.IsNullOrWhiteSpace(push?.Reason) ? I18nManager.T("lobby.kicked") : push.Reason;
             _pendingJoinLobbyId = null;
             CurrentLobby = null;
             BattleManager.Reset();

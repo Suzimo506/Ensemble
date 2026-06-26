@@ -37,13 +37,13 @@ namespace MDEN.UI.Core
                 return PlayerManager.CurrentProfile.Bio;
             }
 
-            return string.IsNullOrWhiteSpace(player?.Bio) ? "暂无简介" : player.Bio;
+            return string.IsNullOrWhiteSpace(player?.Bio) ? I18nManager.T("player.bio.empty") : player.Bio;
         }
 
         private static string GetRatingLevelText(double? ratingLevel, bool ratingLevelLoaded)
         {
-            if (!ratingLevelLoaded) return "查询中...";
-            return ratingLevel.HasValue ? MuseDashMoeProfileManager.FormatRatingLevel(ratingLevel.Value) : "未知";
+            if (!ratingLevelLoaded) return I18nManager.T("common.loading");
+            return ratingLevel.HasValue ? MuseDashMoeProfileManager.FormatRatingLevel(ratingLevel.Value) : I18nManager.T("common.unknown");
         }
 
         private static string GetPingColor(PlayerSyncEntry player)

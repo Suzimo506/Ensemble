@@ -3,6 +3,7 @@ using Il2Cpp;
 using Il2CppAssets.Scripts.UI.Controls;
 using Il2CppAssets.Scripts.UI.Panels;
 using Il2CppAssets.Scripts.UI.Panels.PnlMusicTag;
+using MDEN.Managers;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -21,12 +22,12 @@ namespace MDEN.UI.Core
 
         public static void ShowAlreadyAvailable(string chartName)
         {
-            ShowText.ShowInfo($"谱面已在本地: {chartName}");
+            ShowText.ShowInfo(I18nManager.Tf("missing_chart.local", chartName));
         }
 
         public static void ShowActivated(string chartName)
         {
-            ShowText.ShowInfo($"已从候选区导入谱面: {chartName}");
+            ShowText.ShowInfo(I18nManager.Tf("missing_chart.imported", chartName));
         }
 
         public static void ShowFallback(string chartName, MissingChartFallbackStatus status)
@@ -37,22 +38,22 @@ namespace MDEN.UI.Core
             if (status == MissingChartFallbackStatus.Multiple)
             {
                 ShowText.ShowInfo(searchOpened
-                    ? $"候选区有多个可能结果，已打开搜索并复制: {chartName}"
-                    : $"候选区有多个可能结果，已复制谱面名: {chartName}");
+                    ? I18nManager.Tf("missing_chart.multiple_search", chartName)
+                    : I18nManager.Tf("missing_chart.multiple_copy", chartName));
                 return;
             }
 
             if (status == MissingChartFallbackStatus.Error)
             {
                 ShowText.ShowInfo(searchOpened
-                    ? $"自动导入失败，已打开搜索并复制: {chartName}"
-                    : $"自动导入失败，已复制谱面名: {chartName}");
+                    ? I18nManager.Tf("missing_chart.import_failed_search", chartName)
+                    : I18nManager.Tf("missing_chart.import_failed_copy", chartName));
                 return;
             }
 
             ShowText.ShowInfo(searchOpened
-                ? $"候选区未找到，已打开搜索并复制: {chartName}"
-                : $"候选区未找到，已复制谱面名: {chartName}");
+                ? I18nManager.Tf("missing_chart.not_found_search", chartName)
+                : I18nManager.Tf("missing_chart.not_found_copy", chartName));
         }
 
         public static bool TryOpenNativeSearch(string chartName)

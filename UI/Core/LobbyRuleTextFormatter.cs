@@ -1,5 +1,6 @@
 using MDEN.Protocol.Enums;
 using MDEN.Protocol.Rules;
+using MDEN.Managers;
 
 namespace MDEN.UI.Core
 {
@@ -20,10 +21,10 @@ namespace MDEN.UI.Core
         {
             return LobbyPlayModeRules.Normalize(mode) switch
             {
-                LobbyPlayMode.Rookie => "新手模式",
-                LobbyPlayMode.Fearless => "无畏模式",
-                LobbyPlayMode.Tenzi => "天子模式",
-                _ => "正常模式"
+                LobbyPlayMode.Rookie => I18nManager.T("mode.rookie"),
+                LobbyPlayMode.Fearless => I18nManager.T("mode.fearless"),
+                LobbyPlayMode.Tenzi => I18nManager.T("mode.tenzi"),
+                _ => I18nManager.T("mode.normal")
             };
         }
 
@@ -47,11 +48,11 @@ namespace MDEN.UI.Core
         {
             return difficulty switch
             {
-                DifficultyDisplayRules.Easy => "萌新",
-                DifficultyDisplayRules.Hard => "高手",
-                DifficultyDisplayRules.Master => "大触",
-                DifficultyDisplayRules.Hidden => "隐藏",
-                _ => $"难度{difficulty}"
+                DifficultyDisplayRules.Easy => I18nManager.T("difficulty.easy"),
+                DifficultyDisplayRules.Hard => I18nManager.T("difficulty.hard"),
+                DifficultyDisplayRules.Master => I18nManager.T("difficulty.master"),
+                DifficultyDisplayRules.Hidden => I18nManager.T("difficulty.hidden"),
+                _ => I18nManager.Tf("difficulty.unknown", difficulty)
             };
         }
 

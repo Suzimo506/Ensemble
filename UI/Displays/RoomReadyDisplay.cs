@@ -179,7 +179,7 @@ namespace MDEN.UI.Displays
             _buttonStopText.fontSize = 26;
             _buttonStopText.horizontalOverflow = HorizontalWrapMode.Overflow;
             ApplyGameFont(_buttonStopText);
-            _buttonStopText.text = "停止游戏";
+            _buttonStopText.text = I18nManager.T("ready.stop");
             _buttonStopText.color = Color.white;
 
             _buttonEquip = new GameObject("BtnEquip");
@@ -212,7 +212,7 @@ namespace MDEN.UI.Displays
             _buttonEquipText.fontSize = 23;
             _buttonEquipText.horizontalOverflow = HorizontalWrapMode.Overflow;
             ApplyGameFont(_buttonEquipText);
-            _buttonEquipText.text = "使用推荐";
+            _buttonEquipText.text = I18nManager.T("ready.equip");
             _buttonEquipText.color = Color.white;
 
             DestroyTransformObject(_imgBase.transform.Find("Synchronizing/TxtSynchronizing/ImgSynchronizing"));
@@ -249,13 +249,13 @@ namespace MDEN.UI.Displays
                 RecommendedConfigManager.Request(entry);
             }
 
-            var chartTitle = entry == null ? "等待歌曲" : entry.DisplayName;
+            var chartTitle = entry == null ? I18nManager.T("ready.waiting_chart") : entry.DisplayName;
             var recommended = RecommendedConfigManager.GetDisplayText(entry);
             _message.text = BuildMessageText(lobby, chartTitle, recommended, entry);
 
             bool isReady = PlaylistManager.IsLocalPlayerReady();
             _buttonMainText.text = lobby.IsPlaying
-                ? "游戏中"
+                ? I18nManager.T("lobby.status.playing")
                 : GetMainButtonText(lobby, isReady);
 
             RefreshButtonStates(lobby);
@@ -322,7 +322,7 @@ namespace MDEN.UI.Displays
 
             if (CustomAlbumsWindowGuard.CloseIfOpen("ready"))
             {
-                MainThreadDispatcher.Enqueue(() => ShowText.ShowInfo("已关闭自制谱窗口，请重新准备"));
+                MainThreadDispatcher.Enqueue(() => ShowText.ShowInfo(I18nManager.T("ready.custom_closed")));
                 return;
             }
 
@@ -331,7 +331,7 @@ namespace MDEN.UI.Displays
 
             try
             {
-                IDisposable uiLock = WindowStackController.LockUI("Setting ready...");
+                IDisposable uiLock = WindowStackController.LockUI(I18nManager.T("common.processing"));
                 try
                 {
                     await PlaylistManager.SetReadyAsync(!PlaylistManager.IsLocalPlayerReady());
@@ -344,7 +344,7 @@ namespace MDEN.UI.Displays
             catch (Exception ex)
             {
                 MDEN.Managers.ClientLogManager.Warning($"Set ready failed: {ex.Message}");
-                MainThreadDispatcher.Enqueue(() => ShowText.ShowInfo($"准备失败：{ex.Message}"));
+                MainThreadDispatcher.Enqueue(() => ShowText.ShowInfo(I18nManager.Tf("ready.failed", ex.Message)));
             }
             finally
             {
@@ -363,7 +363,7 @@ namespace MDEN.UI.Displays
 
             try
             {
-                IDisposable uiLock = WindowStackController.LockUI("Applying recommended config...");
+                IDisposable uiLock = WindowStackController.LockUI(I18nManager.T("common.applying"));
                 try
                 {
                 await RecommendedConfigManager.ApplyCurrentAsync();
@@ -393,7 +393,7 @@ namespace MDEN.UI.Displays
 
             try
             {
-                IDisposable uiLock = WindowStackController.LockUI("Stopping lobby...");
+                IDisposable uiLock = WindowStackController.LockUI(I18nManager.T("common.stopping"));
                 try
                 {
                 await PlaylistManager.StopLobbyAsync();
@@ -471,7 +471,7 @@ namespace MDEN.UI.Displays
 
             if (_buttonEquipText != null)
             {
-                _buttonEquipText.text = recommendationEquipped ? "已选择" : "使用推荐";
+                _buttonEquipText.text = recommendationEquipped ? I18nManager.T("ready.equipped") : I18nManager.T("ready.equip");
                 _buttonEquipText.color = canEquip ? Color.white : new Color(0.7f, 0.7f, 0.7f, 1f);
             }
         }
@@ -480,41 +480,41 @@ namespace MDEN.UI.Displays
         {
             if (PlaylistManager.IsRookieMode())
             {
-                return isReady ? "取消准备" : "跳转选择难度";
+                return isReady ? I18nManager.T("ready.cancel") : I18nManager.T("ready.rookie_jump");
             }
 
             return isReady
                 ? $"{lobby.ReadyPlayers?.Length ?? 0} / {lobby.Players?.Length ?? 0}"
-                : "准备";
+                : I18nManager.T("ready.button");
         }
 
         private static void JumpToRookieDifficultySelection()
         {
             if (CustomAlbumsWindowGuard.CloseIfOpen("rookie difficulty selection"))
             {
-                MainThreadDispatcher.Enqueue(() => ShowText.ShowInfo("已关闭自制谱窗口，请重新点击跳转"));
+                MainThreadDispatcher.Enqueue(() => ShowText.ShowInfo(I18nManager.T("ready.custom_closed_jump")));
                 return;
             }
 
             if (MultiplayerBattleController.NavigateToRookieReadyChart())
             {
-                MainThreadDispatcher.Enqueue(() => ShowText.ShowInfo("请选择难度后点击 Play 准备"));
+                MainThreadDispatcher.Enqueue(() => ShowText.ShowInfo(I18nManager.T("ready.choose_difficulty")));
                 return;
             }
 
-            MainThreadDispatcher.Enqueue(() => ShowText.ShowInfo("未找到本局谱面"));
+            MainThreadDispatcher.Enqueue(() => ShowText.ShowInfo(I18nManager.T("ready.chart_not_found")));
         }
 
         private static string BuildMessageText(LobbySyncPush lobby, string chartTitle, string recommended, PlaylistEntryViewModel entry)
         {
-            var ownerName = string.IsNullOrWhiteSpace(entry?.OwnerName) ? "Unknown" : entry.OwnerName;
+            var ownerName = string.IsNullOrWhiteSpace(entry?.OwnerName) ? I18nManager.T("common.unknown") : entry.OwnerName;
             var ownerColor = GetOwnerColor(lobby, ownerName);
 
-            return "<color=#F8DC51>Next:</color>\n" +
+            return $"<color=#F8DC51>{I18nManager.T("ready.next")}</color>\n" +
                 $"{chartTitle}\n" +
-                $"<color=#{Constants.ColorPink}>推荐配置:</color>\n" +
+                $"<color=#{Constants.ColorPink}>{I18nManager.T("ready.recommended_config")}</color>\n" +
                 $"{recommended}\n" +
-                $"<size={OwnerInfoFontSize}><color=#{Constants.ColorCyan}>选谱人:</color></size>\n" +
+                $"<size={OwnerInfoFontSize}><color=#{Constants.ColorCyan}>{I18nManager.T("ready.owner")}</color></size>\n" +
                 $"<size={OwnerInfoFontSize}><color=#{ownerColor}>{EscapeRichText(ownerName)}</color></size>";
         }
 

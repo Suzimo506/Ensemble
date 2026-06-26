@@ -74,7 +74,7 @@ namespace MDEN.UI.Windows
             var txt = newTitle.GetComponent<UnityEngine.UI.Text>();
             if (txt != null)
             {
-                txt.text = "个人信息";
+                txt.text = I18nManager.T("profile.title");
                 txt.alignment = TextAnchor.MiddleCenter;
             }
 
@@ -104,50 +104,50 @@ namespace MDEN.UI.Windows
 
             var profile = PlayerManager.CurrentProfile;
             var summary = profile == null
-                ? "个人信息会保存到本地 Ensemble.json"
-                : $"名字: {profile.Name}\n颜色: {SanitizeColor(profile.ChatColor)}\n介绍: {profile.Bio ?? ""}\n入场提示: {profile.EntranceMessage ?? ""}\n头衔: {profile.Title ?? ""}";
+                ? I18nManager.T("profile.local.saved")
+                : I18nManager.Tf("profile.summary", profile.Name, SanitizeColor(profile.ChatColor), profile.Bio ?? "", profile.EntranceMessage ?? "", profile.Title ?? "");
 
-            _btnBack = new ForumObject(new LocalString("- 返回 -"), new LocalString("回到主菜单"));
+            _btnBack = new ForumObject(new LocalString(I18nManager.T("common.back.button")), new LocalString(I18nManager.T("common.back.main_menu")));
             _btnBack.Texture = GetProfileBannerTexture("HomePanel.png");
             _window.ForumObjects.Add(_btnBack);
 
-            _btnRefresh = new ForumObject(new LocalString("本地资料"), new LocalString(summary));
+            _btnRefresh = new ForumObject(new LocalString(I18nManager.T("profile.local.title")), new LocalString(summary));
             _btnRefresh.Texture = GetProfileBannerTexture("PlayerCard.png");
             _window.ForumObjects.Add(_btnRefresh);
 
             _btnAvatar = new ForumObject(
-                new LocalString("修改头像"),
+                new LocalString(I18nManager.T("profile.avatar.edit")),
                 new LocalString(BuildAvatarGuideText()));
             _btnAvatar.Texture = GetProfileBannerTexture("OptionsPanel.png");
             _window.ForumObjects.Add(_btnAvatar);
 
             _btnName = new ForumObject(
-                new LocalString("修改名字"),
-                new LocalString(WithCurrentSetting("修改自己的名字，16字上限", profile?.Name)));
+                new LocalString(I18nManager.T("profile.name.edit")),
+                new LocalString(WithCurrentSetting(I18nManager.T("profile.name.desc"), profile?.Name)));
             _btnName.Texture = GetProfileBannerTexture("PlayerCard.png");
             _window.ForumObjects.Add(_btnName);
 
             _btnNameColor = new ForumObject(
-                new LocalString("修改名字颜色"),
-                new LocalString(WithCurrentSetting("输入十六进制颜色，不要带#，例如 ff00ff", SanitizeColor(profile?.ChatColor))));
+                new LocalString(I18nManager.T("profile.color.edit")),
+                new LocalString(WithCurrentSetting(I18nManager.T("profile.color.desc"), SanitizeColor(profile?.ChatColor))));
             _btnNameColor.Texture = GetProfileBannerTexture("OptionsPanel.png");
             _window.ForumObjects.Add(_btnNameColor);
 
             _btnBio = new ForumObject(
-                new LocalString("修改个人介绍"),
-                new LocalString(WithCurrentSetting("别人在房间点击你的卡片时显示的介绍，30字上限", profile?.Bio)));
+                new LocalString(I18nManager.T("profile.bio.edit")),
+                new LocalString(WithCurrentSetting(I18nManager.T("profile.bio.desc"), profile?.Bio)));
             _btnBio.Texture = GetProfileBannerTexture("SocialNetwork.png");
             _window.ForumObjects.Add(_btnBio);
 
             _btnEntranceMessage = new ForumObject(
-                new LocalString("修改入场提示语"),
-                new LocalString(WithCurrentSetting("进入房间时显示的提示语，12字上限", profile?.EntranceMessage)));
+                new LocalString(I18nManager.T("profile.entrance.edit")),
+                new LocalString(WithCurrentSetting(I18nManager.T("profile.entrance.desc"), profile?.EntranceMessage)));
             _btnEntranceMessage.Texture = GetProfileBannerTexture("HomePanel.png");
             _window.ForumObjects.Add(_btnEntranceMessage);
 
             _btnTitle = new ForumObject(
-                new LocalString("修改头衔"),
-                new LocalString(WithCurrentSetting("显示在个人信息中的头衔，12字上限", profile?.Title)));
+                new LocalString(I18nManager.T("profile.title.edit")),
+                new LocalString(WithCurrentSetting(I18nManager.T("profile.title.desc"), profile?.Title)));
             _btnTitle.Texture = GetProfileBannerTexture("PlayerCard.png");
             _window.ForumObjects.Add(_btnTitle);
         }
@@ -160,21 +160,17 @@ namespace MDEN.UI.Windows
 
         private static string WithCurrentSetting(string description, string value)
         {
-            return $"{description}\n当前设置：<color={Constants.ColorYellow}>{EscapeRichText(GetDisplayValue(value))}</color>";
+            return $"{description}\n{I18nManager.Tf("common.current_setting", Constants.ColorYellow, EscapeRichText(GetDisplayValue(value)))}";
         }
 
         private static string BuildAvatarGuideText()
         {
-            return $"<color={Constants.ColorGreen}>添加头像教程：\n" +
-                   $"1. 将 png、jpg 或 jpeg 图片放入头像文件夹\n" +
-                   $"2. 再次点击左侧“修改头像”进入头像列表\n" +
-                   $"3. 选择图片后会自动裁成圆形并长期保存\n" +
-                   $"当前头像文件夹：{EscapeRichText(AvatarManager.GetAvatarLibraryFolder())}</color>";
+            return I18nManager.Tf("profile.avatar.guide", Constants.ColorGreen, EscapeRichText(AvatarManager.GetAvatarLibraryFolder()));
         }
 
         private static string GetDisplayValue(string value)
         {
-            return string.IsNullOrWhiteSpace(value) ? "未设置" : value.Trim();
+            return string.IsNullOrWhiteSpace(value) ? I18nManager.T("profile.unset") : value.Trim();
         }
 
         private static string SanitizeColor(string color)
@@ -215,23 +211,23 @@ namespace MDEN.UI.Windows
             }
             else if (button == _btnName)
             {
-                OpenInput("名字", 16, value => !string.IsNullOrWhiteSpace(value), value => PlayerManager.UpdateNameAsync(value), "名字不能为空且最多16字");
+                OpenInput(I18nManager.T("profile.name.edit"), 16, value => !string.IsNullOrWhiteSpace(value), value => PlayerManager.UpdateNameAsync(value), I18nManager.T("profile.validation.name"));
             }
             else if (button == _btnNameColor)
             {
-                OpenInput("名字颜色", 8, value => ColorRegex.IsMatch(value), value => PlayerManager.UpdateChatColorAsync(value), "名字颜色必须是十六进制颜色，不要带#");
+                OpenInput(I18nManager.T("profile.color.edit"), 8, value => ColorRegex.IsMatch(value), value => PlayerManager.UpdateChatColorAsync(value), I18nManager.T("profile.validation.color"));
             }
             else if (button == _btnBio)
             {
-                OpenInput("个人介绍", 30, value => true, value => PlayerManager.UpdateBioAsync(value), "个人介绍最多30字");
+                OpenInput(I18nManager.T("profile.bio.edit"), 30, value => true, value => PlayerManager.UpdateBioAsync(value), I18nManager.T("profile.validation.bio"));
             }
             else if (button == _btnEntranceMessage)
             {
-                OpenInput("入场提示语", 12, value => true, value => PlayerManager.UpdateEntranceMessageAsync(value), "入场提示语最多12字");
+                OpenInput(I18nManager.T("profile.entrance.edit"), 12, value => true, value => PlayerManager.UpdateEntranceMessageAsync(value), I18nManager.T("profile.validation.entrance"));
             }
             else if (button == _btnTitle)
             {
-                OpenInput("头衔", 12, value => true, value => PlayerManager.UpdateTitleAsync(value), "头衔最多12字");
+                OpenInput(I18nManager.T("profile.title.edit"), 12, value => true, value => PlayerManager.UpdateTitleAsync(value), I18nManager.T("profile.validation.title"));
             }
         }
 
@@ -258,7 +254,7 @@ namespace MDEN.UI.Windows
 
         private async Task SaveProfileFieldAsync(string fieldName, string value, Func<string, Task> saveAction)
         {
-            IDisposable uiLock = WindowStackController.LockUI("Saving profile...");
+            IDisposable uiLock = WindowStackController.LockUI(I18nManager.T("common.saving"));
 
             try
             {

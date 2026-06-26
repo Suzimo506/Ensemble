@@ -269,7 +269,7 @@ namespace MDEN.UI.Core
             panelImage.color = new Color(0.42f, 0.13f, 0.50f, 0.92f);
             panelImage.raycastTarget = true;
 
-            var title = CreateText(panelRect, "FallbackTitle", "结算", 46, TextAnchor.MiddleCenter);
+            var title = CreateText(panelRect, "FallbackTitle", I18nManager.T("settlement.title"), 46, TextAnchor.MiddleCenter);
             title.color = new Color(1f, 0.86f, 1f, 1f);
             title.fontStyle = FontStyle.Bold;
             var titleRect = title.rectTransform;
@@ -348,7 +348,7 @@ namespace MDEN.UI.Core
 
         private static void CreateHeader(RectTransform parent)
         {
-            var title = CreateText(parent, "Title", "结算", 50, TextAnchor.MiddleCenter);
+            var title = CreateText(parent, "Title", I18nManager.T("settlement.title"), 50, TextAnchor.MiddleCenter);
             title.color = new Color(1f, 0.86f, 1f, 1f);
             title.fontStyle = FontStyle.Bold;
 
@@ -363,7 +363,7 @@ namespace MDEN.UI.Core
             outline.effectColor = new Color(0.27f, 0.05f, 0.36f, 0.82f);
             outline.effectDistance = new Vector2(2f, -2f);
 
-            var subtitle = CreateText(parent, "Subtitle", "SETTLEMENT RESULT", 18, TextAnchor.MiddleCenter);
+            var subtitle = CreateText(parent, "Subtitle", I18nManager.T("settlement.subtitle"), 18, TextAnchor.MiddleCenter);
             subtitle.color = new Color(1f, 0.70f, 0.96f, 0.88f);
             subtitle.fontStyle = FontStyle.Bold;
             var subtitleRect = subtitle.rectTransform;
@@ -387,13 +387,13 @@ namespace MDEN.UI.Core
 
             var gap = 14f;
             var x = 0f;
-            CreateAwardCard(areaRect, x, "龙币", result?.DragonCoinUids, result, "ffd700ff");
+            CreateAwardCard(areaRect, x, I18nManager.T("settlement.award.dragon_coin"), result?.DragonCoinUids, result, "ffd700ff");
             x += AwardCardWidth + gap;
-            CreateAwardCard(areaRect, x, "最能连之人", result?.ComboUids, result, Constants.ColorBlue);
+            CreateAwardCard(areaRect, x, I18nManager.T("settlement.award.combo"), result?.ComboUids, result, Constants.ColorBlue);
             x += AwardCardWidth + gap;
-            CreateAwardCard(areaRect, x, "P佬", result?.PerfectUids, result, Constants.ColorPink);
+            CreateAwardCard(areaRect, x, I18nManager.T("settlement.award.perfect"), result?.PerfectUids, result, Constants.ColorPink);
             x += AwardCardWidth + gap;
-            CreateAwardCard(areaRect, x, "真·梦游少女", result?.SleepwalkUids, result, "ff9f1aff");
+            CreateAwardCard(areaRect, x, I18nManager.T("settlement.award.sleepwalk"), result?.SleepwalkUids, result, "ff9f1aff");
         }
 
         private static void CreateAwardCard(RectTransform parent, float x, string titleText, string[] uids, SettlementResultPush result, string accentColor)
@@ -435,7 +435,7 @@ namespace MDEN.UI.Core
 
             if (uniqueUids.Length == 0)
             {
-                var empty = CreateText(contentRect, "NamesEmpty", "暂无", 21, TextAnchor.MiddleLeft);
+                var empty = CreateText(contentRect, "NamesEmpty", I18nManager.T("settlement.empty"), 21, TextAnchor.MiddleLeft);
                 empty.color = new Color(1f, 0.96f, 1f, 0.78f);
                 var emptyRect = empty.rectTransform;
                 emptyRect.anchorMin = Vector2.zero;
@@ -517,7 +517,7 @@ namespace MDEN.UI.Core
             section.sizeDelta = new Vector2(PanelWidth - SidePadding * 2f, 382f);
             section.anchoredPosition = new Vector2(0f, -322f);
 
-            var title = CreateText(section, "ChartsTitle", ColorLabel("游玩曲目", Constants.ColorBlue), 28, TextAnchor.MiddleLeft);
+            var title = CreateText(section, "ChartsTitle", ColorLabel(I18nManager.T("settlement.played_charts"), Constants.ColorBlue), 28, TextAnchor.MiddleLeft);
             title.fontStyle = FontStyle.Bold;
             var titleRect = title.rectTransform;
             titleRect.anchorMin = new Vector2(0f, 1f);
@@ -529,7 +529,7 @@ namespace MDEN.UI.Core
             var total = CreateText(
                 section,
                 "Duration",
-                $"{ColorLabel("本次游玩时长", Constants.ColorCyan)}：{ColorLabel(GetTotalDurationText(result?.PlayedCharts), "ffffffff")}",
+                $"{ColorLabel(I18nManager.T("settlement.total_duration"), Constants.ColorCyan)}: {ColorLabel(GetTotalDurationText(result?.PlayedCharts), "ffffffff")}",
                 23,
                 TextAnchor.MiddleRight);
             var totalRect = total.rectTransform;
@@ -636,7 +636,7 @@ namespace MDEN.UI.Core
             };
             button.onClick.AddListener((UnityAction)new Action(CloseWithSound));
 
-            var label = CreateText(rect, "Label", "确认", 27, TextAnchor.MiddleCenter);
+            var label = CreateText(rect, "Label", I18nManager.T("settlement.confirm"), 27, TextAnchor.MiddleCenter);
             label.color = Color.white;
             label.fontStyle = FontStyle.Bold;
             var labelRect = label.rectTransform;
@@ -737,7 +737,7 @@ namespace MDEN.UI.Core
         {
             if (charts == null || charts.Length == 0)
             {
-                return "暂无";
+                return I18nManager.T("settlement.empty");
             }
 
             var lines = new List<string>();
@@ -745,7 +745,7 @@ namespace MDEN.UI.Core
             {
                 var chart = charts[i];
                 var name = EscapeRichText(string.IsNullOrWhiteSpace(chart?.ChartName)
-                    ? $"Unknown Chart {chart?.Difficulty ?? 0}"
+                    ? I18nManager.Tf("chart.unknown_with_difficulty", chart?.Difficulty ?? 0)
                     : chart.ChartName);
                 lines.Add($"{ColorLabel((i + 1).ToString("00"), Constants.ColorYellow)}  {ColorLabel(name, "ffffffff")}  {FormatDifficulty(chart?.Difficulty ?? 0)}");
             }
@@ -755,12 +755,12 @@ namespace MDEN.UI.Core
 
         private static string BuildFallbackContent(SettlementResultPush result)
         {
-            return $"{ColorLabel("龙币", "ffd700ff")}：{FormatNames(result?.DragonCoinUids, result)}\n" +
-                   $"{ColorLabel("最能连之人", Constants.ColorBlue)}：{FormatNames(result?.ComboUids, result)}\n" +
-                   $"{ColorLabel("P佬", Constants.ColorPink)}：{FormatNames(result?.PerfectUids, result)}\n" +
-                   $"{ColorLabel("真·梦游少女", "ff9f1aff")}：{FormatNames(result?.SleepwalkUids, result)}\n\n" +
-                   $"{ColorLabel("本次游玩时长", Constants.ColorCyan)}：{ColorLabel(GetTotalDurationText(result?.PlayedCharts), "ffffffff")}\n" +
-                   $"{ColorLabel("游玩曲目", Constants.ColorBlue)}：\n" +
+            return $"{ColorLabel(I18nManager.T("settlement.award.dragon_coin"), "ffd700ff")}: {FormatNames(result?.DragonCoinUids, result)}\n" +
+                   $"{ColorLabel(I18nManager.T("settlement.award.combo"), Constants.ColorBlue)}: {FormatNames(result?.ComboUids, result)}\n" +
+                   $"{ColorLabel(I18nManager.T("settlement.award.perfect"), Constants.ColorPink)}: {FormatNames(result?.PerfectUids, result)}\n" +
+                   $"{ColorLabel(I18nManager.T("settlement.award.sleepwalk"), "ff9f1aff")}: {FormatNames(result?.SleepwalkUids, result)}\n\n" +
+                   $"{ColorLabel(I18nManager.T("settlement.total_duration"), Constants.ColorCyan)}: {ColorLabel(GetTotalDurationText(result?.PlayedCharts), "ffffffff")}\n" +
+                   $"{ColorLabel(I18nManager.T("settlement.played_charts"), Constants.ColorBlue)}:\n" +
                    BuildChartList(result?.PlayedCharts);
         }
 
@@ -805,7 +805,7 @@ namespace MDEN.UI.Core
 
         private static string FormatNames(string[] uids, SettlementResultPush result)
         {
-            if (uids == null || uids.Length == 0) return "暂无";
+            if (uids == null || uids.Length == 0) return I18nManager.T("settlement.empty");
 
             var names = new System.Collections.Generic.List<string>();
             foreach (var uid in uids)
@@ -817,7 +817,7 @@ namespace MDEN.UI.Core
                 }
             }
 
-            return names.Count == 0 ? "暂无" : string.Join("，", names);
+            return names.Count == 0 ? I18nManager.T("settlement.empty") : string.Join(I18nManager.T("settlement.name_separator"), names);
         }
 
         private static string GetPlayerName(string uid, SettlementResultPush result)
@@ -845,7 +845,7 @@ namespace MDEN.UI.Core
                 }
             }
 
-            return uid ?? "Unknown";
+            return uid ?? I18nManager.T("common.unknown");
         }
 
         private static string EscapeRichText(string value)

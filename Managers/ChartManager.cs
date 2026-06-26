@@ -20,7 +20,7 @@ namespace MDEN.Managers
         public string OwnerName { get; set; }
         public string ChartName { get; set; }
         public string DisplayName => string.IsNullOrWhiteSpace(ChartName)
-            ? $"Unknown Chart {Difficulty}"
+            ? I18nManager.Tf("chart.unknown_with_difficulty", Difficulty)
             : ChartName;
     }
 
@@ -108,7 +108,7 @@ namespace MDEN.Managers
                     Entry = entry,
                     ChartKey = entry,
                     Difficulty = 0,
-                    OwnerName = "Unknown",
+                    OwnerName = I18nManager.T("common.unknown"),
                     ChartName = entry
                 };
             }
@@ -119,10 +119,10 @@ namespace MDEN.Managers
                 Entry = entry,
                 ChartKey = parts[0],
                 Difficulty = difficulty,
-                OwnerName = parts.Length > 2 && !string.IsNullOrWhiteSpace(parts[2]) ? DecodeEntryPart(parts[2]) : "Unknown",
+                OwnerName = parts.Length > 2 && !string.IsNullOrWhiteSpace(parts[2]) ? DecodeEntryPart(parts[2]) : I18nManager.T("common.unknown"),
                 ChartName = !string.IsNullOrWhiteSpace(chartName)
                     ? chartName
-                    : $"Unknown Chart {difficulty}"
+                    : I18nManager.Tf("chart.unknown_with_difficulty", difficulty)
             };
             TryRepairUnknownChartName(parsed);
             return parsed;
@@ -196,7 +196,7 @@ namespace MDEN.Managers
 
         private static string GetNiceChartName(MusicInfo musicInfo, int difficulty)
         {
-            if (musicInfo == null) return $"Unknown Chart {difficulty}";
+            if (musicInfo == null) return I18nManager.Tf("chart.unknown_with_difficulty", difficulty);
 
             var level = musicInfo.GetMusicLevelStringByDiff(difficulty);
             var album = GetCustomAlbum(musicInfo);
@@ -245,7 +245,8 @@ namespace MDEN.Managers
         private static bool IsUnknownChartName(string chartName)
         {
             return string.IsNullOrWhiteSpace(chartName) ||
-                   chartName.TrimStart().StartsWith("Unknown Chart", System.StringComparison.OrdinalIgnoreCase);
+                   chartName.TrimStart().StartsWith("Unknown Chart", System.StringComparison.OrdinalIgnoreCase) ||
+                   chartName.TrimStart().StartsWith(I18nManager.T("chart.unknown"), System.StringComparison.OrdinalIgnoreCase);
         }
 
         private static string GetBestChartName(MusicInfo musicInfo, Album album)
@@ -260,7 +261,7 @@ namespace MDEN.Managers
                 return musicInfo.name;
             }
 
-            return "Unknown Chart";
+            return I18nManager.T("chart.unknown");
         }
 
         private static Album GetCustomAlbum(MusicInfo musicInfo)
@@ -322,7 +323,7 @@ namespace MDEN.Managers
 
         private static string GetLocalPlayerName()
         {
-            return PlayerManager.CurrentProfile?.Name ?? PlayerManager.CurrentUid ?? "Unknown";
+            return PlayerManager.CurrentProfile?.Name ?? PlayerManager.CurrentUid ?? I18nManager.T("common.unknown");
         }
 
         private static bool IsCustomChartKey(string chartKey)

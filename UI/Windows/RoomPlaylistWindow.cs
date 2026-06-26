@@ -81,7 +81,7 @@ namespace MDEN.UI.Windows
             _items = PlaylistManager.GetPlaylistItems();
             if (lobby?.Playlist == null || _items.Length == 0)
             {
-                AddButton("暂无歌曲", "在选歌界面点击 Start 可加入歌曲列表");
+                AddButton(I18nManager.T("playlist.empty.title"), I18nManager.T("playlist.empty.desc"));
                 return;
             }
 
@@ -95,7 +95,7 @@ namespace MDEN.UI.Windows
                 catch (System.Exception ex)
                 {
                     MDEN.Managers.ClientLogManager.Warning($"Build playlist item failed: {ex.Message}");
-                    AddButton("无法显示的谱面", "该歌曲列表项格式异常");
+                    AddButton(I18nManager.T("playlist.invalid.title"), I18nManager.T("playlist.invalid.desc"));
                 }
             }
         }
@@ -153,7 +153,7 @@ namespace MDEN.UI.Windows
                 return;
             }
 
-            NativeConfirmDialog.Show("删除歌曲", $"确认从歌曲列表移除「{GetConfirmDisplayName(item)}」吗？", confirmed =>
+            NativeConfirmDialog.Show(I18nManager.T("playlist.delete.title"), I18nManager.Tf("playlist.delete.confirm", GetConfirmDisplayName(item)), confirmed =>
             {
                 if (!confirmed) return;
                 _ = RemoveItemAsync(item);
@@ -169,10 +169,19 @@ namespace MDEN.UI.Windows
         {
             if (IsCustomEntry(item))
             {
-                return $"谱面: {EscapeRichText(item.DisplayName)}\n类型: 自制谱\n难度: {FormatDifficulty(item.Difficulty)}\n添加者: {EscapeRichText(item.OwnerName)}\nID: {FormatCustomChartId(item.ChartKey)}";
+                return I18nManager.Tf(
+                    "playlist.item.custom.desc",
+                    EscapeRichText(item.DisplayName),
+                    FormatDifficulty(item.Difficulty),
+                    EscapeRichText(item.OwnerName),
+                    FormatCustomChartId(item.ChartKey));
             }
 
-            return $"谱面: {EscapeRichText(item.DisplayName)}\n难度: {FormatDifficulty(item.Difficulty)}\n添加者: {EscapeRichText(item.OwnerName)}";
+            return I18nManager.Tf(
+                "playlist.item.desc",
+                EscapeRichText(item.DisplayName),
+                FormatDifficulty(item.Difficulty),
+                EscapeRichText(item.OwnerName));
         }
 
         private static string GetConfirmDisplayName(PlaylistEntryViewModel item)
@@ -189,7 +198,7 @@ namespace MDEN.UI.Windows
 
         private static string FormatCustomChartId(string chartKey)
         {
-            if (string.IsNullOrWhiteSpace(chartKey)) return "Unknown";
+            if (string.IsNullOrWhiteSpace(chartKey)) return I18nManager.T("common.unknown");
             return chartKey.Length <= 8 ? chartKey : chartKey.Substring(0, 8).ToUpperInvariant();
         }
 
@@ -197,7 +206,7 @@ namespace MDEN.UI.Windows
         {
             if (item == null || IsDisposed) return;
 
-            IDisposable uiLock = WindowStackController.LockUI("Removing playlist entry...");
+            IDisposable uiLock = WindowStackController.LockUI(I18nManager.T("common.removing"));
             try
             {
                 await PlaylistManager.RemoveAsync(item.Entry);
@@ -206,7 +215,7 @@ namespace MDEN.UI.Windows
                 await MainThreadDispatcher.InvokeAsync(() =>
                 {
                     if (IsDisposed) return;
-                    ShowText.ShowInfo("成功移除歌曲列表");
+                    ShowText.ShowInfo(I18nManager.T("playlist.removed"));
                     RebuildWindow();
                 });
             }
@@ -271,7 +280,7 @@ namespace MDEN.UI.Windows
             var lobby = LobbyManager.CurrentLobby;
             var currentCount = lobby?.Playlist?.Length ?? _items?.Length ?? 0;
             var maxCount = lobby?.PlaylistSize ?? 0;
-            return $"歌曲列表 {currentCount}/{maxCount}";
+            return I18nManager.Tf("playlist.title", currentCount, maxCount);
         }
 
         private static void RemoveInjectedTitle()

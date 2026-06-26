@@ -51,8 +51,8 @@ namespace MDEN.Managers
         {
             var name = GetPlayerName(push);
             UiNotificationManager.RequestConfirm(
-                "好友请求",
-                $"{name} 想添加你为好友",
+                I18nManager.T("social.request.title"),
+                I18nManager.Tf("social.request.confirm", name),
                 confirmed => _ = RespondFriendRequestSafelyAsync(push.PlayerUid, confirmed));
         }
 
@@ -76,12 +76,12 @@ namespace MDEN.Managers
             var name = GetPlayerName(push);
             return push.Action switch
             {
-                "friend_request" => $"{name} 向你发送了好友请求",
-                "friend_accepted" => $"{name} 已成为你的好友",
-                "friend_removed" => $"{name} 已删除好友关系",
-                "friend_request_cancelled" => $"{name} 已取消好友请求",
-                "friend_declined" => $"{name} 拒绝了你的好友请求",
-                _ => "好友状态已更新"
+                "friend_request" => I18nManager.Tf("social.notify.request", name),
+                "friend_accepted" => I18nManager.Tf("social.notify.accepted", name),
+                "friend_removed" => I18nManager.Tf("social.notify.removed", name),
+                "friend_request_cancelled" => I18nManager.Tf("social.notify.cancelled", name),
+                "friend_declined" => I18nManager.Tf("social.notify.declined", name),
+                _ => I18nManager.T("friend.updated")
             };
         }
 
@@ -89,9 +89,9 @@ namespace MDEN.Managers
         {
             return action switch
             {
-                2 => "已添加好友",
-                5 => "已拒绝好友请求",
-                _ => "好友状态已更新"
+                2 => I18nManager.T("friend.added"),
+                5 => I18nManager.T("friend.request_declined"),
+                _ => I18nManager.T("friend.updated")
             };
         }
 

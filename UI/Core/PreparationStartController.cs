@@ -53,7 +53,7 @@ namespace MDEN.UI.Core
                 _boundButton.enabled = true;
                 if (_boundKeyBinding != null) _boundKeyBinding.enabled = true;
                 if (_boundKeyIcon != null) _boundKeyIcon.SetActive(true);
-                if (_boundText != null) _boundText.text = "PLAY!";
+                if (_boundText != null) _boundText.text = I18nManager.T("prepare.play");
                 return;
             }
 
@@ -83,13 +83,13 @@ namespace MDEN.UI.Core
 
             _busy = true;
             Refresh();
-            IDisposable uiLock = WindowStackController.LockUI("Updating playlist...");
+            IDisposable uiLock = WindowStackController.LockUI(I18nManager.T("prepare.update_playlist"));
 
             try
             {
                 var result = await PlaylistManager.ToggleCurrentChartAsync();
                 MainThreadDispatcher.Enqueue(() => ShowText.ShowInfo(
-                    result == PlaylistToggleResult.Added ? "成功加入歌曲列表" : "成功移除歌曲列表"));
+                    result == PlaylistToggleResult.Added ? I18nManager.T("playlist.added") : I18nManager.T("playlist.removed")));
             }
             catch (Exception ex)
             {
@@ -109,30 +109,30 @@ namespace MDEN.UI.Core
             var entry = PlaylistManager.GetCurrentPlaylistEntry();
             if (!ChartManager.IsCurrentSelectedChart(entry))
             {
-                ShowText.ShowInfo("请先选择本局谱面");
+                ShowText.ShowInfo(I18nManager.T("prepare.select_chart_first"));
                 return;
             }
 
             var difficulty = ChartManager.CurrentDifficulty;
             if (!MDEN.Protocol.Rules.DifficultyDisplayRules.IsKnownDifficulty(difficulty))
             {
-                ShowText.ShowInfo("请选择有效难度");
+                ShowText.ShowInfo(I18nManager.T("prepare.valid_difficulty"));
                 return;
             }
 
             _busy = true;
             Refresh();
-            IDisposable uiLock = WindowStackController.LockUI("Setting ready...");
+            IDisposable uiLock = WindowStackController.LockUI(I18nManager.T("common.processing"));
 
             try
             {
                 await PlaylistManager.SetReadyAsync(true, difficulty);
-                MainThreadDispatcher.Enqueue(() => ShowText.ShowInfo("已选择并准备"));
+                MainThreadDispatcher.Enqueue(() => ShowText.ShowInfo(I18nManager.T("prepare.selected_ready")));
             }
             catch (Exception ex)
             {
                 MDEN.Managers.ClientLogManager.Warning($"Set rookie ready failed: {ex.Message}");
-                MainThreadDispatcher.Enqueue(() => ShowText.ShowInfo($"准备失败：{ex.Message}"));
+                MainThreadDispatcher.Enqueue(() => ShowText.ShowInfo(I18nManager.Tf("ready.failed", ex.Message)));
             }
             finally
             {

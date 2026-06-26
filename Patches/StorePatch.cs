@@ -9,8 +9,6 @@ namespace MDEN.Patches
 {
     internal static class StorePatch
     {
-        private const string StoreDisabledMessage = "多人房间中不能打开商店！";
-
         [HarmonyPatch(typeof(OpenDlc), nameof(OpenDlc.OnButtonClicked))]
         internal static class OpenDlcPatch
         {
@@ -18,7 +16,7 @@ namespace MDEN.Patches
             {
                 if (!LobbyManager.IsInLobby) return true;
 
-                ShowText.ShowInfo(StoreDisabledMessage);
+                ShowText.ShowInfo(I18nManager.T("patch.store_disabled"));
                 return false;
             }
         }
@@ -32,7 +30,7 @@ namespace MDEN.Patches
                 if (RoomHudController.IsChatConsumingInput) return true;
 
                 __result = false;
-                ShowText.ShowInfo(StoreDisabledMessage);
+                ShowText.ShowInfo(I18nManager.T("patch.store_disabled"));
                 return false;
             }
         }

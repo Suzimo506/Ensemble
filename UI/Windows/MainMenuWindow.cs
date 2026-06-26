@@ -26,27 +26,27 @@ namespace MDEN.UI.Windows
             _window = new ForumWindow();
             _window.AutoReset = true;
             
-            _btnAbout = new ForumObject(new LocalString("关于"), new LocalString(Constants.CreditsText));
+            _btnAbout = new ForumObject(new LocalString(I18nManager.T("main.about")), new LocalString(GetCreditsText()));
             _btnAbout.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("HomePanel.png")?.texture;
             _window.ForumObjects.Add(_btnAbout);
 
-            _btnProfile = new ForumObject(new LocalString("个人信息"), new LocalString("更改自己的名字、个人简介、以及个性化修改"));
+            _btnProfile = new ForumObject(new LocalString(I18nManager.T("main.profile")), new LocalString(I18nManager.T("main.profile.desc")));
             _btnProfile.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("PlayerCard.png")?.texture;
             _window.ForumObjects.Add(_btnProfile);
 
-            _btnFriends = new ForumObject(new LocalString("好友列表"), new LocalString("查看自己的好友，与好友一起玩吧！"));
+            _btnFriends = new ForumObject(new LocalString(I18nManager.T("main.friends")), new LocalString(I18nManager.T("main.friends.desc")));
             _btnFriends.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("SocialNetwork.png")?.texture;
             _window.ForumObjects.Add(_btnFriends);
 
-            _btnLobbies = new ForumObject(new LocalString("联机大厅"), new LocalString("加入服务器，与服务器的其他人一起愉快的组队吧！"));
+            _btnLobbies = new ForumObject(new LocalString(I18nManager.T("main.lobbies")), new LocalString(I18nManager.T("main.lobbies.desc")));
             _btnLobbies.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("RoomList.png")?.texture;
             _window.ForumObjects.Add(_btnLobbies);
 
-            _btnSettings = new ForumObject(new LocalString("设置"), new LocalString("更改游戏的各种设置喵"));
+            _btnSettings = new ForumObject(new LocalString(I18nManager.T("main.settings")), new LocalString(I18nManager.T("main.settings.desc")));
             _btnSettings.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("OptionsPanel.png")?.texture;
             _window.ForumObjects.Add(_btnSettings);
 
-            _btnSupportUs = new ForumObject(new LocalString("支持我们"), new LocalString("前往爱发电支持我们，让服务器更长久！OVO"));
+            _btnSupportUs = new ForumObject(new LocalString(I18nManager.T("main.support")), new LocalString(I18nManager.T("main.support.desc")));
             _btnSupportUs.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("HomePanel.png")?.texture;
             _window.ForumObjects.Add(_btnSupportUs);
 
@@ -108,7 +108,7 @@ namespace MDEN.UI.Windows
                             var txt = newTitle.GetComponent<UnityEngine.UI.Text>();
                             if (txt != null)
                             {
-                                txt.text = "一起合奏吧";
+                                txt.text = I18nManager.T("main.title");
                                 txt.alignment = UnityEngine.TextAnchor.MiddleCenter;
                             }
 
@@ -128,6 +128,16 @@ namespace MDEN.UI.Windows
         }
 
         private int _lastSelectedIndex = -1;
+
+        private static string GetCreditsText()
+        {
+            return I18nManager.Tf(
+                "main.credits.text",
+                Constants.ColorGreen,
+                Constants.ColorCyan,
+                Constants.ColorPink,
+                Constants.ColorLavender);
+        }
 
         private void OnSelectionChanged(PopupLib.UI.Windows.Interfaces.IListWindow window, int objectIndex)
         {

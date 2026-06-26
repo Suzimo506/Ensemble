@@ -54,22 +54,22 @@ namespace MDEN.UI.Windows
             _lastSelectedIndex = -1;
 
             var selectedServer = GetSelectedCustomServer();
-            var serverName = selectedServer?.Name ?? "自定义节点";
-            var serverAddress = selectedServer?.Address ?? "节点不存在";
+            var serverName = selectedServer?.Name ?? I18nManager.T("server.custom.default_name");
+            var serverAddress = selectedServer?.Address ?? I18nManager.T("server.missing");
 
-            _btnBack = new ForumObject(new LocalString("- 返回 -"), new LocalString("回到节点列表"));
+            _btnBack = new ForumObject(new LocalString(I18nManager.T("common.back.button")), new LocalString(I18nManager.T("common.back.server_list")));
             _btnBack.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("OptionsPanel.png")?.texture;
             _window.ForumObjects.Add(_btnBack);
 
-            _btnJoin = new ForumObject(new LocalString("- 加入 -"), new LocalString($"加入节点: {serverAddress}"));
+            _btnJoin = new ForumObject(new LocalString(I18nManager.T("server.custom.join.button")), new LocalString(I18nManager.Tf("server.custom.join.desc", serverAddress)));
             _btnJoin.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("RoomList.png")?.texture;
             _window.ForumObjects.Add(_btnJoin);
 
-            _btnRename = new ForumObject(new LocalString("- 重命名 -"), new LocalString($"重命名节点: {serverName}"));
+            _btnRename = new ForumObject(new LocalString(I18nManager.T("server.custom.rename.button")), new LocalString(I18nManager.Tf("server.custom.rename.desc", serverName)));
             _btnRename.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("OptionsPanel.png")?.texture;
             _window.ForumObjects.Add(_btnRename);
 
-            _btnDelete = new ForumObject(new LocalString("- 删除 -"), new LocalString($"从列表中删除节点: {serverName}"));
+            _btnDelete = new ForumObject(new LocalString(I18nManager.T("server.custom.delete.button")), new LocalString(I18nManager.Tf("server.custom.delete.desc", serverName)));
             _btnDelete.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("HomePanel.png")?.texture;
             _window.ForumObjects.Add(_btnDelete);
         }
@@ -154,7 +154,7 @@ namespace MDEN.UI.Windows
             {
                 await MainThreadDispatcher.InvokeAsync(() =>
                 {
-                    uiLock = WindowStackController.LockUI("Connecting to server...");
+                    uiLock = WindowStackController.LockUI(I18nManager.T("common.connecting"));
                     GameAccountManager.RefreshSnapshot();
                 });
 
@@ -208,7 +208,7 @@ namespace MDEN.UI.Windows
             var txt = newTitle.GetComponent<UnityEngine.UI.Text>();
             if (txt != null)
             {
-                txt.text = "管理自定义节点";
+                txt.text = I18nManager.T("server.custom.management.title");
                 txt.alignment = TextAnchor.MiddleCenter;
             }
 

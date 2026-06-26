@@ -90,7 +90,7 @@ namespace MDEN.UI.Windows
                             var txt = newTitle.GetComponent<UnityEngine.UI.Text>();
                             if (txt != null)
                             {
-                                txt.text = "节点列表";
+                                txt.text = I18nManager.T("server.title");
                                 txt.alignment = UnityEngine.TextAnchor.MiddleCenter;
                             }
 
@@ -142,8 +142,8 @@ namespace MDEN.UI.Windows
             }
 
             _isRefreshingNodes = true;
-            IDisposable uiLock = WindowStackController.LockUI("Fetching server nodes...");
-            CloudSyncIndicator.Start("正在获取节点...");
+            IDisposable uiLock = WindowStackController.LockUI(I18nManager.T("server.fetching"));
+            CloudSyncIndicator.Start(I18nManager.T("server.fetching"));
 
             try
             {
@@ -268,24 +268,24 @@ namespace MDEN.UI.Windows
 
         private static string BuildServerStatsDescription(ServerInfoResponse info)
         {
-            if (info == null) return "获取信息失败或服务器离线";
+            if (info == null) return I18nManager.T("server.offline");
 
-            var version = string.IsNullOrWhiteSpace(info.Version) ? "未知" : info.Version;
-            return $"版本: <color={Constants.ColorBlue}>{version}</color>\n当前在线: <color={Constants.ColorYellow}>{info.PlayerCount}</color> 人\n房间数量: <color={Constants.ColorCyan}>{info.RoomCount}</color> 个";
+            var version = string.IsNullOrWhiteSpace(info.Version) ? I18nManager.T("common.unknown") : info.Version;
+            return I18nManager.Tf("server.stats", Constants.ColorBlue, version, Constants.ColorYellow, info.PlayerCount, Constants.ColorCyan, info.RoomCount);
         }
 
         private static string BuildCustomServerDescription(CustomServerInfo server)
         {
-            if (server == null) return "节点不存在";
+            if (server == null) return I18nManager.T("server.missing");
 
-            var status = "当前在线: 未刷新\n房间数量: 未刷新";
+            var status = I18nManager.T("server.custom.default_status");
             if (!string.IsNullOrWhiteSpace(server.Address) &&
                 _customServerStatusDescriptions.TryGetValue(server.Address, out var cachedStatus))
             {
                 status = cachedStatus;
             }
 
-            return $"IP地址: {server.Address}\n{status}\n点击后管理该服务器";
+            return I18nManager.Tf("server.custom.desc", server.Address, status);
         }
 
         private static string NormalizeServerDisplayName(string name)
@@ -297,12 +297,12 @@ namespace MDEN.UI.Windows
         {
             if (string.IsNullOrWhiteSpace(nodeId)) return null;
 
-            if (nodeId == "shanghai") return "上海";
-            if (nodeId == "shandong") return "山东";
-            if (nodeId == "hubei") return "湖北";
-            if (nodeId == "hongkong") return "香港";
-            if (nodeId == "us") return "美国";
-            if (nodeId == "test") return "内测节点";
+            if (nodeId == "shanghai") return I18nManager.T("server.node.shanghai");
+            if (nodeId == "shandong") return I18nManager.T("server.node.shandong");
+            if (nodeId == "hubei") return I18nManager.T("server.node.hubei");
+            if (nodeId == "hongkong") return I18nManager.T("server.node.hongkong");
+            if (nodeId == "us") return I18nManager.T("server.node.us");
+            if (nodeId == "test") return I18nManager.T("server.node.test");
             return nodeId;
         }
 
@@ -339,11 +339,11 @@ namespace MDEN.UI.Windows
             _window.ForumObjects.Clear();
             _lastSelectedIndex = -1; // 重建时清除选中状态
 
-            _btnBack = new ForumObject(new LocalString("- 返回 -"), new LocalString("回到上一个窗口"));
+            _btnBack = new ForumObject(new LocalString(I18nManager.T("common.back.button")), new LocalString(I18nManager.T("common.back.previous_window")));
             _btnBack.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("OptionsPanel.png")?.texture;
             _window.ForumObjects.Add(_btnBack);
 
-            _btnRefresh = new ForumObject(new LocalString("- 刷新 -"), new LocalString("重新获取最新的服务器节点"));
+            _btnRefresh = new ForumObject(new LocalString(I18nManager.T("server.refresh.button")), new LocalString(I18nManager.T("server.refresh.desc")));
             _btnRefresh.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("RoomList.png")?.texture;
             _window.ForumObjects.Add(_btnRefresh);
 
@@ -365,11 +365,11 @@ namespace MDEN.UI.Windows
                 _window.ForumObjects.Add(node);
             }
 
-            _btnAddServer = new ForumObject(new LocalString("- 添加服务器 -"), new LocalString("添加私人服务器长期到列表"));
+            _btnAddServer = new ForumObject(new LocalString(I18nManager.T("server.add.button")), new LocalString(I18nManager.T("server.add.desc")));
             _btnAddServer.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("OptionsPanel.png")?.texture;
             _window.ForumObjects.Add(_btnAddServer);
 
-            _btnJoinServer = new ForumObject(new LocalString("- 加入服务器 -"), new LocalString("临时加入私人服务器"));
+            _btnJoinServer = new ForumObject(new LocalString(I18nManager.T("server.join.button")), new LocalString(I18nManager.T("server.join.desc")));
             _btnJoinServer.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("SocialNetwork.png")?.texture;
             _window.ForumObjects.Add(_btnJoinServer);
         }
@@ -497,7 +497,7 @@ namespace MDEN.UI.Windows
             {
                 await MainThreadDispatcher.InvokeAsync(() =>
                 {
-                    uiLock = WindowStackController.LockUI("Connecting to server...");
+                    uiLock = WindowStackController.LockUI(I18nManager.T("common.connecting"));
                     GameAccountManager.RefreshSnapshot();
                 });
 

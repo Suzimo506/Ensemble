@@ -83,7 +83,7 @@ namespace MDEN.Managers
         public static string GetDisplayText()
         {
             var current = Current;
-            if (current == null) return "查询中...";
+            if (current == null) return I18nManager.T("common.loading");
             return $"{GetGirlName(current.GirlIndex)} / {GetElfinName(current.ElfinIndex)}";
         }
 
@@ -91,7 +91,7 @@ namespace MDEN.Managers
         {
             var current = Current;
             if (current != null) return GetDisplayText();
-            return IsLoading(entry) ? "查询中..." : "暂无推荐";
+            return IsLoading(entry) ? I18nManager.T("common.loading") : I18nManager.T("ready.no_recommendation");
         }
 
         private static async Task LoadAsync(PlaylistEntryViewModel entry, string key)
@@ -193,7 +193,7 @@ namespace MDEN.Managers
             }
             catch
             {
-                return $"角色 {girlId}";
+                return I18nManager.Tf("ready.girl_fallback", girlId);
             }
         }
 
@@ -209,7 +209,7 @@ namespace MDEN.Managers
             }
             catch
             {
-                return $"精灵 {elfinId}";
+                return I18nManager.Tf("ready.elfin_fallback", elfinId);
             }
         }
     }
