@@ -137,9 +137,9 @@ namespace MDEN.Managers
             }
 
             if (IsCurrentChartUnsupported()) return GetCurrentChartUnsupportedMessage(entry);
+            if (IsPlaylistFull()) return I18nManager.T("playlist.full");
             if (IsTenziMode() && HasReachedLocalTenziEntryLimit()) return I18nManager.Tf("playlist.tenzi_limit", GetTenziSongsPerPlayerLimit());
             if (IsTenziRoundClosed()) return I18nManager.T("playlist.round_closed");
-            if (IsPlaylistFull()) return I18nManager.T("playlist.full");
             return I18nManager.T("playlist.add");
         }
 
@@ -188,6 +188,7 @@ namespace MDEN.Managers
 
             EnsureEntrySupported(entry);
             EnsureEntryAllowedByPlayMode(entry);
+            EnsurePlaylistHasSpace();
             EnsureEntryAllowedByTenziMode();
             await AddAsync(entry);
             return PlaylistToggleResult.Added;
@@ -198,6 +199,7 @@ namespace MDEN.Managers
             EnsureReady();
             EnsureEntrySupported(entry);
             EnsureEntryAllowedByPlayMode(entry);
+            EnsurePlaylistHasSpace();
             EnsureEntryAllowedByTenziMode();
             await PlayerManager.SyncChartStateAsync();
             var response = await NetworkClient.Instance.SendRequestAsync<PlaylistAddRequest, PlaylistAddResponse>(
@@ -529,6 +531,14 @@ namespace MDEN.Managers
             if (IsTenziRoundClosed())
             {
                 throw new System.InvalidOperationException(I18nManager.T("playlist.tenzi_round_remove"));
+            }
+        }
+
+        private static void EnsurePlaylistHasSpace()
+        {
+            if (IsPlaylistFull())
+            {
+                throw new System.InvalidOperationException(I18nManager.T("playlist.full"));
             }
         }
 
