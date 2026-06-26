@@ -54,6 +54,7 @@ namespace MDEN.Protocol.Messages.Mdt
         public byte Goal { get; set; }
         public ushort MaxPlayers { get; set; }
         public ushort PlaylistSize { get; set; }
+        public byte TenziSongsPerPlayer { get; set; }
         public int PlaylistCount { get; set; }
         public bool SettlementEnabled { get; set; }
         public bool IsPrivate { get; set; }

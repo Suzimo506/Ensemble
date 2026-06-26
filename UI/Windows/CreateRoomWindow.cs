@@ -4,6 +4,7 @@ using Il2CppAssets.Scripts.UI.Controls;
 using LocalizeLib;
 using MDEN.Managers;
 using MDEN.Protocol.Enums;
+using MDEN.Protocol.Rules;
 using MDEN.UI.Core;
 using MelonLoader;
 using PopupLib.UI.Components;
@@ -19,6 +20,7 @@ namespace MDEN.UI.Windows
         private ForumObject _btnName;
         private ForumObject _btnMaxPlayers;
         private ForumObject _btnPlayMode;
+        private ForumObject _btnTenziSongsPerPlayer;
         private ForumObject _btnPlaylistSize;
         private ForumObject _btnGoal;
         private ForumObject _btnSettlement;
@@ -31,6 +33,7 @@ namespace MDEN.UI.Windows
         private ushort _maxPlayers = 4;
         private LobbyPlayMode _playMode = LobbyPlayMode.Normal;
         private ushort _playlistSize = 12;
+        private byte _tenziSongsPerPlayer = LobbyPlayModeRules.DefaultTenziSongsPerPlayer;
         private LobbyGoal _goal = LobbyGoal.Accuracy;
         private bool _settlementEnabled;
         private string _password;
@@ -79,6 +82,19 @@ namespace MDEN.UI.Windows
                 new LocalString(I18nManager.Tf("create.play_mode.desc", FormatPlayMode(_playMode), FormatPlayMode(LobbyRuleTextFormatter.GetNextPlayMode((byte)_playMode)))));
             _btnPlayMode.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("OptionsPanel.png")?.texture;
             _window.ForumObjects.Add(_btnPlayMode);
+
+            if (LobbyPlayModeRules.IsTenzi((byte)_playMode))
+            {
+                _btnTenziSongsPerPlayer = new ForumObject(
+                    new LocalString(I18nManager.T("tenzi.songs_per_player.title")),
+                    new LocalString(I18nManager.Tf("tenzi.songs_per_player.desc", HighlightValue(_tenziSongsPerPlayer), LobbyPlayModeRules.GetTenziSongsPerPlayerMax(_playlistSize))));
+                _btnTenziSongsPerPlayer.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("RoomList.png")?.texture;
+                _window.ForumObjects.Add(_btnTenziSongsPerPlayer);
+            }
+            else
+            {
+                _btnTenziSongsPerPlayer = null;
+            }
 
             _btnPlaylistSize = new ForumObject(new LocalString(I18nManager.T("create.playlist_size.title")), new LocalString(I18nManager.Tf("create.playlist_size.desc", HighlightValue(_playlistSize))));
             _btnPlaylistSize.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("RoomList.png")?.texture;
@@ -140,7 +156,12 @@ namespace MDEN.UI.Windows
             else if (button == _btnPlayMode)
             {
                 _playMode = LobbyRuleTextFormatter.GetNextPlayMode((byte)_playMode);
+                ClampTenziSongsPerPlayer();
                 RebuildWindow();
+            }
+            else if (button == _btnTenziSongsPerPlayer)
+            {
+                ShowTenziSongsPerPlayerInput();
             }
             else if (button == _btnPlaylistSize)
             {
@@ -223,7 +244,20 @@ namespace MDEN.UI.Windows
 
         private void ShowPlaylistSizeInput()
         {
-            ShowNumberInput(I18nManager.T("create.playlist_size.title"), 2, 32, value => _playlistSize = value);
+            ShowNumberInput(I18nManager.T("create.playlist_size.title"), 2, 32, value =>
+            {
+                _playlistSize = value;
+                ClampTenziSongsPerPlayer();
+            });
+        }
+
+        private void ShowTenziSongsPerPlayerInput()
+        {
+            ShowNumberInput(
+                I18nManager.T("tenzi.songs_per_player.title"),
+                LobbyPlayModeRules.MinTenziSongsPerPlayer,
+                LobbyPlayModeRules.GetTenziSongsPerPlayerMax(_playlistSize),
+                value => _tenziSongsPerPlayer = (byte)value);
         }
 
         private void ShowNumberInput(string fieldName, int min, int max, Action<ushort> applyValue)
@@ -289,6 +323,7 @@ namespace MDEN.UI.Windows
                     (byte)_playMode,
                     _goal,
                     _playlistSize,
+                    _tenziSongsPerPlayer,
                     _settlementEnabled,
                     _password);
                 if (IsDisposed) return;
@@ -307,7 +342,7 @@ namespace MDEN.UI.Windows
             catch (Exception ex)
             {
                 MDEN.Managers.ClientLogManager.Warning($"Create lobby failed: {ex.Message}");
-                MainThreadDispatcher.Enqueue(() => ShowText.ShowInfo(I18nManager.Tf("create.failed", ex.Message)));
+                MainThreadDispatcher.Enqueue(() => ShowText.ShowInfo(I18nManager.Tf("create.failed", LobbyManager.FormatCreateLobbyFailureMessage(ex.Message, _playlistSize))));
             }
             finally
             {
@@ -332,6 +367,20 @@ namespace MDEN.UI.Windows
 
         private string BuildSummary()
         {
+            if (LobbyPlayModeRules.IsTenzi((byte)_playMode))
+            {
+                return I18nManager.Tf(
+                    "create.summary.tenzi",
+                    HighlightValue(EscapeRichText(_roomName)),
+                    HighlightValue(_maxPlayers),
+                    FormatPlayMode(_playMode),
+                    HighlightValue(_playlistSize),
+                    HighlightValue(_tenziSongsPerPlayer),
+                    HighlightValue(GetGoalName()),
+                    HighlightValue(GetSettlementNamePlain()),
+                    HighlightValue(string.IsNullOrWhiteSpace(_password) ? I18nManager.T("common.no") : I18nManager.T("common.set")));
+            }
+
             return I18nManager.Tf(
                 "create.summary",
                 HighlightValue(EscapeRichText(_roomName)),
@@ -375,6 +424,11 @@ namespace MDEN.UI.Windows
             return string.IsNullOrEmpty(value)
                 ? string.Empty
                 : value.Replace("&", "&amp;").Replace("<", "&lt;").Replace(">", "&gt;");
+        }
+
+        private void ClampTenziSongsPerPlayer()
+        {
+            _tenziSongsPerPlayer = LobbyPlayModeRules.NormalizeTenziSongsPerPlayer(_tenziSongsPerPlayer, _playlistSize);
         }
 
         private void RebuildWindow()

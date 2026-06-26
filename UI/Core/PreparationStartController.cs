@@ -94,7 +94,7 @@ namespace MDEN.UI.Core
             catch (Exception ex)
             {
                 MDEN.Managers.ClientLogManager.Warning($"Toggle playlist chart failed: {ex.Message}");
-                MainThreadDispatcher.Enqueue(() => ShowText.ShowInfo(ex.Message));
+                MainThreadDispatcher.Enqueue(() => ShowText.ShowInfo(PlaylistManager.FormatPlaylistFailureMessage(ex.Message)));
             }
             finally
             {

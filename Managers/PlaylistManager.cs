@@ -137,7 +137,7 @@ namespace MDEN.Managers
             }
 
             if (IsCurrentChartUnsupported()) return GetCurrentChartUnsupportedMessage(entry);
-            if (IsTenziMode() && HasLocalTenziEntry()) return I18nManager.T("playlist.remove_own_first");
+            if (IsTenziMode() && HasReachedLocalTenziEntryLimit()) return I18nManager.Tf("playlist.tenzi_limit", GetTenziSongsPerPlayerLimit());
             if (IsTenziRoundClosed()) return I18nManager.T("playlist.round_closed");
             if (IsPlaylistFull()) return I18nManager.T("playlist.full");
             return I18nManager.T("playlist.add");
@@ -160,7 +160,7 @@ namespace MDEN.Managers
                 return !IsTenziMode() || IsTenziEntryOwner(actualEntry, PlayerManager.CurrentUid);
             }
 
-            if (IsTenziMode() && HasLocalTenziEntry()) return false;
+            if (IsTenziMode() && HasReachedLocalTenziEntryLimit()) return false;
             if (IsTenziRoundClosed()) return false;
             return !IsEntryUnsupportedForCurrentLobby(entry) && !IsPlaylistFull();
         }
@@ -440,6 +440,45 @@ namespace MDEN.Managers
             return IsTenziMode() && HasTenziEntryFromPlayer(PlayerManager.CurrentUid);
         }
 
+        public static int GetLocalTenziEntryCount()
+        {
+            return IsTenziMode() ? GetTenziEntryCountFromPlayer(PlayerManager.CurrentUid) : 0;
+        }
+
+        public static int GetTenziSongsPerPlayerLimit()
+        {
+            var lobby = LobbyManager.CurrentLobby;
+            return LobbyPlayModeRules.NormalizeTenziSongsPerPlayer(
+                lobby?.TenziSongsPerPlayer ?? 0,
+                lobby?.PlaylistSize ?? LobbyPlayModeRules.DefaultTenziSongsPerPlayer);
+        }
+
+        public static bool HasReachedLocalTenziEntryLimit()
+        {
+            return IsTenziMode() && GetLocalTenziEntryCount() >= GetTenziSongsPerPlayerLimit();
+        }
+
+        public static string FormatPlaylistFailureMessage(string reason)
+        {
+            if (string.IsNullOrWhiteSpace(reason)) return I18nManager.T("common.unknown_error");
+            if (reason == "游戏准备或进行中，不能修改歌曲列表") return I18nManager.T("playlist.locked_blocked");
+            if (reason == "游戏进行中，不能修改歌曲列表") return I18nManager.T("playlist.playing_blocked");
+            if (reason == "你已被禁止选谱") return I18nManager.T("playlist.chart_selection_banned");
+            if (reason == "歌曲列表已满") return I18nManager.T("playlist.full");
+            if (reason == "歌曲已在列表中") return I18nManager.T("playlist.already_added");
+            if (reason == "歌曲不在列表中") return I18nManager.T("playlist.not_found");
+            if (reason == "天子模式本轮已封盘，请先移除本轮谱面") return I18nManager.T("playlist.tenzi_round_remove");
+            if (reason == "天子模式只能移除自己选择的谱面") return I18nManager.T("playlist.remove_own_only");
+            if (reason.StartsWith("天子模式每人最多选择", System.StringComparison.Ordinal))
+            {
+                return I18nManager.Tf(
+                    "playlist.tenzi_limit",
+                    ProtocolReasonText.TryReadLastPositiveInt(reason, out var limit) ? limit : GetTenziSongsPerPlayerLimit());
+            }
+
+            return reason;
+        }
+
         public static bool CanRemovePlaylistEntry(PlaylistEntryViewModel item)
         {
             if (item == null) return false;
@@ -482,9 +521,9 @@ namespace MDEN.Managers
 
         private static void EnsureEntryAllowedByTenziMode()
         {
-            if (IsTenziMode() && HasLocalTenziEntry())
+            if (IsTenziMode() && HasReachedLocalTenziEntryLimit())
             {
-                throw new System.InvalidOperationException(I18nManager.T("playlist.tenzi_remove_first"));
+                throw new System.InvalidOperationException(I18nManager.Tf("playlist.tenzi_limit", GetTenziSongsPerPlayerLimit()));
             }
 
             if (IsTenziRoundClosed())
@@ -503,9 +542,14 @@ namespace MDEN.Managers
 
         private static bool HasTenziEntryFromPlayer(string uid)
         {
+            return GetTenziEntryCountFromPlayer(uid) > 0;
+        }
+
+        private static int GetTenziEntryCountFromPlayer(string uid)
+        {
             var owners = LobbyManager.CurrentLobby?.PlaylistOwners;
-            if (owners == null || string.IsNullOrWhiteSpace(uid)) return false;
-            return owners.Any(owner => owner?.Uid == uid);
+            if (owners == null || string.IsNullOrWhiteSpace(uid)) return 0;
+            return owners.Count(owner => owner?.Uid == uid);
         }
 
         private static bool IsTenziEntryOwner(string entry, string uid)

@@ -6,6 +6,7 @@ using MDEN.Protocol;
 using MDEN.Protocol.Enums;
 using MDEN.Protocol.Messages.Lobby;
 using MDEN.Protocol.Models;
+using MDEN.Protocol.Rules;
 using MDEN.UI.Core;
 using MelonLoader;
 
@@ -97,6 +98,7 @@ namespace MDEN.Managers
                 PlayMode = entry.PlayMode,
                 MaxPlayers = entry.MaxPlayers,
                 PlaylistSize = entry.PlaylistSize,
+                TenziSongsPerPlayer = LobbyPlayModeRules.NormalizeTenziSongsPerPlayer(entry.TenziSongsPerPlayer, entry.PlaylistSize),
                 SettlementEnabled = entry.SettlementEnabled,
                 IsPrivate = entry.IsPrivate,
                 JoinLocked = entry.JoinLocked,
@@ -151,12 +153,27 @@ namespace MDEN.Managers
             return response?.LobbyId ?? 0;
         }
 
+        public static string FormatCreateLobbyFailureMessage(string reason, ushort playlistSize)
+        {
+            if (string.IsNullOrWhiteSpace(reason)) return I18nManager.T("common.unknown_error");
+            if (IsTenziSongsPerPlayerRangeFailure(reason))
+            {
+                return FormatTenziSongsPerPlayerRangeFailure(
+                    ProtocolReasonText.TryReadLastPositiveInt(reason, out var max)
+                        ? max
+                        : LobbyPlayModeRules.GetTenziSongsPerPlayerMax(playlistSize));
+            }
+
+            return reason;
+        }
+
         public static Task<int> CreateLobbyAsync(
             string name,
             ushort maxPlayers,
             byte playMode,
             LobbyGoal goal,
             ushort playlistSize,
+            byte tenziSongsPerPlayer,
             bool settlementEnabled,
             string password)
         {
@@ -169,6 +186,7 @@ namespace MDEN.Managers
                 ChartSelection = (byte)LobbyChartSelection.HostPlaylist,
                 Goal = (byte)goal,
                 PlaylistSize = playlistSize,
+                TenziSongsPerPlayer = tenziSongsPerPlayer,
                 SettlementEnabled = settlementEnabled,
                 Password = password
             });
@@ -342,12 +360,79 @@ namespace MDEN.Managers
             });
         }
 
+        public static Task SetTenziSongsPerPlayerAsync(byte value)
+        {
+            return SetLobbySettingsAsync(new LobbySettingsRequest
+            {
+                JoinLocked = CurrentLobby?.JoinLocked == true,
+                UpdateTenziSongsPerPlayer = true,
+                TenziSongsPerPlayer = value
+            });
+        }
+
+        public static bool CanSetTenziSongsPerPlayer(byte value, out string blockedMessage)
+        {
+            blockedMessage = null;
+            var lobby = CurrentLobby;
+            if (lobby == null) return true;
+
+            var maxOwned = GetMaxTenziEntryCount(lobby);
+            if (value >= maxOwned) return true;
+
+            blockedMessage = I18nManager.Tf("tenzi.songs_per_player.existing_limit", maxOwned);
+            return false;
+        }
+
         public static async Task SetLobbySettingsAsync(LobbySettingsRequest request)
         {
             EnsureReady();
             await NetworkClient.Instance.SendRequestAsync<LobbySettingsRequest, LobbySettingsResponse>(
                 OpCodes.LobbySettingsReq,
                 request ?? new LobbySettingsRequest());
+        }
+
+        public static string FormatSettingsFailureMessage(string reason)
+        {
+            if (string.IsNullOrWhiteSpace(reason)) return I18nManager.T("common.unknown_error");
+            if (reason == "游戏准备或进行中，不能修改房间规则") return I18nManager.T("room.rules_locked");
+            if (reason == "已有玩家点歌数超过新上限，请先移除多余谱面")
+            {
+                return I18nManager.T("tenzi.songs_per_player.existing_limit_server");
+            }
+
+            if (IsTenziSongsPerPlayerRangeFailure(reason))
+            {
+                return FormatTenziSongsPerPlayerRangeFailure(
+                    ProtocolReasonText.TryReadLastPositiveInt(reason, out var max)
+                        ? max
+                        : LobbyPlayModeRules.GetTenziSongsPerPlayerMax(CurrentLobby?.PlaylistSize ?? 2));
+            }
+
+            return reason;
+        }
+
+        private static bool IsTenziSongsPerPlayerRangeFailure(string reason)
+        {
+            return reason.StartsWith("天子模式每人点歌数必须在", System.StringComparison.Ordinal);
+        }
+
+        private static string FormatTenziSongsPerPlayerRangeFailure(int max)
+        {
+            return I18nManager.Tf(
+                "create.number_range",
+                I18nManager.T("tenzi.songs_per_player.title"),
+                LobbyPlayModeRules.MinTenziSongsPerPlayer,
+                max);
+        }
+
+        private static int GetMaxTenziEntryCount(LobbySyncPush lobby)
+        {
+            return lobby?.PlaylistOwners?
+                .Where(owner => !string.IsNullOrWhiteSpace(owner?.Uid))
+                .GroupBy(owner => owner.Uid)
+                .Select(group => group.Count())
+                .DefaultIfEmpty(0)
+                .Max() ?? 0;
         }
 
         public static void Init()
@@ -390,6 +475,7 @@ namespace MDEN.Managers
                 PlayMode = request.PlayMode,
                 MaxPlayers = request.MaxPlayers,
                 PlaylistSize = request.PlaylistSize,
+                TenziSongsPerPlayer = LobbyPlayModeRules.NormalizeTenziSongsPerPlayer(request.TenziSongsPerPlayer, request.PlaylistSize),
                 SettlementEnabled = request.SettlementEnabled,
                 IsPrivate = !string.IsNullOrWhiteSpace(request.Password),
                 JoinLocked = false,
@@ -525,6 +611,7 @@ namespace MDEN.Managers
                 previous.Goal != next.Goal ||
                 previous.MaxPlayers != next.MaxPlayers ||
                 previous.PlaylistSize != next.PlaylistSize ||
+                previous.TenziSongsPerPlayer != next.TenziSongsPerPlayer ||
                 previous.SettlementEnabled != next.SettlementEnabled ||
                 previous.IsPrivate != next.IsPrivate ||
                 previous.JoinLocked != next.JoinLocked ||

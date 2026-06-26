@@ -12,6 +12,7 @@ namespace MDEN.Protocol.Messages.Lobby
         public byte ChartSelection { get; set; }
         public byte Goal { get; set; }
         public ushort PlaylistSize { get; set; }
+        public byte TenziSongsPerPlayer { get; set; }
         public bool SettlementEnabled { get; set; }
 
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -95,6 +96,8 @@ namespace MDEN.Protocol.Messages.Lobby
         public bool SettlementEnabled { get; set; }
         public bool UpdatePlayMode { get; set; }
         public byte PlayMode { get; set; }
+        public bool UpdateTenziSongsPerPlayer { get; set; }
+        public byte TenziSongsPerPlayer { get; set; }
 
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public string Password { get; set; }
@@ -141,6 +144,7 @@ namespace MDEN.Protocol.Messages.Lobby
         public byte Goal { get; set; }
         public ushort MaxPlayers { get; set; }
         public ushort PlaylistSize { get; set; }
+        public byte TenziSongsPerPlayer { get; set; }
         public bool SettlementEnabled { get; set; }
         public bool IsPrivate { get; set; }
         public bool JoinLocked { get; set; }

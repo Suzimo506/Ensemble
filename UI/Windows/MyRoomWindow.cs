@@ -20,6 +20,7 @@ namespace MDEN.UI.Windows
         private ForumWindow _window;
         private ForumObject _btnLeave;
         private ForumObject _btnPlayMode;
+        private ForumObject _btnTenziSongsPerPlayer;
         private ForumObject _btnGoal;
         private ForumObject _btnSettlement;
         private ForumObject _btnJoinLock;
@@ -130,6 +131,7 @@ namespace MDEN.UI.Windows
                 lobby.Goal,
                 lobby.MaxPlayers,
                 lobby.PlaylistSize,
+                lobby.TenziSongsPerPlayer,
                 lobby.SettlementEnabled,
                 lobby.IsPrivate,
                 lobby.JoinLocked,
@@ -226,6 +228,19 @@ namespace MDEN.UI.Windows
                 _btnPlayMode.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("OptionsPanel.png")?.texture;
                 _window.ForumObjects.Add(_btnPlayMode);
 
+                if (LobbyPlayModeRules.IsTenzi(lobby.PlayMode))
+                {
+                    _btnTenziSongsPerPlayer = new ForumObject(
+                        new LocalString(I18nManager.T("tenzi.songs_per_player.title")),
+                        new LocalString(I18nManager.Tf("tenzi.songs_per_player.room_desc", Highlight(GetTenziSongsPerPlayer(lobby).ToString(), Constants.ColorYellow), LobbyPlayModeRules.GetTenziSongsPerPlayerMax(lobby.PlaylistSize))));
+                    _btnTenziSongsPerPlayer.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("RoomList.png")?.texture;
+                    _window.ForumObjects.Add(_btnTenziSongsPerPlayer);
+                }
+                else
+                {
+                    _btnTenziSongsPerPlayer = null;
+                }
+
                 _btnGoal = new ForumObject(
                     new LocalString(I18nManager.T("create.goal.title")),
                     new LocalString(I18nManager.Tf("room.setting.desc", Highlight(GetGoalName(lobby.Goal), Constants.ColorYellow), Highlight(GetGoalName(GetNextGoal(lobby.Goal)), Constants.ColorCyan))));
@@ -241,6 +256,7 @@ namespace MDEN.UI.Windows
             else
             {
                 _btnPlayMode = null;
+                _btnTenziSongsPerPlayer = null;
                 _btnGoal = null;
                 _btnSettlement = null;
             }
@@ -376,12 +392,15 @@ namespace MDEN.UI.Windows
         private static string BuildRoomSummary(MDEN.Protocol.Messages.Lobby.LobbySyncPush lobby)
         {
             var hostName = EscapeRichText(lobby.HostName ?? lobby.HostUid ?? I18nManager.T("common.unknown"));
+            var playlistText = LobbyPlayModeRules.IsTenzi(lobby.PlayMode)
+                ? I18nManager.Tf("room.playlist.tenzi", $"{GetPlaylistCount(lobby)}/{lobby.PlaylistSize}", GetTenziSongsPerPlayer(lobby))
+                : $"{GetPlaylistCount(lobby)}/{lobby.PlaylistSize}";
             return I18nManager.Tf(
                 "room.summary",
                 Highlight(hostName, Constants.ColorPink),
                 Highlight($"{GetPlayerCount(lobby)}/{lobby.MaxPlayers}", Constants.ColorCyan),
                 Highlight(LobbyRuleTextFormatter.GetPlayModeName(lobby.PlayMode), LobbyRuleTextFormatter.GetPlayModeColor(lobby.PlayMode)),
-                Highlight($"{GetPlaylistCount(lobby)}/{lobby.PlaylistSize}", Constants.ColorYellow),
+                Highlight(playlistText, Constants.ColorYellow),
                 Highlight(GetGoalName(lobby.Goal), Constants.ColorYellow),
                 Highlight(lobby.SettlementEnabled ? I18nManager.T("common.enabled") : I18nManager.T("common.disabled"), Constants.ColorYellow),
                 Highlight(lobby.JoinLocked ? I18nManager.T("common.locked") : I18nManager.T("common.open"), lobby.JoinLocked ? Constants.ColorYellow : RoomListWindow.WaitingStatusColor),
@@ -474,6 +493,15 @@ namespace MDEN.UI.Windows
                     LocalLobbySettingsChange.ForPlayMode(
                         lobby.JoinLocked,
                         (byte)LobbyRuleTextFormatter.GetNextPlayMode(lobby.PlayMode)));
+                return;
+            }
+
+            if (button == _btnTenziSongsPerPlayer)
+            {
+                var lobby = LobbyManager.CurrentLobby;
+                if (!CanChangeRoomRules(lobby)) return;
+
+                ShowTenziSongsPerPlayerInput(lobby);
                 return;
             }
 
@@ -594,6 +622,44 @@ namespace MDEN.UI.Windows
             input.Show();
         }
 
+        private void ShowTenziSongsPerPlayerInput(LobbySyncPush lobby)
+        {
+            if (lobby == null) return;
+
+            var min = LobbyPlayModeRules.MinTenziSongsPerPlayer;
+            var max = LobbyPlayModeRules.GetTenziSongsPerPlayerMax(lobby.PlaylistSize);
+            if (_window != null)
+            {
+                _window.ForceClose();
+            }
+
+            var input = new InputWindow();
+            input.OnCompletion += (w) =>
+            {
+                var value = input.Result?.Trim();
+                if (!TryParseNumberInRange(value, min, max, out var parsed))
+                {
+                    Il2CppAssets.Scripts.UI.Controls.ShowText.ShowInfo(I18nManager.Tf("create.number_range", I18nManager.T("tenzi.songs_per_player.title"), min, max));
+                    MainThreadDispatcher.Enqueue(RebuildWindow);
+                    return;
+                }
+
+                if (!LobbyManager.CanSetTenziSongsPerPlayer((byte)parsed, out var blockedMessage))
+                {
+                    Il2CppAssets.Scripts.UI.Controls.ShowText.ShowInfo(blockedMessage);
+                    MainThreadDispatcher.Enqueue(RebuildWindow);
+                    return;
+                }
+
+                _ = UpdateLobbySettingsAsync(
+                    () => LobbyManager.SetTenziSongsPerPlayerAsync((byte)parsed),
+                    LocalLobbySettingsChange.ForTenziSongsPerPlayer(
+                        LobbyManager.CurrentLobby?.JoinLocked == true,
+                        (byte)parsed));
+            };
+            input.Show();
+        }
+
         private async Task UpdateLobbySettingsAsync(Func<Task> updateAsync, LocalLobbySettingsChange localChange)
         {
             IDisposable uiLock = WindowStackController.LockUI(I18nManager.T("common.processing"));
@@ -613,7 +679,11 @@ namespace MDEN.UI.Windows
             catch (System.Exception ex)
             {
                 MDEN.Managers.ClientLogManager.Warning($"Update lobby settings failed: {ex.Message}");
-                MainThreadDispatcher.Enqueue(RebuildWindow);
+                MainThreadDispatcher.Enqueue(() =>
+                {
+                    Il2CppAssets.Scripts.UI.Controls.ShowText.ShowInfo(I18nManager.Tf("room.setting_failed", LobbyManager.FormatSettingsFailureMessage(ex.Message)));
+                    RebuildWindow();
+                });
             }
             finally
             {
@@ -657,6 +727,11 @@ namespace MDEN.UI.Windows
                     lobby.CurrentPlaylistEntry = 0;
                 }
             }
+
+            if (change.UpdateTenziSongsPerPlayer)
+            {
+                lobby.TenziSongsPerPlayer = change.TenziSongsPerPlayer;
+            }
         }
 
         private sealed class LocalLobbySettingsChange
@@ -670,6 +745,8 @@ namespace MDEN.UI.Windows
             public bool SettlementEnabled { get; private set; }
             public bool UpdatePlayMode { get; private set; }
             public byte PlayMode { get; private set; }
+            public bool UpdateTenziSongsPerPlayer { get; private set; }
+            public byte TenziSongsPerPlayer { get; private set; }
 
             public static LocalLobbySettingsChange JoinLock(bool joinLocked)
             {
@@ -715,11 +792,35 @@ namespace MDEN.UI.Windows
                     PlayMode = playMode
                 };
             }
+
+            public static LocalLobbySettingsChange ForTenziSongsPerPlayer(bool joinLocked, byte value)
+            {
+                return new LocalLobbySettingsChange
+                {
+                    JoinLocked = joinLocked,
+                    UpdateTenziSongsPerPlayer = true,
+                    TenziSongsPerPlayer = value
+                };
+            }
         }
 
         private static byte GetNextGoal(byte goal)
         {
             return (byte)((LobbyGoal)goal == LobbyGoal.Accuracy ? LobbyGoal.Score : LobbyGoal.Accuracy);
+        }
+
+        private static byte GetTenziSongsPerPlayer(LobbySyncPush lobby)
+        {
+            return LobbyPlayModeRules.NormalizeTenziSongsPerPlayer(lobby?.TenziSongsPerPlayer ?? 0, lobby?.PlaylistSize ?? 2);
+        }
+
+        private static bool TryParseNumberInRange(string value, int min, int max, out int parsed)
+        {
+            parsed = 0;
+            return !string.IsNullOrWhiteSpace(value) &&
+                   int.TryParse(value, out parsed) &&
+                   parsed >= min &&
+                   parsed <= max;
         }
 
         private async System.Threading.Tasks.Task LeaveLobbyAsync()

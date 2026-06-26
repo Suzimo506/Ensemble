@@ -222,7 +222,7 @@ namespace MDEN.UI.Windows
             catch (System.Exception ex)
             {
                 MDEN.Managers.ClientLogManager.Warning($"Remove playlist entry failed: {ex.Message}");
-                MainThreadDispatcher.Enqueue(() => ShowText.ShowInfo(ex.Message));
+                MainThreadDispatcher.Enqueue(() => ShowText.ShowInfo(PlaylistManager.FormatPlaylistFailureMessage(ex.Message)));
             }
             finally
             {

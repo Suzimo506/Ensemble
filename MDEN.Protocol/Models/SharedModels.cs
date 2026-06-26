@@ -50,6 +50,7 @@ namespace MDEN.Protocol.Models
         public byte Goal { get; set; }
         public ushort MaxPlayers { get; set; }
         public ushort PlaylistSize { get; set; }
+        public byte TenziSongsPerPlayer { get; set; }
         public int PlaylistCount { get; set; }
         public bool SettlementEnabled { get; set; }
         public int PlayerCount { get; set; }

@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Il2CppAssets.Scripts.UI.Controls;
@@ -6,6 +7,7 @@ using LocalizeLib;
 using MDEN.Managers;
 using MDEN.Protocol.Enums;
 using MDEN.Protocol.Models;
+using MDEN.Protocol.Rules;
 using MDEN.UI.Core;
 using MelonLoader;
 using PopupLib.UI.Components;
@@ -205,8 +207,11 @@ namespace MDEN.UI.Windows
         private static string BuildLobbyDescription(LobbyListEntry lobby)
         {
             var host = EscapeRichText(lobby.HostName ?? lobby.HostUid ?? I18nManager.T("common.unknown"));
-            return I18nManager.Tf(
-                "lobby.desc",
+            var key = LobbyPlayModeRules.IsTenzi(lobby.PlayMode)
+                ? "lobby.desc.tenzi"
+                : "lobby.desc";
+            var args = new object[]
+            {
                 Constants.ColorPink,
                 host,
                 Constants.ColorCyan,
@@ -226,7 +231,20 @@ namespace MDEN.UI.Windows
                 lobby.SettlementEnabled ? I18nManager.T("common.enabled") : I18nManager.T("common.disabled"),
                 ColorText(lobby.JoinLocked ? I18nManager.T("common.locked") : I18nManager.T("common.open"), lobby.JoinLocked ? LockedStatusColor : WaitingStatusColor),
                 ColorText(lobby.IsPrivate ? I18nManager.T("common.required") : I18nManager.T("common.no"), lobby.IsPrivate ? LockedStatusColor : WaitingStatusColor),
-                GetColoredLobbyStatus(lobby.IsPlaying, lobby.Locked, lobby.JoinLocked));
+                GetColoredLobbyStatus(lobby.IsPlaying, lobby.Locked, lobby.JoinLocked)
+            };
+
+            if (!LobbyPlayModeRules.IsTenzi(lobby.PlayMode))
+            {
+                return I18nManager.Tf(key, args);
+            }
+
+            var tenziArgs = args.Concat(new object[]
+            {
+                Constants.ColorYellow,
+                LobbyPlayModeRules.NormalizeTenziSongsPerPlayer(lobby.TenziSongsPerPlayer, lobby.PlaylistSize)
+            }).ToArray();
+            return I18nManager.Tf(key, tenziArgs);
         }
 
         private static string GetGoalName(byte goal)
@@ -553,6 +571,7 @@ namespace MDEN.UI.Windows
                 left.Goal == right.Goal &&
                 left.MaxPlayers == right.MaxPlayers &&
                 left.PlaylistSize == right.PlaylistSize &&
+                left.TenziSongsPerPlayer == right.TenziSongsPerPlayer &&
                 left.PlaylistCount == right.PlaylistCount &&
                 left.SettlementEnabled == right.SettlementEnabled &&
                 left.PlayerCount == right.PlayerCount &&
