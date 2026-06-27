@@ -13,6 +13,15 @@ namespace MDEN.UI.Core
             var dbMusicTag = GlobalDataBase.dbMusicTag;
             if (dbMusicTag != null)
             {
+                try
+                {
+                    dbMusicTag.SetSelectedMusic(musicInfo);
+                }
+                catch (System.Exception ex)
+                {
+                    ClientLogManager.Warning($"Failed to set native selected music uid={musicInfo.uid}: {ex.Message}");
+                }
+
                 dbMusicTag.selectedDiffTglIndex = nativeDifficulty;
                 dbMusicTag.pnlSelectMusicUid = musicInfo.uid;
                 dbMusicTag.m_CurSelectedMusicInfo = musicInfo;

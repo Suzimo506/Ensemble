@@ -178,8 +178,7 @@ namespace MDEN.UI.Core
             }
 
             var difficulty = ResolvePreviewDifficulty(entry);
-            NativeChartNavigator.JumpToChart(musicInfo);
-            SyncSelectedChart(musicInfo, difficulty);
+            NativeChartNavigator.JumpToChart(musicInfo, difficulty);
         }
 
         private static int ResolvePreviewDifficulty(PlaylistEntryViewModel entry)

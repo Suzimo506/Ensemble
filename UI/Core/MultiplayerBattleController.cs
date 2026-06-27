@@ -63,7 +63,11 @@ namespace MDEN.UI.Core
         {
             var entry = Managers.PlaylistManager.GetCurrentPlaylistEntry();
             if (entry == null) return false;
-            if (Managers.ChartManager.IsCurrentSelectedChart(entry)) return true;
+            if (Managers.ChartManager.IsCurrentSelectedChart(entry) &&
+                IsRookieDifficultySelectionReady(Managers.ChartManager.CurrentMusicInfo, entry.Difficulty))
+            {
+                return true;
+            }
 
             var musicInfo = Managers.ChartManager.GetMusicInfo(entry.ChartKey);
             if (musicInfo == null)
@@ -71,7 +75,7 @@ namespace MDEN.UI.Core
                 return false;
             }
 
-            NativeChartNavigator.JumpToChart(musicInfo);
+            NativeChartNavigator.JumpToChart(musicInfo, entry.Difficulty);
             return true;
         }
 
@@ -200,7 +204,7 @@ namespace MDEN.UI.Core
 
             if (ShouldNavigateToBattleChart(battleId, retriesRemaining))
             {
-                NativeChartNavigator.JumpToChart(musicInfo);
+                NativeChartNavigator.JumpToChart(musicInfo, entry.Difficulty);
                 _navigatedBattleId = battleId;
             }
 
