@@ -23,6 +23,8 @@ namespace MDEN.UI.Core
 
             try
             {
+                NativeChartSelectionSync.SyncDataHelperSelectedUid(uid);
+
                 var pnlMenu = GameObject.Find("UI/Standerd/PnlMenu")?.GetComponent<PnlMenu>();
                 if (pnlMenu != null && pnlMenu.gameObject.active)
                 {
@@ -89,6 +91,7 @@ namespace MDEN.UI.Core
 
             dbMusicTag.pnlSelectMusicUid = uid;
             dbMusicTag.m_CurSelectedMusicInfo = musicInfo;
+            NativeChartSelectionSync.SyncDataHelperSelectedUid(uid);
             dbMusicTag.SetSelectedMusic(musicInfo);
             dbMusicTag.curSelectedMusicIdx = targetIndex;
             stage.musicFancyScrollView?.ScrollToDataIndex(targetIndex, 0f, true);

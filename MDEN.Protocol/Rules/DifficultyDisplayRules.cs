@@ -6,15 +6,16 @@ namespace MDEN.Protocol.Rules
         public const int Hard = 2;
         public const int Master = 3;
         public const int Hidden = 4;
+        public const int Spell = 5;
 
         public static bool IsKnownDifficulty(int difficulty)
         {
-            return difficulty >= Easy && difficulty <= Hidden;
+            return difficulty >= Easy && difficulty <= Spell;
         }
 
         public static bool IsFearlessDifficulty(int difficulty)
         {
-            return difficulty == Master || difficulty == Hidden;
+            return difficulty == Master || difficulty == Hidden || difficulty == Spell;
         }
     }
 }

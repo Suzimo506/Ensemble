@@ -409,6 +409,7 @@ namespace MDEN.Managers
             Register("difficulty.hard", "高手", "Hard", "高手", "高手", "어려움");
             Register("difficulty.master", "大触", "Master", "大觸", "大触", "마스터");
             Register("difficulty.hidden", "隐藏", "Hidden", "隱藏", "隠し", "히든");
+            Register("difficulty.spell", "特殊", "Special", "特殊", "特殊", "특수");
             Register("difficulty.unknown", "难度{0}", "Difficulty {0}", "難度{0}", "難易度{0}", "난이도 {0}");
 
             Register("ready.stop", "停止游戏", "Stop Game", "停止遊戲", "ゲーム停止", "게임 중지");

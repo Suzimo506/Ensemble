@@ -66,7 +66,7 @@ namespace MDEN.Managers
 
         public static string GetEntry(MusicInfo musicInfo, int difficulty)
         {
-            var entryKey = GetEntryKey(musicInfo);
+            var entryKey = GetEntryKey(musicInfo, difficulty);
             if (string.IsNullOrWhiteSpace(entryKey)) return null;
 
             return $"{entryKey}#{difficulty}#{EncodeEntryPart(GetLocalPlayerName())}#{EncodeEntryPart(GetNiceChartName(musicInfo, difficulty))}";
@@ -143,7 +143,7 @@ namespace MDEN.Managers
             if (entry == null) return false;
 
             var musicInfo = CurrentMusicInfo;
-            var currentKey = GetEntryKey(musicInfo);
+            var currentKey = GetEntryKey(musicInfo, entry.Difficulty);
             return !string.IsNullOrWhiteSpace(currentKey) &&
                    currentKey == entry.ChartKey;
         }
@@ -151,6 +151,23 @@ namespace MDEN.Managers
         public static string GetCustomChartMd5(string uid)
         {
             return GetMd5(uid);
+        }
+
+        public static IEnumerable<string> GetCustomChartMd5s(string uid)
+        {
+            var album = AlbumManager.GetByUid(uid);
+            if (!IsAlbumAvailable(album) || album.Sheets == null) yield break;
+
+            foreach (var sheet in album.Sheets.Values)
+            {
+                if (sheet == null) continue;
+
+                var md5 = sheet.Md5;
+                if (string.IsNullOrEmpty(md5)) continue;
+
+                CustomAlbumsByMd5[md5] = album;
+                yield return md5;
+            }
         }
 
         public static string GetEntryKey(string uid)
@@ -180,8 +197,7 @@ namespace MDEN.Managers
                     var album = pair.Value;
                     if (!IsAlbumAvailable(album)) continue;
 
-                    var sheet = GetPreferredSheet(album);
-                    if (sheet != null && sheet.Md5 == chartKey)
+                    if (AlbumHasSheetMd5(album, chartKey))
                     {
                         CustomAlbumsByMd5[chartKey] = album;
                         return GlobalDataBase.dbMusicTag.GetMusicInfoFromAll(album.Uid);
@@ -284,25 +300,37 @@ namespace MDEN.Managers
 
         private static string GetEntryKey(MusicInfo musicInfo)
         {
-            var md5 = GetMd5(musicInfo);
+            var md5 = GetMd5(musicInfo, 0);
             if (musicInfo?.albumIndex == AlbumManager.Uid) return md5;
             return md5 ?? musicInfo?.uid;
         }
 
-        private static string GetMd5(MusicInfo musicInfo)
+        private static string GetEntryKey(MusicInfo musicInfo, int difficulty)
+        {
+            var md5 = GetMd5(musicInfo, difficulty);
+            if (musicInfo?.albumIndex == AlbumManager.Uid) return md5;
+            return md5 ?? musicInfo?.uid;
+        }
+
+        private static string GetMd5(MusicInfo musicInfo, int difficulty)
         {
             if (musicInfo == null || musicInfo.albumIndex != AlbumManager.Uid) return null;
-            return GetMd5(musicInfo.uid);
+            return GetMd5(musicInfo.uid, difficulty);
         }
 
         private static string GetMd5(string uid)
+        {
+            return GetMd5(uid, 0);
+        }
+
+        private static string GetMd5(string uid, int difficulty)
         {
             if (string.IsNullOrEmpty(uid) || !uid.StartsWith(AlbumManager.Uid.ToString())) return null;
 
             Album album = AlbumManager.GetByUid(uid);
             if (!IsAlbumAvailable(album)) return null;
 
-            var sheet = GetPreferredSheet(album);
+            var sheet = GetSheet(album, difficulty);
             if (sheet != null)
             {
                 CustomAlbumsByMd5[sheet.Md5] = album;
@@ -311,14 +339,39 @@ namespace MDEN.Managers
             return sheet?.Md5;
         }
 
+        private static Sheet GetSheet(Album album, int difficulty)
+        {
+            if (album == null) return null;
+            if (difficulty > 0 && album.Sheets.TryGetValue(difficulty, out var sheet)) return sheet;
+            return GetPreferredSheet(album);
+        }
+
         private static Sheet GetPreferredSheet(Album album)
         {
             if (album == null) return null;
             if (album.Sheets.TryGetValue(2, out var sheet)) return sheet;
             if (album.Sheets.TryGetValue(3, out sheet)) return sheet;
             if (album.Sheets.TryGetValue(1, out sheet)) return sheet;
+            if (album.Sheets.TryGetValue(4, out sheet)) return sheet;
+            if (album.Sheets.TryGetValue(5, out sheet)) return sheet;
             if (album.Sheets.TryGetValue(0, out sheet)) return sheet;
             return null;
+        }
+
+        private static bool AlbumHasSheetMd5(Album album, string md5)
+        {
+            if (!IsAlbumAvailable(album) || album.Sheets == null || string.IsNullOrEmpty(md5)) return false;
+
+            foreach (var sheet in album.Sheets.Values)
+            {
+                if (sheet == null) continue;
+                if (sheet.Md5 != md5) continue;
+
+                CustomAlbumsByMd5[md5] = album;
+                return true;
+            }
+
+            return false;
         }
 
         private static string GetLocalPlayerName()
@@ -412,9 +465,11 @@ namespace MDEN.Managers
                 var album = pair.Value;
                 if (!IsAlbumAvailable(album)) continue;
 
-                var sheet = GetPreferredSheet(album);
-                if (sheet != null)
+                if (album.Sheets == null) continue;
+
+                foreach (var sheet in album.Sheets.Values)
                 {
+                    if (sheet == null) continue;
                     CustomAlbumsByMd5[sheet.Md5] = album;
                 }
             }

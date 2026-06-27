@@ -200,10 +200,7 @@ namespace MDEN.UI.Core
 
         private static void SyncSelectedChart(MusicInfo musicInfo, int difficulty)
         {
-            var nativeDifficulty = HiddenDifficultyController.Sync(musicInfo, difficulty);
-            GlobalDataBase.dbMusicTag.selectedDiffTglIndex = nativeDifficulty;
-            GlobalDataBase.dbMusicTag.pnlSelectMusicUid = musicInfo.uid;
-            GlobalDataBase.dbMusicTag.m_CurSelectedMusicInfo = musicInfo;
+            NativeChartSelectionSync.Sync(musicInfo, difficulty);
         }
     }
 }

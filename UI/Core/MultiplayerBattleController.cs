@@ -139,8 +139,7 @@ namespace MDEN.UI.Core
         {
             var entry = Managers.ChartManager.ParseEntry(entryText);
             if (entry == null ||
-                entry.Difficulty < 0 ||
-                entry.Difficulty > 4 ||
+                !DifficultyDisplayRules.IsKnownDifficulty(entry.Difficulty) ||
                 ChartSelectionRules.IsUnsupportedChartKey(entry.ChartKey))
             {
                 ReportStartFailure(
@@ -237,10 +236,7 @@ namespace MDEN.UI.Core
 
         private static void SyncSelectedChart(MusicInfo musicInfo, int difficulty)
         {
-            var nativeDifficulty = HiddenDifficultyController.Sync(musicInfo, difficulty);
-            GlobalDataBase.dbMusicTag.selectedDiffTglIndex = nativeDifficulty;
-            GlobalDataBase.dbMusicTag.pnlSelectMusicUid = musicInfo.uid;
-            GlobalDataBase.dbMusicTag.m_CurSelectedMusicInfo = musicInfo;
+            NativeChartSelectionSync.Sync(musicInfo, difficulty);
         }
 
         private static bool IsRookieDifficultySelectionReady(MusicInfo musicInfo, int difficulty)

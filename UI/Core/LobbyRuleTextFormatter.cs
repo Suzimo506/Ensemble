@@ -52,6 +52,7 @@ namespace MDEN.UI.Core
                 DifficultyDisplayRules.Hard => I18nManager.T("difficulty.hard"),
                 DifficultyDisplayRules.Master => I18nManager.T("difficulty.master"),
                 DifficultyDisplayRules.Hidden => I18nManager.T("difficulty.hidden"),
+                DifficultyDisplayRules.Spell => I18nManager.T("difficulty.spell"),
                 _ => I18nManager.Tf("difficulty.unknown", difficulty)
             };
         }
@@ -64,6 +65,7 @@ namespace MDEN.UI.Core
                 DifficultyDisplayRules.Hard => "4564ffff",
                 DifficultyDisplayRules.Master => "9b55ffff",
                 DifficultyDisplayRules.Hidden => "ff5555ff",
+                DifficultyDisplayRules.Spell => "ff8a00ff",
                 _ => "b8b8b8ff"
             };
         }

@@ -364,11 +364,7 @@ namespace MDEN.Managers
             var customs = new List<string>();
             foreach (var pair in AlbumManager.LoadedAlbums)
             {
-                var md5 = ChartManager.GetCustomChartMd5(pair.Value?.Uid);
-                if (!string.IsNullOrEmpty(md5))
-                {
-                    customs.Add(md5);
-                }
+                customs.AddRange(ChartManager.GetCustomChartMd5s(pair.Value?.Uid));
             }
 
             return customs.Distinct().ToArray();
