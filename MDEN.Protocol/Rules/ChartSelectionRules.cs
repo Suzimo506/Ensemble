@@ -58,10 +58,9 @@ namespace MDEN.Protocol.Rules
                 return false;
             }
 
-            return chartKey.StartsWith("42-", StringComparison.Ordinal) ||
-                   chartKey.StartsWith("55-", StringComparison.Ordinal) ||
-                   chartKey.StartsWith("69-", StringComparison.Ordinal) ||
-                   chartKey.StartsWith("80-", StringComparison.Ordinal);
+            // Official slot 5 is used by Touhou danmaku/special charts. Blocking by slot
+            // avoids chasing album uid prefixes as newer Touhou songs are added.
+            return IsOfficialChartKey(chartKey) || IsCustomChartKey(chartKey);
         }
 
         public static bool IsUnsupportedChartKey(string chartKey)

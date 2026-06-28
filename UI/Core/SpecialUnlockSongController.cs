@@ -18,7 +18,8 @@ namespace MDEN.UI.Core
                    chartKey == "0-55" ||
                    chartKey == "33-12" ||
                    chartKey == "39-8" ||
-                   chartKey == "0-57";
+                   chartKey == "0-57" ||
+                   chartKey == "0-59";
         }
 
         public static string GetBaseUid(string chartKey)
@@ -35,6 +36,8 @@ namespace MDEN.UI.Core
                 "39-8" => "39-0",
                 "0-58" => "0-58",
                 "0-57" => "0-58",
+                "0-60" => "0-60",
+                "0-59" => "0-60",
                 _ => null
             };
         }
