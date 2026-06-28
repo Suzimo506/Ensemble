@@ -258,6 +258,13 @@ namespace MDEN.UI.Core
                        !HiddenDifficultyController.IsHiddenInvoked(musicInfo);
             }
 
+            if (difficulty == DifficultyDisplayRules.Spell)
+            {
+                return SpecialDifficultyController.IsSpecialDifficultySelected(
+                    musicInfo,
+                    GlobalDataBase.dbMusicTag.selectedDiffTglIndex);
+            }
+
             return GlobalDataBase.dbMusicTag.selectedDiffTglIndex == difficulty;
         }
 

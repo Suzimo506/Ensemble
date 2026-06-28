@@ -41,7 +41,7 @@ namespace MDEN.Managers
                     return 4;
                 }
 
-                return diff;
+                return SpecialDifficultyController.ResolveCurrentDifficulty(musicInfo, diff);
             }
         }
 
