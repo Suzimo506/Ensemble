@@ -53,6 +53,9 @@ namespace MDEN.UI.Core
                 DifficultyDisplayRules.Master => I18nManager.T("difficulty.master"),
                 DifficultyDisplayRules.Hidden => I18nManager.T("difficulty.hidden"),
                 DifficultyDisplayRules.Spell => I18nManager.T("difficulty.spell"),
+                DifficultyDisplayRules.SpellEasy => I18nManager.T("difficulty.spell_easy"),
+                DifficultyDisplayRules.SpellHard => I18nManager.T("difficulty.spell_hard"),
+                DifficultyDisplayRules.SpellMaster => I18nManager.T("difficulty.spell_master"),
                 _ => I18nManager.Tf("difficulty.unknown", difficulty)
             };
         }
@@ -66,6 +69,9 @@ namespace MDEN.UI.Core
                 DifficultyDisplayRules.Master => "9b55ffff",
                 DifficultyDisplayRules.Hidden => "ff5555ff",
                 DifficultyDisplayRules.Spell => "ff8a00ff",
+                DifficultyDisplayRules.SpellEasy => "ff8a00ff",
+                DifficultyDisplayRules.SpellHard => "ff8a00ff",
+                DifficultyDisplayRules.SpellMaster => "ff8a00ff",
                 _ => "b8b8b8ff"
             };
         }

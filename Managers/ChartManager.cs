@@ -61,12 +61,19 @@ namespace MDEN.Managers
         {
             var musicInfo = CurrentMusicInfo;
             if (musicInfo == null) return null;
-            return GetEntry(musicInfo, CurrentDifficulty);
+
+            var difficulty = CurrentDifficulty;
+            if (!PlaylistManager.IsRookieReadySelectionActive())
+            {
+                difficulty = SpecialDifficultyController.NormalizePlaylistDifficulty(difficulty);
+            }
+
+            return GetEntry(musicInfo, difficulty);
         }
 
         public static string GetEntry(MusicInfo musicInfo, int difficulty)
         {
-            var entryKey = GetEntryKey(musicInfo, difficulty);
+            var entryKey = GetEntryKey(musicInfo, SpecialDifficultyController.GetChartIdentityDifficulty(difficulty));
             if (string.IsNullOrWhiteSpace(entryKey)) return null;
 
             return $"{entryKey}#{difficulty}#{EncodeEntryPart(GetLocalPlayerName())}#{EncodeEntryPart(GetNiceChartName(musicInfo, difficulty))}";
@@ -143,7 +150,7 @@ namespace MDEN.Managers
             if (entry == null) return false;
 
             var musicInfo = CurrentMusicInfo;
-            var currentKey = GetEntryKey(musicInfo, entry.Difficulty);
+            var currentKey = GetEntryKey(musicInfo, SpecialDifficultyController.GetChartIdentityDifficulty(entry.Difficulty));
             return !string.IsNullOrWhiteSpace(currentKey) &&
                    currentKey == entry.ChartKey;
         }
@@ -214,7 +221,8 @@ namespace MDEN.Managers
         {
             if (musicInfo == null) return I18nManager.Tf("chart.unknown_with_difficulty", difficulty);
 
-            var level = musicInfo.GetMusicLevelStringByDiff(difficulty);
+            var levelDifficulty = SpecialDifficultyController.GetLevelDisplayDifficulty(difficulty);
+            var level = musicInfo.GetMusicLevelStringByDiff(levelDifficulty);
             var album = GetCustomAlbum(musicInfo);
             if (difficulty == 4 && musicInfo.uid.StartsWith($"{AlbumManager.Uid}-"))
             {

@@ -63,8 +63,10 @@ namespace MDEN.UI.Core
         {
             var entry = Managers.PlaylistManager.GetCurrentPlaylistEntry();
             if (entry == null) return false;
+
+            var difficulty = ResolveRookieReadyNavigationDifficulty(entry.Difficulty);
             if (Managers.ChartManager.IsCurrentSelectedChart(entry) &&
-                IsRookieDifficultySelectionReady(Managers.ChartManager.CurrentMusicInfo, entry.Difficulty))
+                IsRookieDifficultySelectionReady(Managers.ChartManager.CurrentMusicInfo, difficulty))
             {
                 return true;
             }
@@ -75,7 +77,7 @@ namespace MDEN.UI.Core
                 return false;
             }
 
-            NativeChartNavigator.JumpToChart(musicInfo, entry.Difficulty);
+            NativeChartNavigator.JumpToChart(musicInfo, difficulty);
             return true;
         }
 
@@ -258,14 +260,37 @@ namespace MDEN.UI.Core
                        !HiddenDifficultyController.IsHiddenInvoked(musicInfo);
             }
 
-            if (difficulty == DifficultyDisplayRules.Spell)
+            if (DifficultyDisplayRules.IsSpellDifficulty(difficulty))
             {
                 return SpecialDifficultyController.IsSpecialDifficultySelected(
                     musicInfo,
-                    GlobalDataBase.dbMusicTag.selectedDiffTglIndex);
+                    GlobalDataBase.dbMusicTag.selectedDiffTglIndex,
+                    difficulty);
             }
 
             return GlobalDataBase.dbMusicTag.selectedDiffTglIndex == difficulty;
+        }
+
+        private static int ResolveRookieReadyNavigationDifficulty(int playlistDifficulty)
+        {
+            var readyDifficulty = Managers.LobbyManager.GetReadyDifficulty(Managers.PlayerManager.CurrentUid);
+            if (DifficultyDisplayRules.IsKnownDifficulty(readyDifficulty))
+            {
+                return readyDifficulty;
+            }
+
+            var currentDifficulty = Managers.ChartManager.CurrentDifficulty;
+            return IsRookiePlaylistDifficultyCompatible(playlistDifficulty, currentDifficulty)
+                ? currentDifficulty
+                : playlistDifficulty;
+        }
+
+        private static bool IsRookiePlaylistDifficultyCompatible(int playlistDifficulty, int currentDifficulty)
+        {
+            if (playlistDifficulty == currentDifficulty) return true;
+
+            return playlistDifficulty == DifficultyDisplayRules.Spell &&
+                   DifficultyDisplayRules.IsSpellDifficulty(currentDifficulty);
         }
 
         private static bool IsNativeChartSelectionReady(MusicInfo musicInfo)
