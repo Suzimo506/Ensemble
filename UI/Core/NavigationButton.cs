@@ -22,6 +22,9 @@ namespace MDEN.UI.Core
         private static Sprite _serverLabelBackgroundSprite;
         private static bool _connectionStateSubscribed;
         private static ConnectionLifecycleState _lastConnectionState = ConnectionLifecycleState.Disconnected;
+        private static bool _startConfirmOpen;
+        private static bool _startPrepareBusy;
+        private static int _startConfirmGeneration;
         private const float NavigationButtonOffset = 132f;
         private const float LeftNavigationOffset = 192f;
         private const float ServerLabelOptionOffset = 500f;
@@ -162,6 +165,7 @@ namespace MDEN.UI.Core
         public static void RefreshRoomButton()
         {
             RecoverSceneObjects();
+            ReconcileStartPrepareState();
             if (_multiplayerBtn == null)
             {
                 _myRoomBtn = null;
@@ -183,6 +187,7 @@ namespace MDEN.UI.Core
                 DestroyRoomActionButtons();
             }
 
+            RefreshRoomActionButtonStates();
             RefreshServerLabel();
         }
 
@@ -440,44 +445,131 @@ namespace MDEN.UI.Core
             {
                 _startBtn = CreateTopActionButton("BtnMDENStartGame", 2, I18nManager.T("navigation.start_game"), () =>
                 {
-                    if (LobbyManager.CurrentLobby?.HostUid != PlayerManager.CurrentUid)
-                    {
-                        ShowText.ShowInfo(I18nManager.T("navigation.host_only_start"));
-                        MDEN.Managers.ClientLogManager.Warning("No permission to start lobby.");
-                        return;
-                    }
-
-                    NativeConfirmDialog.Show(I18nManager.T("navigation.start_game"), I18nManager.T("navigation.start_confirm"), confirmed =>
-                    {
-                        if (!confirmed) return;
-                        _ = StartPrepareAsync();
-                    });
+                    OnStartPrepareClicked();
                 });
             }
+
+            RefreshRoomActionButtonStates();
+        }
+
+        private static void OnStartPrepareClicked()
+        {
+            if (!CanOpenStartPrepareConfirm()) return;
+
+            if (LobbyManager.CurrentLobby?.HostUid != PlayerManager.CurrentUid)
+            {
+                ShowText.ShowInfo(I18nManager.T("navigation.host_only_start"));
+                MDEN.Managers.ClientLogManager.Warning("No permission to start lobby.");
+                return;
+            }
+
+            _startConfirmOpen = true;
+            var generation = ++_startConfirmGeneration;
+            RefreshRoomActionButtonStates();
+
+            NativeConfirmDialog.Show(I18nManager.T("navigation.start_game"), I18nManager.T("navigation.start_confirm"), confirmed =>
+            {
+                if (generation != _startConfirmGeneration) return;
+
+                _startConfirmOpen = false;
+                _startConfirmGeneration++;
+                RefreshRoomActionButtonStates();
+
+                if (!confirmed) return;
+                _ = StartPrepareAsync();
+            });
         }
 
         private static async System.Threading.Tasks.Task StartPrepareAsync()
         {
+            if (!CanSendStartPrepareRequest()) return;
+
+            _startPrepareBusy = true;
+            RefreshRoomActionButtonStates();
+
             if (CustomAlbumsWindowGuard.CloseIfOpen("start prepare"))
             {
                 MainThreadDispatcher.Enqueue(() => ShowText.ShowInfo(I18nManager.T("navigation.custom_closed_start")));
+                _startPrepareBusy = false;
+                RefreshRoomActionButtonStates();
                 return;
             }
 
             IDisposable uiLock = WindowStackController.LockUI(I18nManager.T("common.starting"));
+            var accepted = false;
 
             try
             {
                 await PlaylistManager.StartPrepareAsync();
+                accepted = true;
             }
             catch (Exception ex)
             {
+                _startPrepareBusy = false;
                 MDEN.Managers.ClientLogManager.Warning($"Start lobby prepare failed: {ex.Message}");
                 MainThreadDispatcher.Enqueue(() => ShowText.ShowInfo(I18nManager.Tf("navigation.start_failed", ex.Message)));
             }
             finally
             {
+                if (!accepted)
+                {
+                    _startPrepareBusy = false;
+                }
+
+                MainThreadDispatcher.Enqueue(RefreshRoomActionButtonStates);
                 await MainThreadDispatcher.InvokeAsync(() => uiLock?.Dispose());
+            }
+        }
+
+        private static bool CanOpenStartPrepareConfirm()
+        {
+            var lobby = LobbyManager.CurrentLobby;
+            return lobby != null &&
+                   !lobby.Locked &&
+                   !lobby.IsPlaying &&
+                   !_startConfirmOpen &&
+                   !_startPrepareBusy;
+        }
+
+        private static bool CanSendStartPrepareRequest()
+        {
+            var lobby = LobbyManager.CurrentLobby;
+            return lobby != null &&
+                   lobby.HostUid == PlayerManager.CurrentUid &&
+                   !lobby.Locked &&
+                   !lobby.IsPlaying &&
+                   !_startPrepareBusy;
+        }
+
+        private static void ReconcileStartPrepareState()
+        {
+            var lobby = LobbyManager.CurrentLobby;
+            if (lobby != null &&
+                !lobby.Locked &&
+                !lobby.IsPlaying &&
+                lobby.HostUid == PlayerManager.CurrentUid)
+            {
+                return;
+            }
+
+            _startPrepareBusy = false;
+            InvalidateStartPrepareConfirm();
+        }
+
+        private static void InvalidateStartPrepareConfirm()
+        {
+            if (!_startConfirmOpen) return;
+
+            _startConfirmOpen = false;
+            _startConfirmGeneration++;
+        }
+
+        private static void RefreshRoomActionButtonStates()
+        {
+            var startButton = _startBtn == null ? null : _startBtn.GetComponent<Button>();
+            if (startButton != null)
+            {
+                startButton.interactable = CanOpenStartPrepareConfirm();
             }
         }
 
@@ -604,6 +696,9 @@ namespace MDEN.UI.Core
 
         private static void DestroyRoomActionButtons()
         {
+            _startPrepareBusy = false;
+            InvalidateStartPrepareConfirm();
+
             if (_playlistBtn != null)
             {
                 DestroyObject(_playlistBtn);
@@ -660,6 +755,8 @@ namespace MDEN.UI.Core
 
         public static void ResetSceneObjects()
         {
+            _startPrepareBusy = false;
+            InvalidateStartPrepareConfirm();
             _multiplayerBtn = null;
             _myRoomBtn = null;
             _playlistBtn = null;
