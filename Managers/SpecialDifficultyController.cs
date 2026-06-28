@@ -1,7 +1,7 @@
 using Il2CppAssets.Scripts.Database;
 using MDEN.Protocol.Rules;
 
-namespace MDEN.UI.Core
+namespace MDEN.Managers
 {
     internal static class SpecialDifficultyController
     {

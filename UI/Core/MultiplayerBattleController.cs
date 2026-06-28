@@ -247,33 +247,15 @@ namespace MDEN.UI.Core
             if (Managers.ChartManager.IsCurrentSelectedChart(entry))
             {
                 var currentDifficulty = Managers.ChartManager.CurrentDifficulty;
-                if (IsPlayableDifficulty(Managers.ChartManager.CurrentSelectionMusicInfo, currentDifficulty))
+                if (Managers.ChartManager.IsCurrentSelectionPlayableDifficulty(
+                    Managers.ChartManager.CurrentSelectionMusicInfo,
+                    currentDifficulty))
                 {
                     return currentDifficulty;
                 }
             }
 
             return entry.Difficulty;
-        }
-
-        public static bool IsPlayableDifficulty(MusicInfo musicInfo, int difficulty)
-        {
-            if (!DifficultyDisplayRules.IsKnownDifficulty(difficulty)) return false;
-            if (difficulty == DifficultyDisplayRules.Hidden)
-            {
-                return HiddenDifficultyController.IsHiddenDifficultySelected(
-                    musicInfo,
-                    GlobalDataBase.dbMusicTag.selectedDiffTglIndex);
-            }
-
-            if (difficulty == DifficultyDisplayRules.Spell)
-            {
-                return SpecialDifficultyController.IsSpecialDifficultySelected(
-                    musicInfo,
-                    GlobalDataBase.dbMusicTag.selectedDiffTglIndex);
-            }
-
-            return musicInfo != null && musicInfo.GetDifficulty(difficulty) > 0;
         }
 
         private static void SyncSelectedChart(string chartKey, MusicInfo musicInfo, int difficulty)
@@ -314,8 +296,8 @@ namespace MDEN.UI.Core
             if (currentInfo == null || currentInfo.Pointer == System.IntPtr.Zero) return false;
             if (currentInfo.uid != musicInfo.uid && currentInfo.uid != chartKey)
             {
-                if (!SpecialUnlockSongController.IsSpecialUnlockPair(chartKey) ||
-                    SpecialUnlockSongController.GetBaseUid(currentInfo.uid) != SpecialUnlockSongController.GetBaseUid(chartKey))
+                if (!SpecialChartVariantResolver.IsKnownVariantPair(chartKey) ||
+                    SpecialChartVariantResolver.GetBaseUid(currentInfo.uid) != SpecialChartVariantResolver.GetBaseUid(chartKey))
                 {
                     return false;
                 }

@@ -23,7 +23,7 @@ namespace MDEN.UI.Core
                 dbMusicTag.selectedDiffTglIndex = nativeDifficulty;
                 dbMusicTag.pnlSelectMusicUid = selectedUid;
                 dbMusicTag.m_CurSelectedMusicInfo = musicInfo;
-                SpecialUnlockSongController.SyncSelection(selectedUid, musicInfo);
+                SpecialChartVariantResolver.SyncSelection(selectedUid);
             }
 
             SyncDataHelperSelectedUid(selectedUid);

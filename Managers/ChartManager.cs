@@ -2,7 +2,6 @@ using CustomAlbums.Data;
 using CustomAlbums.Managers;
 using Il2CppAssets.Scripts.Database;
 using MDEN.Protocol.Rules;
-using MDEN.UI.Core;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -37,7 +36,7 @@ namespace MDEN.Managers
                 var diff = GlobalDataBase.dbMusicTag.selectedDiffTglIndex;
                 var musicInfo = GlobalDataBase.dbMusicTag.m_CurSelectedMusicInfo;
                 var selectedUid = GlobalDataBase.dbMusicTag.pnlSelectMusicUid;
-                if (SpecialUnlockSongController.IsSpecialUnlockPair(selectedUid))
+                if (SpecialChartVariantResolver.IsKnownVariantPair(selectedUid))
                 {
                     musicInfo = GetMusicInfo(selectedUid) ?? musicInfo;
                 }
@@ -133,6 +132,24 @@ namespace MDEN.Managers
             return fallbackAlbum?.Uid ?? musicInfo.uid;
         }
 
+        public static bool IsCurrentSelectionPlayableDifficulty(MusicInfo musicInfo, int difficulty)
+        {
+            if (!DifficultyDisplayRules.IsKnownDifficulty(difficulty)) return false;
+
+            var nativeDifficulty = GlobalDataBase.dbMusicTag?.selectedDiffTglIndex ?? 0;
+            if (difficulty == DifficultyDisplayRules.Hidden)
+            {
+                return HiddenDifficultyController.IsHiddenDifficultySelected(musicInfo, nativeDifficulty);
+            }
+
+            if (difficulty == DifficultyDisplayRules.Spell)
+            {
+                return SpecialDifficultyController.IsSpecialDifficultySelected(musicInfo, nativeDifficulty);
+            }
+
+            return IsNativeDifficultyAvailable(musicInfo, difficulty);
+        }
+
         public static PlaylistEntryViewModel ParseEntry(string entry)
         {
             if (string.IsNullOrWhiteSpace(entry)) return null;
@@ -193,7 +210,7 @@ namespace MDEN.Managers
 
         private static MusicInfo ResolveSelectionMusicInfo(MusicInfo musicInfo, string selectedUid)
         {
-            return SpecialUnlockSongController.IsSpecialUnlockPair(selectedUid)
+            return SpecialChartVariantResolver.IsKnownVariantPair(selectedUid)
                 ? GetMusicInfo(selectedUid) ?? musicInfo
                 : musicInfo;
         }
@@ -201,11 +218,11 @@ namespace MDEN.Managers
         private static bool IsSpecialUnlockSelection(MusicInfo musicInfo, string selectedUid)
         {
             if (musicInfo == null || string.IsNullOrEmpty(selectedUid)) return false;
-            if (!SpecialUnlockSongController.IsSpecialUnlockPair(selectedUid)) return false;
+            if (!SpecialChartVariantResolver.IsKnownVariantPair(selectedUid)) return false;
 
             var currentUid = musicInfo.uid;
             return currentUid == selectedUid ||
-                   SpecialUnlockSongController.GetBaseUid(currentUid) == SpecialUnlockSongController.GetBaseUid(selectedUid);
+                   SpecialChartVariantResolver.GetBaseUid(currentUid) == SpecialChartVariantResolver.GetBaseUid(selectedUid);
         }
 
         private static bool IsNativeDifficultyAvailable(MusicInfo musicInfo, int difficulty)
@@ -274,7 +291,7 @@ namespace MDEN.Managers
                 return null;
             }
 
-            return SpecialUnlockSongController.ResolveMusicInfo(
+            return SpecialChartVariantResolver.ResolveMusicInfo(
                 chartKey,
                 GlobalDataBase.dbMusicTag.GetMusicInfoFromAll(chartKey));
         }
@@ -518,7 +535,7 @@ namespace MDEN.Managers
                 return;
             }
 
-            MainThreadDispatcher.Enqueue(() =>
+            MDEN.UI.Core.MainThreadDispatcher.Enqueue(() =>
             {
                 Interlocked.Exchange(ref _albumLoadedRefreshQueued, 0);
                 RebuildCustomAlbumIndex();

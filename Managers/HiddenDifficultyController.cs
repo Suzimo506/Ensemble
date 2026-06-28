@@ -4,9 +4,8 @@ using System.Reflection;
 using Il2Cpp;
 using Il2CppAssets.Scripts.Database;
 using Il2CppAssets.Scripts.PeroTools.Commons;
-using MDEN.Managers;
 
-namespace MDEN.UI.Core
+namespace MDEN.Managers
 {
     internal static class HiddenDifficultyController
     {

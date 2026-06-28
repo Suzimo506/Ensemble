@@ -150,7 +150,7 @@ namespace MDEN.Managers
             {
                 return !IsLocalPlayerReady() &&
                        ChartManager.IsCurrentSelectedChart(PlaylistManager.GetCurrentPlaylistEntry()) &&
-                       UI.Core.MultiplayerBattleController.IsPlayableDifficulty(
+                       ChartManager.IsCurrentSelectionPlayableDifficulty(
                            ChartManager.CurrentSelectionMusicInfo,
                            ChartManager.CurrentDifficulty);
             }

@@ -47,10 +47,10 @@ namespace MDEN.Protocol.Rules
 
         public static bool IsRookieUnsupportedChart(string chartKey, int difficulty)
         {
-            return IsTouhouSpellChart(chartKey, difficulty);
+            return IsRookieUnsupportedSpecialChart(chartKey, difficulty);
         }
 
-        public static bool IsTouhouSpellChart(string chartKey, int difficulty)
+        public static bool IsRookieUnsupportedSpecialChart(string chartKey, int difficulty)
         {
             if (difficulty != DifficultyDisplayRules.Spell ||
                 string.IsNullOrWhiteSpace(chartKey))
@@ -58,8 +58,7 @@ namespace MDEN.Protocol.Rules
                 return false;
             }
 
-            // Official slot 5 is used by Touhou danmaku/special charts. Blocking by slot
-            // avoids chasing album uid prefixes as newer Touhou songs are added.
+            // Slot 5 is a special chart lane that rookie mode cannot keep in sync safely.
             return IsOfficialChartKey(chartKey) || IsCustomChartKey(chartKey);
         }
 

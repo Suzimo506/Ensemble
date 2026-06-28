@@ -3,11 +3,11 @@ using System.Collections;
 using System.Reflection;
 using Il2CppAssets.Scripts.Database;
 
-namespace MDEN.UI.Core
+namespace MDEN.Managers
 {
-    internal static class SpecialUnlockSongController
+    internal static class SpecialChartVariantResolver
     {
-        public static bool IsSpecialUnlockPair(string chartKey)
+        public static bool IsKnownVariantPair(string chartKey)
         {
             return GetBaseUid(chartKey) != null;
         }
@@ -54,9 +54,9 @@ namespace MDEN.UI.Core
             return fallback;
         }
 
-        public static void SyncSelection(string chartKey, MusicInfo musicInfo)
+        public static void SyncSelection(string chartKey)
         {
-            if (!IsSpecialUnlockPair(chartKey)) return;
+            if (!IsKnownVariantPair(chartKey)) return;
 
             var dbMusicTag = GlobalDataBase.dbMusicTag;
             if (dbMusicTag != null && !string.IsNullOrEmpty(chartKey))
@@ -68,7 +68,7 @@ namespace MDEN.UI.Core
         private static bool TryGetSpecialUnlockPair(string chartKey, out SpecialUnlockPair pair)
         {
             pair = null;
-            if (!IsSpecialUnlockPair(chartKey)) return false;
+            if (!IsKnownVariantPair(chartKey)) return false;
 
             try
             {
