@@ -36,6 +36,12 @@ namespace MDEN.Managers
             {
                 var diff = GlobalDataBase.dbMusicTag.selectedDiffTglIndex;
                 var musicInfo = GlobalDataBase.dbMusicTag.m_CurSelectedMusicInfo;
+                var selectedUid = GlobalDataBase.dbMusicTag.pnlSelectMusicUid;
+                if (SpecialUnlockSongController.IsSpecialUnlockPair(selectedUid))
+                {
+                    musicInfo = GetMusicInfo(selectedUid) ?? musicInfo;
+                }
+
                 if (musicInfo != null && HiddenDifficultyController.IsHiddenDifficultySelected(musicInfo, diff))
                 {
                     return 4;
@@ -46,6 +52,16 @@ namespace MDEN.Managers
         }
 
         public static MusicInfo CurrentMusicInfo => GlobalDataBase.dbMusicTag.CurMusicInfo();
+
+        public static MusicInfo CurrentSelectionMusicInfo
+        {
+            get
+            {
+                var musicInfo = CurrentMusicInfo;
+                var selectedUid = GlobalDataBase.dbMusicTag?.pnlSelectMusicUid;
+                return ResolveSelectionMusicInfo(musicInfo, selectedUid);
+            }
+        }
 
         public static void Initialize()
         {
@@ -65,7 +81,11 @@ namespace MDEN.Managers
             var selectedUid = GlobalDataBase.dbMusicTag?.pnlSelectMusicUid;
             if (IsSpecialUnlockSelection(musicInfo, selectedUid))
             {
-                return GetEntry(selectedUid, musicInfo, CurrentDifficulty);
+                var selectedMusicInfo = ResolveSelectionMusicInfo(musicInfo, selectedUid);
+                var difficulty = CurrentDifficulty;
+                if (!IsNativeDifficultyAvailable(selectedMusicInfo, difficulty)) return null;
+
+                return GetEntry(selectedUid, selectedMusicInfo, difficulty);
             }
 
             return GetEntry(musicInfo, CurrentDifficulty);
@@ -171,6 +191,13 @@ namespace MDEN.Managers
                    currentKey == entry.ChartKey;
         }
 
+        private static MusicInfo ResolveSelectionMusicInfo(MusicInfo musicInfo, string selectedUid)
+        {
+            return SpecialUnlockSongController.IsSpecialUnlockPair(selectedUid)
+                ? GetMusicInfo(selectedUid) ?? musicInfo
+                : musicInfo;
+        }
+
         private static bool IsSpecialUnlockSelection(MusicInfo musicInfo, string selectedUid)
         {
             if (musicInfo == null || string.IsNullOrEmpty(selectedUid)) return false;
@@ -179,6 +206,13 @@ namespace MDEN.Managers
             var currentUid = musicInfo.uid;
             return currentUid == selectedUid ||
                    SpecialUnlockSongController.GetBaseUid(currentUid) == SpecialUnlockSongController.GetBaseUid(selectedUid);
+        }
+
+        private static bool IsNativeDifficultyAvailable(MusicInfo musicInfo, int difficulty)
+        {
+            return musicInfo != null &&
+                   DifficultyDisplayRules.IsKnownDifficulty(difficulty) &&
+                   musicInfo.GetDifficulty(difficulty) > 0;
         }
 
         public static string GetCustomChartMd5(string uid)

@@ -148,7 +148,11 @@ namespace MDEN.Managers
             if (!LobbyManager.IsInLobby) return true;
             if (IsRookieReadySelectionActive())
             {
-                return !IsLocalPlayerReady() && ChartManager.IsCurrentSelectedChart(PlaylistManager.GetCurrentPlaylistEntry());
+                return !IsLocalPlayerReady() &&
+                       ChartManager.IsCurrentSelectedChart(PlaylistManager.GetCurrentPlaylistEntry()) &&
+                       UI.Core.MultiplayerBattleController.IsPlayableDifficulty(
+                           ChartManager.CurrentSelectionMusicInfo,
+                           ChartManager.CurrentDifficulty);
             }
 
             if (!CanChangePlaylist) return false;

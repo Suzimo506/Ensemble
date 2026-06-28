@@ -64,8 +64,9 @@ namespace MDEN.UI.Core
             var entry = Managers.PlaylistManager.GetCurrentPlaylistEntry();
             if (entry == null) return false;
 
+            var difficulty = ResolveRookieReadyDifficulty(entry);
             if (Managers.ChartManager.IsCurrentSelectedChart(entry) &&
-                IsRookieDifficultySelectionReady(Managers.ChartManager.CurrentMusicInfo, entry.Difficulty))
+                IsRookieDifficultySelectionReady(Managers.ChartManager.CurrentMusicInfo, difficulty))
             {
                 return true;
             }
@@ -76,7 +77,7 @@ namespace MDEN.UI.Core
                 return false;
             }
 
-            NativeChartNavigator.JumpToChart(entry.ChartKey, musicInfo, entry.Difficulty);
+            NativeChartNavigator.JumpToChart(entry.ChartKey, musicInfo, difficulty);
             return true;
         }
 
@@ -237,6 +238,42 @@ namespace MDEN.UI.Core
         {
             if (_navigatedBattleId != battleId) return true;
             return retriesRemaining > 0 && retriesRemaining % StartNavigationRetryInterval == 0;
+        }
+
+        private static int ResolveRookieReadyDifficulty(Managers.PlaylistEntryViewModel entry)
+        {
+            if (entry == null) return 0;
+
+            if (Managers.ChartManager.IsCurrentSelectedChart(entry))
+            {
+                var currentDifficulty = Managers.ChartManager.CurrentDifficulty;
+                if (IsPlayableDifficulty(Managers.ChartManager.CurrentSelectionMusicInfo, currentDifficulty))
+                {
+                    return currentDifficulty;
+                }
+            }
+
+            return entry.Difficulty;
+        }
+
+        public static bool IsPlayableDifficulty(MusicInfo musicInfo, int difficulty)
+        {
+            if (!DifficultyDisplayRules.IsKnownDifficulty(difficulty)) return false;
+            if (difficulty == DifficultyDisplayRules.Hidden)
+            {
+                return HiddenDifficultyController.IsHiddenDifficultySelected(
+                    musicInfo,
+                    GlobalDataBase.dbMusicTag.selectedDiffTglIndex);
+            }
+
+            if (difficulty == DifficultyDisplayRules.Spell)
+            {
+                return SpecialDifficultyController.IsSpecialDifficultySelected(
+                    musicInfo,
+                    GlobalDataBase.dbMusicTag.selectedDiffTglIndex);
+            }
+
+            return musicInfo != null && musicInfo.GetDifficulty(difficulty) > 0;
         }
 
         private static void SyncSelectedChart(string chartKey, MusicInfo musicInfo, int difficulty)

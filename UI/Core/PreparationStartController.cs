@@ -114,7 +114,8 @@ namespace MDEN.UI.Core
             }
 
             var difficulty = ChartManager.CurrentDifficulty;
-            if (!MDEN.Protocol.Rules.DifficultyDisplayRules.IsKnownDifficulty(difficulty))
+            if (!MDEN.Protocol.Rules.DifficultyDisplayRules.IsKnownDifficulty(difficulty) ||
+                !MultiplayerBattleController.IsPlayableDifficulty(ChartManager.CurrentSelectionMusicInfo, difficulty))
             {
                 ShowText.ShowInfo(I18nManager.T("prepare.valid_difficulty"));
                 return;
