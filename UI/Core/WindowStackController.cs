@@ -77,5 +77,16 @@ namespace MDEN.UI.Core
             }
         }
 
+        public static bool CloseCurrentWindowIf<TWindow>() where TWindow : MDENWindowBase
+        {
+            if (_windowStack.Count == 0 || !(_windowStack.Peek() is TWindow))
+            {
+                return false;
+            }
+
+            CloseCurrentWindow();
+            return true;
+        }
+
     }
 }

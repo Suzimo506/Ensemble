@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Text.RegularExpressions;
 using Il2CppAssets.Scripts.UI.Controls;
 using MDEN.Managers;
+using MDEN.Protocol;
 using MDEN.Protocol.Messages.Chat;
 using MDEN.Protocol.Rules;
 using MDEN.UI.Core;

@@ -50,9 +50,20 @@ namespace MDEN.UI.Core
         private static readonly string[] NativeSettingsPanelPaths =
         {
             "UI/Standerd/PnlOption",
+            "UI/Standerd/PnlMenu/Panels/PnlOption",
+            "UI/Standerd/PnlMenu/Panels/PnlOption/PnlInputPc",
+            "UI/Standerd/PnlMenu/Panels/PnlOption/PnlOffsetOption",
+            "UI/Standerd/PnlMenu/Panels/PnlOption/PnlGraphicSetting",
+            "UI/Standerd/PnlMenu/Panels/PnlOption/PnlBackgroundSetting",
+            "UI/Standerd/PnlMenu/Panels/PnlOption/PnlFeverSetting",
             "UI/Standerd/PnlSetting",
             "UI/Standerd/PnlSettings",
             "PnlOption",
+            "PnlInputPc",
+            "PnlOffsetOption",
+            "PnlGraphicSetting",
+            "PnlBackgroundSetting",
+            "PnlFeverSetting",
             "PnlSetting",
             "PnlSettings"
         };
@@ -82,7 +93,6 @@ namespace MDEN.UI.Core
         public static bool IsReady => IsHomeReady && IsNavigationReady;
         public static bool IsHomeVisible => GetHomeVisible();
         public static bool IsRoomInfoVisible => GetRoomInfoVisible();
-
         public static void InvalidatePlayerColors()
         {
             PlayerColorCache.Clear();
@@ -130,17 +140,18 @@ namespace MDEN.UI.Core
             if (_frame != null) _frame.SetActive(false);
         }
 
-        public static void UpdateVisibility()
+        public static bool UpdateVisibility()
         {
             var lobby = LobbyManager.CurrentLobby;
             var homeVisible = IsHomeVisible;
-            var visible = LobbyManager.IsInLobby && ShouldShowRoomInfo(lobby, homeVisible);
+            var nativeSettingsVisible = IsNativeSettingsVisible();
+            var visible = LobbyManager.IsInLobby && ShouldShowRoomInfo(lobby, homeVisible, nativeSettingsVisible);
             if (visible)
             {
                 EnsureFrame();
             }
 
-            if (_frame == null) return;
+            if (_frame == null) return nativeSettingsVisible;
             _frame.SetActive(visible);
             if (visible)
             {
@@ -154,6 +165,8 @@ namespace MDEN.UI.Core
                 HandlePlayerListPointerInput(lobby);
                 UpdateRoomInfo(lobby);
             }
+
+            return nativeSettingsVisible;
         }
 
         public static void Destroy()
@@ -253,8 +266,13 @@ namespace MDEN.UI.Core
 
         private static bool ShouldShowRoomInfo(LobbySyncPush lobby, bool homeVisible)
         {
+            return ShouldShowRoomInfo(lobby, homeVisible, IsNativeSettingsVisible());
+        }
+
+        private static bool ShouldShowRoomInfo(LobbySyncPush lobby, bool homeVisible, bool nativeSettingsVisible)
+        {
             return lobby != null &&
-                   !IsNativeSettingsVisible() &&
+                   !nativeSettingsVisible &&
                    (homeVisible || !lobby.IsPlaying);
         }
 

@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using MDEN.Managers;
 using MDEN.Protocol.Messages.Chat;
 using MDEN.UI.Displays;
+using MDEN.UI.Windows;
 
 namespace MDEN.UI.Core
 {
@@ -171,6 +172,9 @@ namespace MDEN.UI.Core
                 return;
             }
 
+            var nativeSettingsOpen = RoomSceneOverlay.UpdateVisibility();
+            ClosePlayerInfoWindowsForNativeSettings(nativeSettingsOpen);
+
             if (ShouldPauseRoomHudUpdate())
             {
                 RestoreNativeInput();
@@ -181,9 +185,16 @@ namespace MDEN.UI.Core
             UpdateNativeInputBlock();
             ReadyDisplay.Update();
             StageDesignerTextController.Update();
-            RoomSceneOverlay.UpdateVisibility();
             RoomCharacterDisplay.UpdateLabelPositions(LobbyManager.CurrentLobby);
             RepairRoomCharactersIfNeeded();
+        }
+
+        private static void ClosePlayerInfoWindowsForNativeSettings(bool nativeSettingsOpen)
+        {
+            if (!nativeSettingsOpen) return;
+
+            WindowStackController.CloseCurrentWindowIf<RoomPlayerProfileWindow>();
+            WindowStackController.CloseCurrentWindowIf<RoomPlayerWindow>();
         }
 
         public static bool IsChatConsumingInput => Chat.IsConsumingInput;
