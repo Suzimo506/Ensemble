@@ -7,20 +7,27 @@ namespace MDEN.UI.Core
     {
         public static int Sync(MusicInfo musicInfo, int difficulty)
         {
+            return Sync(musicInfo, difficulty, musicInfo?.uid);
+        }
+
+        public static int Sync(MusicInfo musicInfo, int difficulty, string selectedUid)
+        {
             if (musicInfo == null || string.IsNullOrEmpty(musicInfo.uid)) return difficulty;
 
+            if (string.IsNullOrEmpty(selectedUid)) selectedUid = musicInfo.uid;
             var nativeDifficulty = HiddenDifficultyController.Sync(musicInfo, difficulty);
             var dbMusicTag = GlobalDataBase.dbMusicTag;
             if (dbMusicTag != null)
             {
                 nativeDifficulty = SpecialDifficultyController.Sync(musicInfo, nativeDifficulty);
                 dbMusicTag.selectedDiffTglIndex = nativeDifficulty;
-                dbMusicTag.pnlSelectMusicUid = musicInfo.uid;
+                dbMusicTag.pnlSelectMusicUid = selectedUid;
                 dbMusicTag.m_CurSelectedMusicInfo = musicInfo;
+                SpecialUnlockSongController.SyncSelection(selectedUid, musicInfo);
             }
 
-            SyncDataHelperSelectedUid(musicInfo.uid);
-            ClientLogManager.Msg($"Synced native chart selection: uid={musicInfo.uid}, difficulty={difficulty}, nativeDifficulty={nativeDifficulty}");
+            SyncDataHelperSelectedUid(selectedUid);
+            ClientLogManager.Msg($"Synced native chart selection: uid={musicInfo.uid}, selectedUid={selectedUid}, difficulty={difficulty}, nativeDifficulty={nativeDifficulty}");
             return nativeDifficulty;
         }
 

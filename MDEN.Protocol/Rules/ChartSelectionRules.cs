@@ -45,6 +45,25 @@ namespace MDEN.Protocol.Rules
                    DifficultyDisplayRules.IsFearlessDifficulty(difficulty);
         }
 
+        public static bool IsRookieUnsupportedChart(string chartKey, int difficulty)
+        {
+            return IsTouhouSpellChart(chartKey, difficulty);
+        }
+
+        public static bool IsTouhouSpellChart(string chartKey, int difficulty)
+        {
+            if (difficulty != DifficultyDisplayRules.Spell ||
+                string.IsNullOrWhiteSpace(chartKey))
+            {
+                return false;
+            }
+
+            return chartKey.StartsWith("42-", StringComparison.Ordinal) ||
+                   chartKey.StartsWith("55-", StringComparison.Ordinal) ||
+                   chartKey.StartsWith("69-", StringComparison.Ordinal) ||
+                   chartKey.StartsWith("80-", StringComparison.Ordinal);
+        }
+
         public static bool IsUnsupportedChartKey(string chartKey)
         {
             return !string.IsNullOrWhiteSpace(chartKey) &&

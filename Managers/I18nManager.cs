@@ -389,6 +389,7 @@ namespace MDEN.Managers
             Register("playlist.not_found", "歌曲不在列表中", "Song is not in the playlist", "歌曲不在列表中", "曲はプレイリストにありません", "곡이 목록에 없습니다");
             Register("playlist.chart_selection_banned", "你已被禁止选谱", "You are not allowed to select charts", "你已被禁止選譜", "選曲が禁止されています", "선곡이 금지되었습니다");
             Register("playlist.unsupported", "该谱面暂不支持联机", "This chart does not support multiplayer yet", "該譜面暫不支援聯機", "この譜面はまだマルチプレイに対応していません", "이 채보는 아직 멀티플레이를 지원하지 않습니다");
+            Register("playlist.rookie_touhou_spell", "新手模式暂不支持东方特殊谱面，请切换表谱或更换模式", "Rookie mode does not support Touhou Special charts. Choose the normal chart or another mode.", "新手模式暫不支援東方特殊譜面，請切換表譜或更換模式", "ルーキーモードでは東方の特殊譜面は使えません。表譜か別のモードを選んでください", "초보 모드는 동방 특수 채보를 지원하지 않습니다. 일반 채보나 다른 모드를 선택하세요");
             Register("playlist.fearless_difficulty", "无畏模式只能选择大触或隐藏难度", "Fearless mode only allows Master or Hidden difficulty", "無畏模式只能選擇大觸或隱藏難度", "無畏モードでは大触または隠し難易度のみ選択できます", "무외 모드는 마스터 또는 히든 난이도만 선택할 수 있습니다");
             Register("playlist.hidden_by_someone", "有人隐藏了该谱面", "Someone has hidden this chart", "有人隱藏了該譜面", "誰かがこの譜面を非表示にしています", "누군가 이 채보를 숨겼습니다");
             Register("playlist.missing_by_someone", "有人未下载该谱面", "Someone has not downloaded this chart", "有人未下載該譜面", "誰かがこの譜面を未ダウンロードです", "누군가 이 채보를 다운로드하지 않았습니다");
@@ -410,9 +411,6 @@ namespace MDEN.Managers
             Register("difficulty.master", "大触", "Master", "大觸", "大触", "마스터");
             Register("difficulty.hidden", "隐藏", "Hidden", "隱藏", "隠し", "히든");
             Register("difficulty.spell", "特殊", "Special", "特殊", "特殊", "특수");
-            Register("difficulty.spell_easy", "特殊萌新", "Special Easy", "特殊萌新", "特殊萌新", "특수 쉬움");
-            Register("difficulty.spell_hard", "特殊高手", "Special Hard", "特殊高手", "特殊高手", "특수 어려움");
-            Register("difficulty.spell_master", "特殊大触", "Special Master", "特殊大觸", "特殊大触", "특수 마스터");
             Register("difficulty.unknown", "难度{0}", "Difficulty {0}", "難度{0}", "難易度{0}", "난이도 {0}");
 
             Register("ready.stop", "停止游戏", "Stop Game", "停止遊戲", "ゲーム停止", "게임 중지");
@@ -481,6 +479,10 @@ namespace MDEN.Managers
             Register("navigation.start_confirm", "确认开始多人准备吗？", "Start multiplayer preparation?", "確認開始多人準備嗎？", "マルチプレイの準備を開始しますか？", "멀티플레이 준비를 시작할까요?");
             Register("navigation.custom_closed_start", "已关闭自制谱窗口，请重新开始准备", "Closed the custom chart window. Please start preparation again.", "已關閉自訂譜視窗，請重新開始準備", "カスタム譜面ウィンドウを閉じました。もう一度準備を開始してください。", "커스텀 채보 창을 닫았습니다. 다시 준비를 시작해 주세요");
             Register("navigation.start_failed", "开始失败：{0}", "Start failed: {0}", "開始失敗：{0}", "開始失敗：{0}", "시작 실패: {0}");
+            Register("navigation.start_requesting", "正在开始准备，请稍候", "Starting preparation. Please wait.", "正在開始準備，請稍候", "準備開始中です。少しお待ちください", "준비를 시작하는 중입니다. 잠시만 기다려 주세요");
+            Register("navigation.start_locked", "已经进入准备阶段，不能重复开始", "Preparation has already started.", "已經進入準備階段，不能重複開始", "すでに準備段階です", "이미 준비 단계입니다");
+            Register("navigation.start_playing", "游戏进行中，不能开始准备", "Game is already in progress.", "遊戲進行中，不能開始準備", "ゲーム中は準備を開始できません", "게임 진행 중에는 준비를 시작할 수 없습니다");
+            Register("navigation.start_blocked", "当前不能开始准备", "Cannot start preparation right now.", "目前不能開始準備", "現在は準備を開始できません", "지금은 준비를 시작할 수 없습니다");
 
             Register("patch.store_disabled", "多人房间中不能打开商店！", "Cannot open the shop in a multiplayer room!", "多人房間中不能打開商店！", "マルチルーム中はショップを開けません！", "멀티플레이 방에서는 상점을 열 수 없습니다!");
             Register("patch.song_hide_disabled", "不能在游戏房间中隐藏或解除隐藏谱面！", "Cannot hide or unhide charts in a game room!", "不能在遊戲房間中隱藏或解除隱藏譜面！", "ゲームルーム中は譜面の表示/非表示を変更できません！", "게임 방에서는 채보 숨김 상태를 변경할 수 없습니다!");

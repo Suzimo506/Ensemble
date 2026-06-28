@@ -64,9 +64,8 @@ namespace MDEN.UI.Core
             var entry = Managers.PlaylistManager.GetCurrentPlaylistEntry();
             if (entry == null) return false;
 
-            var difficulty = ResolveRookieReadyNavigationDifficulty(entry.Difficulty);
             if (Managers.ChartManager.IsCurrentSelectedChart(entry) &&
-                IsRookieDifficultySelectionReady(Managers.ChartManager.CurrentMusicInfo, difficulty))
+                IsRookieDifficultySelectionReady(Managers.ChartManager.CurrentMusicInfo, entry.Difficulty))
             {
                 return true;
             }
@@ -77,7 +76,7 @@ namespace MDEN.UI.Core
                 return false;
             }
 
-            NativeChartNavigator.JumpToChart(musicInfo, difficulty);
+            NativeChartNavigator.JumpToChart(entry.ChartKey, musicInfo, entry.Difficulty);
             return true;
         }
 
@@ -206,13 +205,13 @@ namespace MDEN.UI.Core
 
             if (ShouldNavigateToBattleChart(battleId, retriesRemaining))
             {
-                NativeChartNavigator.JumpToChart(musicInfo, entry.Difficulty);
+                NativeChartNavigator.JumpToChart(entry.ChartKey, musicInfo, entry.Difficulty);
                 _navigatedBattleId = battleId;
             }
 
-            SyncSelectedChart(musicInfo, entry.Difficulty);
+            SyncSelectedChart(entry.ChartKey, musicInfo, entry.Difficulty);
 
-            if (!IsNativeChartSelectionReady(musicInfo))
+            if (!IsNativeChartSelectionReady(entry.ChartKey, musicInfo))
             {
                 return false;
             }
@@ -240,9 +239,9 @@ namespace MDEN.UI.Core
             return retriesRemaining > 0 && retriesRemaining % StartNavigationRetryInterval == 0;
         }
 
-        private static void SyncSelectedChart(MusicInfo musicInfo, int difficulty)
+        private static void SyncSelectedChart(string chartKey, MusicInfo musicInfo, int difficulty)
         {
-            NativeChartSelectionSync.Sync(musicInfo, difficulty);
+            NativeChartSelectionSync.Sync(musicInfo, difficulty, chartKey);
         }
 
         private static bool IsRookieDifficultySelectionReady(MusicInfo musicInfo, int difficulty)
@@ -260,49 +259,33 @@ namespace MDEN.UI.Core
                        !HiddenDifficultyController.IsHiddenInvoked(musicInfo);
             }
 
-            if (DifficultyDisplayRules.IsSpellDifficulty(difficulty))
+            if (difficulty == DifficultyDisplayRules.Spell)
             {
                 return SpecialDifficultyController.IsSpecialDifficultySelected(
                     musicInfo,
-                    GlobalDataBase.dbMusicTag.selectedDiffTglIndex,
-                    difficulty);
+                    GlobalDataBase.dbMusicTag.selectedDiffTglIndex);
             }
 
             return GlobalDataBase.dbMusicTag.selectedDiffTglIndex == difficulty;
         }
 
-        private static int ResolveRookieReadyNavigationDifficulty(int playlistDifficulty)
+        private static bool IsNativeChartSelectionReady(string chartKey, MusicInfo musicInfo)
         {
-            var readyDifficulty = Managers.LobbyManager.GetReadyDifficulty(Managers.PlayerManager.CurrentUid);
-            if (DifficultyDisplayRules.IsKnownDifficulty(readyDifficulty))
-            {
-                return readyDifficulty;
-            }
-
-            var currentDifficulty = Managers.ChartManager.CurrentDifficulty;
-            return IsRookiePlaylistDifficultyCompatible(playlistDifficulty, currentDifficulty)
-                ? currentDifficulty
-                : playlistDifficulty;
-        }
-
-        private static bool IsRookiePlaylistDifficultyCompatible(int playlistDifficulty, int currentDifficulty)
-        {
-            if (playlistDifficulty == currentDifficulty) return true;
-
-            return playlistDifficulty == DifficultyDisplayRules.Spell &&
-                   DifficultyDisplayRules.IsSpellDifficulty(currentDifficulty);
-        }
-
-        private static bool IsNativeChartSelectionReady(MusicInfo musicInfo)
-        {
-            if (musicInfo == null || string.IsNullOrEmpty(musicInfo.uid)) return false;
+            if (musicInfo == null || string.IsNullOrEmpty(musicInfo.uid) || string.IsNullOrEmpty(chartKey)) return false;
 
             var currentInfo = GlobalDataBase.dbMusicTag.m_CurSelectedMusicInfo;
             if (currentInfo == null || currentInfo.Pointer == System.IntPtr.Zero) return false;
-            if (currentInfo.uid != musicInfo.uid) return false;
+            if (currentInfo.uid != musicInfo.uid && currentInfo.uid != chartKey)
+            {
+                if (!SpecialUnlockSongController.IsSpecialUnlockPair(chartKey) ||
+                    SpecialUnlockSongController.GetBaseUid(currentInfo.uid) != SpecialUnlockSongController.GetBaseUid(chartKey))
+                {
+                    return false;
+                }
+            }
 
             var selectedUid = GlobalDataBase.dbMusicTag.pnlSelectMusicUid;
-            if (!string.IsNullOrEmpty(selectedUid) && selectedUid != musicInfo.uid) return false;
+            if (!string.IsNullOrEmpty(selectedUid) && selectedUid != chartKey) return false;
 
             var stage = GameObject.Find("UI/Standerd/PnlStage");
             return stage != null && stage.activeInHierarchy;

@@ -459,6 +459,7 @@ namespace MDEN.UI.Core
         {
             if (!CanOpenStartPrepareConfirm())
             {
+                ShowText.ShowInfo(GetStartPrepareBlockedMessage());
                 RefreshRoomActionButtonStates();
                 return;
             }
@@ -619,25 +620,30 @@ namespace MDEN.UI.Core
         private static void RefreshRoomActionButtonStates()
         {
             var startButton = _startBtn == null ? null : _startBtn.GetComponent<Button>();
-            var showStartButton = ShouldShowStartPrepareButton();
-            if (_startBtn != null && _startBtn.activeSelf != showStartButton)
+            if (_startBtn != null && !_startBtn.activeSelf)
             {
-                _startBtn.SetActive(showStartButton);
+                _startBtn.SetActive(true);
             }
 
             if (startButton != null)
             {
-                startButton.interactable = showStartButton && CanOpenStartPrepareConfirm();
+                startButton.interactable = true;
             }
         }
 
-        private static bool ShouldShowStartPrepareButton()
+        private static string GetStartPrepareBlockedMessage()
         {
             var lobby = LobbyManager.CurrentLobby;
-            return lobby != null &&
-                   !lobby.Locked &&
-                   !lobby.IsPlaying &&
-                   !IsStartPrepareLatchedForCurrentLobby();
+            if (lobby == null) return I18nManager.T("player.not_in_room");
+            if (lobby.HostUid != PlayerManager.CurrentUid) return I18nManager.T("navigation.host_only_start");
+            if (lobby.IsPlaying) return I18nManager.T("navigation.start_playing");
+            if (lobby.Locked) return I18nManager.T("navigation.start_locked");
+            if (_startConfirmOpen || _startPrepareBusy || IsStartPrepareLatchedForCurrentLobby())
+            {
+                return I18nManager.T("navigation.start_requesting");
+            }
+
+            return I18nManager.T("navigation.start_blocked");
         }
 
         private static bool IsStartPrepareLatchedForCurrentLobby()

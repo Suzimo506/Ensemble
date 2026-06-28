@@ -21,9 +21,16 @@ namespace MDEN.UI.Core
         {
             if (musicInfo == null || string.IsNullOrEmpty(musicInfo.uid)) return;
 
-            NativeChartSelectionSync.Sync(musicInfo, difficulty);
-            JumpToChart(musicInfo.uid);
-            NativeChartSelectionSync.Sync(musicInfo, difficulty);
+            JumpToChart(musicInfo.uid, musicInfo, difficulty);
+        }
+
+        public static void JumpToChart(string chartKey, MusicInfo musicInfo, int difficulty)
+        {
+            if (musicInfo == null || string.IsNullOrEmpty(chartKey)) return;
+
+            NativeChartSelectionSync.Sync(musicInfo, difficulty, chartKey);
+            JumpToChart(chartKey);
+            NativeChartSelectionSync.Sync(musicInfo, difficulty, chartKey);
         }
 
         public static void JumpToChart(string uid)

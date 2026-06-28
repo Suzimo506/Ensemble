@@ -374,6 +374,11 @@ namespace MDEN.Managers
 
         private static void EnsureEntryAllowedByPlayMode(string entry)
         {
+            if (IsRookieMode() && IsEntryUnsupportedByRookieMode(entry))
+            {
+                throw new System.InvalidOperationException(I18nManager.T("playlist.rookie_touhou_spell"));
+            }
+
             if (!IsFearlessMode()) return;
 
             if (!IsEntryAllowedByFearlessMode(entry))
@@ -392,6 +397,11 @@ namespace MDEN.Managers
                 throw new System.InvalidOperationException(I18nManager.T("playlist.lock_unsupported"));
             }
 
+            if (IsRookieMode() && playlist.Any(IsEntryUnsupportedByRookieMode))
+            {
+                throw new System.InvalidOperationException(I18nManager.T("playlist.rookie_touhou_spell"));
+            }
+
             if (IsFearlessMode() && playlist.Any(entry => !IsEntryAllowedByFearlessMode(entry)))
             {
                 throw new System.InvalidOperationException(I18nManager.T("playlist.fearless_difficulty"));
@@ -401,6 +411,7 @@ namespace MDEN.Managers
         private static bool IsEntryUnsupportedForCurrentLobby(string entry)
         {
             if (ChartSelectionRules.IsUnsupportedPlaylistEntry(entry)) return true;
+            if (IsRookieMode() && IsEntryUnsupportedByRookieMode(entry)) return true;
             if (!IsFearlessMode()) return false;
 
             return !IsEntryAllowedByFearlessMode(entry);
@@ -408,6 +419,11 @@ namespace MDEN.Managers
 
         private static string GetCurrentChartUnsupportedMessage(string entry)
         {
+            if (IsRookieMode() && IsEntryUnsupportedByRookieMode(entry))
+            {
+                return I18nManager.T("playlist.rookie_touhou_spell");
+            }
+
             if (IsFearlessMode() && !IsEntryAllowedByFearlessMode(entry))
             {
                 return I18nManager.T("playlist.fearless_difficulty");
@@ -420,6 +436,12 @@ namespace MDEN.Managers
         {
             var parsed = ChartManager.ParseEntry(entry);
             return ChartSelectionRules.IsFearlessAllowedChart(parsed?.ChartKey, parsed?.Difficulty ?? 0);
+        }
+
+        private static bool IsEntryUnsupportedByRookieMode(string entry)
+        {
+            var parsed = ChartManager.ParseEntry(entry);
+            return ChartSelectionRules.IsRookieUnsupportedChart(parsed?.ChartKey, parsed?.Difficulty ?? 0);
         }
 
         public static bool IsRookieMode()
