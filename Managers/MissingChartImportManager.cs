@@ -14,15 +14,15 @@ namespace MDEN.Managers
     {
         private static readonly SemaphoreSlim ImportLock = new SemaphoreSlim(1, 1);
 
-        internal static void HandleMissingChartClick(string chartName, string chartKey = null)
+        internal static void HandleMissingChartClick(string chartName, string chartKey = null, int difficulty = 0)
         {
             chartName = CleanChartName(chartName);
             if (string.IsNullOrWhiteSpace(chartName)) return;
 
-            System.Threading.Tasks.Task.Run(() => FindAndActivate(chartName, chartKey));
+            System.Threading.Tasks.Task.Run(() => FindAndActivate(chartName, chartKey, difficulty));
         }
 
-        private static void FindAndActivate(string chartName, string chartKey)
+        private static void FindAndActivate(string chartName, string chartKey, int difficulty)
         {
             var locked = false;
             try
@@ -35,6 +35,11 @@ namespace MDEN.Managers
                 if (match.Status != MissingChartMatchStatus.Unique)
                 {
                     LogMatchFailure(chartName, match);
+                    if (TryHandleMuseDashToolSearch(chartName, chartKey, difficulty))
+                    {
+                        return;
+                    }
+
                     MainThreadDispatcher.Enqueue(() => ShowFallbackStatus(chartName, match.Status));
                     return;
                 }
@@ -50,6 +55,23 @@ namespace MDEN.Managers
             {
                 if (locked) ImportLock.Release();
             }
+        }
+
+        private static bool TryHandleMuseDashToolSearch(string chartName, string chartKey, int difficulty)
+        {
+            if (!IsCustomChartKey(chartKey))
+            {
+                return false;
+            }
+
+            if (MuseDashToolBridge.OpenGlobalSearch(chartName, chartKey, difficulty))
+            {
+                MainThreadDispatcher.Enqueue(() => UiNotificationManager.RequestToast(I18nManager.T("missing_chart.musedashtool_opened")));
+                return true;
+            }
+
+            MainThreadDispatcher.Enqueue(() => UiNotificationManager.RequestToast(I18nManager.T("missing_chart.musedashtool_not_running")));
+            return true;
         }
 
         private static void ActivateMatch(string chartName, LibraryAlbumEntry entry)

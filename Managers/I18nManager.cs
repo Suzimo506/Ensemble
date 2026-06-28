@@ -504,6 +504,8 @@ namespace MDEN.Managers
             Register("missing_chart.import_failed_copy", "自动导入失败，已复制谱面名: {0}", "Auto import failed. Copied chart name: {0}", "自動匯入失敗，已複製譜面名: {0}", "自動インポートに失敗しました。譜面名をコピーしました: {0}", "자동 가져오기 실패. 채보 이름을 복사했습니다: {0}");
             Register("missing_chart.not_found_search", "候选区未找到，已打开搜索并复制: {0}", "No candidate found. Opened search and copied: {0}", "候選區未找到，已開啟搜尋並複製: {0}", "候補が見つかりません。検索を開いてコピーしました: {0}", "후보를 찾지 못했습니다. 검색을 열고 복사했습니다: {0}");
             Register("missing_chart.not_found_copy", "候选区未找到，已复制谱面名: {0}", "No candidate found. Copied chart name: {0}", "候選區未找到，已複製譜面名: {0}", "候補が見つかりません。譜面名をコピーしました: {0}", "후보를 찾지 못했습니다. 채보 이름을 복사했습니다: {0}");
+            Register("missing_chart.musedashtool_opened", "已在喵斯兔打开全局搜索，请切屏查看结果", "Opened MuseDashTOOL global search. Please switch to it for results.", "已在喵斯兔開啟全域搜尋，請切換視窗查看結果", "MuseDashTOOL の全体検索を開きました。結果を確認してください", "MuseDashTOOL 전역 검색을 열었습니다. 창을 전환해 결과를 확인하세요.");
+            Register("missing_chart.musedashtool_not_running", "请先打开喵斯兔，再点击缺谱播报", "Please open MuseDashTOOL first, then click the missing-chart notice again.", "請先開啟喵斯兔，再點擊缺譜播報", "先に MuseDashTOOL を開いてから、譜面不足通知をもう一度クリックしてください", "먼저 MuseDashTOOL을 연 뒤 누락 채보 알림을 다시 클릭하세요.");
 
             Register("prepare.update_playlist", "更新歌曲列表中...", "Updating playlist...", "正在更新歌曲列表...", "プレイリスト更新中...", "플레이리스트 업데이트 중...");
             Register("prepare.select_chart_first", "请先选择本局谱面", "Please select this round's chart first", "請先選擇本局譜面", "先に今回の譜面を選択してください", "먼저 이번 라운드 채보를 선택하세요");

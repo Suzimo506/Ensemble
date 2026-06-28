@@ -490,7 +490,8 @@ namespace MDEN.UI.Displays
                 {
                     MissingChartImportManager.HandleMissingChartClick(
                         missingChart.Value.ChartName,
-                        missingChart.Value.ChartKey);
+                        missingChart.Value.ChartKey,
+                        missingChart.Value.Difficulty);
                     return;
                 }
 
@@ -844,7 +845,7 @@ namespace MDEN.UI.Displays
             return !string.IsNullOrWhiteSpace(chartName);
         }
 
-        private static (string ChartName, string ChartKey)? GetMissingChartClickData(ChatPushMsg msg)
+        private static (string ChartName, string ChartKey, int Difficulty)? GetMissingChartClickData(ChatPushMsg msg)
         {
             if (msg == null || !msg.IsSystem) return null;
 
@@ -852,14 +853,14 @@ namespace MDEN.UI.Displays
             {
                 var missing = ParsePlayerMissingChart(msg);
                 return missing.HasValue
-                    ? (CleanChartNameForCopy(missing.Value.ChartName), missing.Value.ChartKey)
+                    ? (CleanChartNameForCopy(missing.Value.ChartName), missing.Value.ChartKey, missing.Value.Difficulty)
                     : null;
             }
 
             var textMissing = ParseTextMissingChart(msg.Message);
             if (textMissing.HasValue)
             {
-                return (CleanChartNameForCopy(textMissing.Value.ChartName), null);
+                return (CleanChartNameForCopy(textMissing.Value.ChartName), null, 0);
             }
 
             return null;
@@ -940,19 +941,19 @@ namespace MDEN.UI.Displays
                 .Trim()
                 .ToLowerInvariant();
         }
-        private static (string PlayerName, string ChartName, string ChartKey)? ParsePlayerMissingChart(ChatPushMsg msg)
+        private static (string PlayerName, string ChartName, string ChartKey, int Difficulty)? ParsePlayerMissingChart(ChatPushMsg msg)
         {
             if (string.IsNullOrWhiteSpace(msg?.ExtraData)) return null;
 
             var parts = msg.ExtraData.Split('#');
             if (parts.Length < 2) return null;
 
-            if (TryParseEntryPayload(parts, out var chartName, out var chartKey, out _))
+            if (TryParseEntryPayload(parts, out var chartName, out var chartKey, out var difficulty))
             {
-                return (parts[0], chartName, chartKey);
+                return (parts[0], chartName, chartKey, difficulty);
             }
 
-            return (parts[0], DecodeEntryPart(string.Join("#", parts, 1, parts.Length - 1)), null);
+            return (parts[0], DecodeEntryPart(string.Join("#", parts, 1, parts.Length - 1)), null, 0);
         }
 
         private static (string PlayerName, string ChartName, string ChartKey, int Difficulty)? ParsePlaylistEventData(ChatPushMsg msg)
