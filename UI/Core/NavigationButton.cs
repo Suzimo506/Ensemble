@@ -24,6 +24,9 @@ namespace MDEN.UI.Core
         private static ConnectionLifecycleState _lastConnectionState = ConnectionLifecycleState.Disconnected;
         private static bool _startConfirmOpen;
         private static bool _startPrepareBusy;
+        private static bool _startPrepareAccepted;
+        private static bool _startPrepareObservedLocked;
+        private static int _startPrepareLobbyId;
         private static int _startConfirmGeneration;
         private const float NavigationButtonOffset = 132f;
         private const float LeftNavigationOffset = 192f;
@@ -454,7 +457,11 @@ namespace MDEN.UI.Core
 
         private static void OnStartPrepareClicked()
         {
-            if (!CanOpenStartPrepareConfirm()) return;
+            if (!CanOpenStartPrepareConfirm())
+            {
+                RefreshRoomActionButtonStates();
+                return;
+            }
 
             if (LobbyManager.CurrentLobby?.HostUid != PlayerManager.CurrentUid)
             {
@@ -482,15 +489,23 @@ namespace MDEN.UI.Core
 
         private static async System.Threading.Tasks.Task StartPrepareAsync()
         {
-            if (!CanSendStartPrepareRequest()) return;
+            if (!CanSendStartPrepareRequest())
+            {
+                RefreshRoomActionButtonStates();
+                return;
+            }
 
+            var lobbyId = LobbyManager.CurrentLobby?.Id ?? 0;
             _startPrepareBusy = true;
+            _startPrepareAccepted = false;
+            _startPrepareObservedLocked = false;
+            _startPrepareLobbyId = lobbyId;
             RefreshRoomActionButtonStates();
 
             if (CustomAlbumsWindowGuard.CloseIfOpen("start prepare"))
             {
                 MainThreadDispatcher.Enqueue(() => ShowText.ShowInfo(I18nManager.T("navigation.custom_closed_start")));
-                _startPrepareBusy = false;
+                ClearStartPrepareLatch();
                 RefreshRoomActionButtonStates();
                 return;
             }
@@ -502,16 +517,23 @@ namespace MDEN.UI.Core
             {
                 await PlaylistManager.StartPrepareAsync();
                 accepted = true;
+                _startPrepareAccepted = true;
+                _startPrepareObservedLocked = false;
+                _startPrepareLobbyId = LobbyManager.CurrentLobby?.Id ?? lobbyId;
             }
             catch (Exception ex)
             {
-                _startPrepareBusy = false;
+                ClearStartPrepareLatch();
                 MDEN.Managers.ClientLogManager.Warning($"Start lobby prepare failed: {ex.Message}");
                 MainThreadDispatcher.Enqueue(() => ShowText.ShowInfo(I18nManager.Tf("navigation.start_failed", ex.Message)));
             }
             finally
             {
                 if (!accepted)
+                {
+                    ClearStartPrepareLatch();
+                }
+                else
                 {
                     _startPrepareBusy = false;
                 }
@@ -528,6 +550,7 @@ namespace MDEN.UI.Core
                    !lobby.Locked &&
                    !lobby.IsPlaying &&
                    !_startConfirmOpen &&
+                   !IsStartPrepareLatchedForCurrentLobby() &&
                    !_startPrepareBusy;
         }
 
@@ -538,22 +561,51 @@ namespace MDEN.UI.Core
                    lobby.HostUid == PlayerManager.CurrentUid &&
                    !lobby.Locked &&
                    !lobby.IsPlaying &&
+                   !IsStartPrepareLatchedForCurrentLobby() &&
                    !_startPrepareBusy;
         }
 
         private static void ReconcileStartPrepareState()
         {
             var lobby = LobbyManager.CurrentLobby;
-            if (lobby != null &&
-                !lobby.Locked &&
-                !lobby.IsPlaying &&
-                lobby.HostUid == PlayerManager.CurrentUid)
+            if (lobby == null || lobby.HostUid != PlayerManager.CurrentUid)
             {
+                ClearStartPrepareLatch();
+                InvalidateStartPrepareConfirm();
                 return;
             }
 
-            _startPrepareBusy = false;
-            InvalidateStartPrepareConfirm();
+            if (_startPrepareLobbyId != 0 && _startPrepareLobbyId != lobby.Id)
+            {
+                ClearStartPrepareLatch();
+            }
+
+            if (lobby.IsPlaying)
+            {
+                ClearStartPrepareLatch();
+                InvalidateStartPrepareConfirm();
+                return;
+            }
+
+            if (lobby.Locked)
+            {
+                _startPrepareBusy = false;
+                _startPrepareAccepted = true;
+                _startPrepareObservedLocked = true;
+                _startPrepareLobbyId = lobby.Id;
+                InvalidateStartPrepareConfirm();
+                return;
+            }
+
+            if (_startPrepareAccepted && _startPrepareLobbyId == lobby.Id)
+            {
+                if (_startPrepareObservedLocked)
+                {
+                    ClearStartPrepareLatch();
+                }
+
+                return;
+            }
         }
 
         private static void InvalidateStartPrepareConfirm()
@@ -567,10 +619,41 @@ namespace MDEN.UI.Core
         private static void RefreshRoomActionButtonStates()
         {
             var startButton = _startBtn == null ? null : _startBtn.GetComponent<Button>();
+            var showStartButton = ShouldShowStartPrepareButton();
+            if (_startBtn != null && _startBtn.activeSelf != showStartButton)
+            {
+                _startBtn.SetActive(showStartButton);
+            }
+
             if (startButton != null)
             {
-                startButton.interactable = CanOpenStartPrepareConfirm();
+                startButton.interactable = showStartButton && CanOpenStartPrepareConfirm();
             }
+        }
+
+        private static bool ShouldShowStartPrepareButton()
+        {
+            var lobby = LobbyManager.CurrentLobby;
+            return lobby != null &&
+                   !lobby.Locked &&
+                   !lobby.IsPlaying &&
+                   !IsStartPrepareLatchedForCurrentLobby();
+        }
+
+        private static bool IsStartPrepareLatchedForCurrentLobby()
+        {
+            var lobby = LobbyManager.CurrentLobby;
+            return lobby != null &&
+                   _startPrepareAccepted &&
+                   _startPrepareLobbyId == lobby.Id;
+        }
+
+        private static void ClearStartPrepareLatch()
+        {
+            _startPrepareBusy = false;
+            _startPrepareAccepted = false;
+            _startPrepareObservedLocked = false;
+            _startPrepareLobbyId = 0;
         }
 
         private static GameObject CreateTopActionButton(string name, int position, string label, Action action)
@@ -696,7 +779,7 @@ namespace MDEN.UI.Core
 
         private static void DestroyRoomActionButtons()
         {
-            _startPrepareBusy = false;
+            ClearStartPrepareLatch();
             InvalidateStartPrepareConfirm();
 
             if (_playlistBtn != null)
@@ -755,7 +838,7 @@ namespace MDEN.UI.Core
 
         public static void ResetSceneObjects()
         {
-            _startPrepareBusy = false;
+            ClearStartPrepareLatch();
             InvalidateStartPrepareConfirm();
             _multiplayerBtn = null;
             _myRoomBtn = null;
