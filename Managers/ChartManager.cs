@@ -18,6 +18,8 @@ namespace MDEN.Managers
         public int Difficulty { get; set; }
         public string OwnerName { get; set; }
         public string ChartName { get; set; }
+        public string Artist { get; set; }
+        public string Charter { get; set; }
         public string DisplayName => string.IsNullOrWhiteSpace(ChartName)
             ? I18nManager.Tf("chart.unknown_with_difficulty", Difficulty)
             : ChartName;
@@ -95,7 +97,7 @@ namespace MDEN.Managers
             var entryKey = GetEntryKey(musicInfo, difficulty);
             if (string.IsNullOrWhiteSpace(entryKey)) return null;
 
-            return $"{entryKey}#{difficulty}#{EncodeEntryPart(GetLocalPlayerName())}#{EncodeEntryPart(GetNiceChartName(musicInfo, difficulty))}";
+            return BuildEntry(entryKey, musicInfo, difficulty);
         }
 
         public static string GetEntry(string chartKey, MusicInfo musicInfo, int difficulty)
@@ -105,7 +107,7 @@ namespace MDEN.Managers
             var entryKey = GetEntryKey(chartKey);
             if (string.IsNullOrWhiteSpace(entryKey)) return null;
 
-            return $"{entryKey}#{difficulty}#{EncodeEntryPart(GetLocalPlayerName())}#{EncodeEntryPart(GetNiceChartName(musicInfo, difficulty))}";
+            return BuildEntry(entryKey, musicInfo, difficulty);
         }
 
         public static string GetHiddenCheckUid(MusicInfo musicInfo)
@@ -176,7 +178,9 @@ namespace MDEN.Managers
                 OwnerName = parts.Length > 2 && !string.IsNullOrWhiteSpace(parts[2]) ? DecodeEntryPart(parts[2]) : I18nManager.T("common.unknown"),
                 ChartName = !string.IsNullOrWhiteSpace(chartName)
                     ? chartName
-                    : I18nManager.Tf("chart.unknown_with_difficulty", difficulty)
+                    : I18nManager.Tf("chart.unknown_with_difficulty", difficulty),
+                Artist = parts.Length > 4 ? DecodeEntryPart(parts[4]) : null,
+                Charter = parts.Length > 5 ? DecodeEntryPart(parts[5]) : null
             };
             TryRepairUnknownChartName(parsed);
             return parsed;
@@ -330,6 +334,18 @@ namespace MDEN.Managers
             return $"{chartName} {level}★";
         }
 
+        private static string BuildEntry(string entryKey, MusicInfo musicInfo, int difficulty)
+        {
+            var chartName = GetNiceChartName(musicInfo, difficulty);
+            var artist = GetBestChartArtist(musicInfo);
+            var charter = GetBestChartCharter(musicInfo, difficulty);
+            var entry = $"{entryKey}#{difficulty}#{EncodeEntryPart(GetLocalPlayerName())}#{EncodeEntryPart(chartName)}";
+
+            return string.IsNullOrWhiteSpace(artist) && string.IsNullOrWhiteSpace(charter)
+                ? entry
+                : $"{entry}#{EncodeEntryPart(artist)}#{EncodeEntryPart(charter)}";
+        }
+
         private static void TryRepairUnknownChartName(PlaylistEntryViewModel entry)
         {
             if (entry == null || !IsUnknownChartName(entry.ChartName)) return;
@@ -364,6 +380,57 @@ namespace MDEN.Managers
             }
 
             return I18nManager.T("chart.unknown");
+        }
+
+        private static string GetBestChartArtist(MusicInfo musicInfo)
+        {
+            var album = GetCustomAlbum(musicInfo);
+            if (!string.IsNullOrWhiteSpace(album?.Info?.Author))
+            {
+                return album.Info.Author.Trim();
+            }
+
+            return GetMusicInfoString(musicInfo, "author", "musicAuthor", "composer");
+        }
+
+        private static string GetBestChartCharter(MusicInfo musicInfo, int difficulty)
+        {
+            if (musicInfo == null) return string.Empty;
+
+            var value = difficulty switch
+            {
+                1 => musicInfo.levelDesigner1 ?? musicInfo.levelDesigner,
+                2 => musicInfo.levelDesigner2 ?? musicInfo.levelDesigner,
+                3 => musicInfo.levelDesigner3 ?? musicInfo.levelDesigner,
+                4 => musicInfo.levelDesigner4 ?? musicInfo.levelDesigner,
+                5 => musicInfo.levelDesigner5 ?? musicInfo.levelDesigner,
+                _ => musicInfo.levelDesigner
+            };
+
+            return string.IsNullOrWhiteSpace(value) ? string.Empty : value.Trim();
+        }
+
+        private static string GetMusicInfoString(MusicInfo musicInfo, params string[] names)
+        {
+            if (musicInfo == null) return string.Empty;
+
+            var type = musicInfo.GetType();
+            foreach (var name in names)
+            {
+                var field = type.GetField(name, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.IgnoreCase);
+                if (field?.GetValue(musicInfo) is string fieldValue && !string.IsNullOrWhiteSpace(fieldValue))
+                {
+                    return fieldValue.Trim();
+                }
+
+                var property = type.GetProperty(name, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.IgnoreCase);
+                if (property?.GetValue(musicInfo) is string propertyValue && !string.IsNullOrWhiteSpace(propertyValue))
+                {
+                    return propertyValue.Trim();
+                }
+            }
+
+            return string.Empty;
         }
 
         private static Album GetCustomAlbum(MusicInfo musicInfo)
@@ -494,7 +561,7 @@ namespace MDEN.Managers
 
         private static string[] SplitEntry(string entry)
         {
-            return entry.Split(new[] { '#' }, 4);
+            return entry.Split('#');
         }
 
         private static void OnAlbumLoaded(object sender, CustomAlbums.ModExtensions.AlbumEventArgs e)

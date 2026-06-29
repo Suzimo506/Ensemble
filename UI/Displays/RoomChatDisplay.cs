@@ -491,7 +491,9 @@ namespace MDEN.UI.Displays
                     MissingChartImportManager.HandleMissingChartClick(
                         missingChart.Value.ChartName,
                         missingChart.Value.ChartKey,
-                        missingChart.Value.Difficulty);
+                        missingChart.Value.Difficulty,
+                        missingChart.Value.Artist,
+                        missingChart.Value.Charter);
                     return;
                 }
 
@@ -845,7 +847,7 @@ namespace MDEN.UI.Displays
             return !string.IsNullOrWhiteSpace(chartName);
         }
 
-        private static (string ChartName, string ChartKey, int Difficulty)? GetMissingChartClickData(ChatPushMsg msg)
+        private static (string ChartName, string ChartKey, int Difficulty, string Artist, string Charter)? GetMissingChartClickData(ChatPushMsg msg)
         {
             if (msg == null || !msg.IsSystem) return null;
 
@@ -853,14 +855,14 @@ namespace MDEN.UI.Displays
             {
                 var missing = ParsePlayerMissingChart(msg);
                 return missing.HasValue
-                    ? (CleanChartNameForCopy(missing.Value.ChartName), missing.Value.ChartKey, missing.Value.Difficulty)
+                    ? (CleanChartNameForCopy(missing.Value.ChartName), missing.Value.ChartKey, missing.Value.Difficulty, missing.Value.Artist, missing.Value.Charter)
                     : null;
             }
 
             var textMissing = ParseTextMissingChart(msg.Message);
             if (textMissing.HasValue)
             {
-                return (CleanChartNameForCopy(textMissing.Value.ChartName), null, 0);
+                return (CleanChartNameForCopy(textMissing.Value.ChartName), null, 0, null, null);
             }
 
             return null;
@@ -941,19 +943,19 @@ namespace MDEN.UI.Displays
                 .Trim()
                 .ToLowerInvariant();
         }
-        private static (string PlayerName, string ChartName, string ChartKey, int Difficulty)? ParsePlayerMissingChart(ChatPushMsg msg)
+        private static (string PlayerName, string ChartName, string ChartKey, int Difficulty, string Artist, string Charter)? ParsePlayerMissingChart(ChatPushMsg msg)
         {
             if (string.IsNullOrWhiteSpace(msg?.ExtraData)) return null;
 
             var parts = msg.ExtraData.Split('#');
             if (parts.Length < 2) return null;
 
-            if (TryParseEntryPayload(parts, out var chartName, out var chartKey, out var difficulty))
+            if (TryParseEntryPayload(parts, out var chartName, out var chartKey, out var difficulty, out var artist, out var charter))
             {
-                return (parts[0], chartName, chartKey, difficulty);
+                return (parts[0], chartName, chartKey, difficulty, artist, charter);
             }
 
-            return (parts[0], DecodeEntryPart(string.Join("#", parts, 1, parts.Length - 1)), null, 0);
+            return (parts[0], DecodeEntryPart(string.Join("#", parts, 1, parts.Length - 1)), null, 0, null, null);
         }
 
         private static (string PlayerName, string ChartName, string ChartKey, int Difficulty)? ParsePlaylistEventData(ChatPushMsg msg)
@@ -963,7 +965,7 @@ namespace MDEN.UI.Displays
             var parts = msg.ExtraData.Split('#');
             if (parts.Length < 2) return null;
 
-            if (TryParseEntryPayload(parts, out var chartName, out var chartKey, out var difficulty))
+            if (TryParseEntryPayload(parts, out var chartName, out var chartKey, out var difficulty, out _, out _))
             {
                 return (parts[0], chartName, chartKey, difficulty);
             }
@@ -1021,11 +1023,13 @@ namespace MDEN.UI.Displays
             return value.Trim();
         }
 
-        private static bool TryParseEntryPayload(string[] parts, out string chartName, out string chartKey, out int difficulty)
+        private static bool TryParseEntryPayload(string[] parts, out string chartName, out string chartKey, out int difficulty, out string artist, out string charter)
         {
             chartName = null;
             chartKey = null;
             difficulty = 0;
+            artist = null;
+            charter = null;
 
             if (parts == null ||
                 parts.Length < 5 ||
@@ -1036,7 +1040,9 @@ namespace MDEN.UI.Displays
             }
 
             chartKey = parts[1];
-            chartName = DecodeEntryPart(string.Join("#", parts, 4, parts.Length - 4));
+            chartName = DecodeEntryPart(parts[4]);
+            artist = parts.Length > 5 ? DecodeEntryPart(parts[5]) : null;
+            charter = parts.Length > 6 ? DecodeEntryPart(parts[6]) : null;
             return true;
         }
 

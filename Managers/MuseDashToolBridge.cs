@@ -11,7 +11,7 @@ namespace MDEN.Managers
         private const string PipeName = "MuseDashTOOL-DeepLink";
         private const int ConnectTimeoutMs = 500;
 
-        internal static bool OpenGlobalSearch(string chartName, string chartKey = null, int difficulty = 0)
+        internal static bool OpenGlobalSearch(string chartName, string chartKey = null, int difficulty = 0, string artist = null, string charter = null)
         {
             if (string.IsNullOrWhiteSpace(chartName))
             {
@@ -20,7 +20,7 @@ namespace MDEN.Managers
 
             try
             {
-                var uri = BuildGlobalSearchUri(chartName, chartKey, difficulty);
+                var uri = BuildGlobalSearchUri(chartName, chartKey, difficulty, artist, charter);
                 using var client = new NamedPipeClientStream(".", PipeName, PipeDirection.Out);
                 client.Connect(ConnectTimeoutMs);
                 using var writer = new StreamWriter(client, new UTF8Encoding(false));
@@ -35,7 +35,7 @@ namespace MDEN.Managers
             }
         }
 
-        private static string BuildGlobalSearchUri(string chartName, string chartKey, int difficulty)
+        private static string BuildGlobalSearchUri(string chartName, string chartKey, int difficulty, string artist, string charter)
         {
             var parts = new List<string>
             {
@@ -50,6 +50,16 @@ namespace MDEN.Managers
             if (difficulty > 0)
             {
                 parts.Add("difficulty=" + difficulty);
+            }
+
+            if (!string.IsNullOrWhiteSpace(artist))
+            {
+                parts.Add("artist=" + Uri.EscapeDataString(artist));
+            }
+
+            if (!string.IsNullOrWhiteSpace(charter))
+            {
+                parts.Add("charter=" + Uri.EscapeDataString(charter));
             }
 
             return "musedashtool://global-search?" + string.Join("&", parts);

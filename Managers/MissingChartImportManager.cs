@@ -14,15 +14,15 @@ namespace MDEN.Managers
     {
         private static readonly SemaphoreSlim ImportLock = new SemaphoreSlim(1, 1);
 
-        internal static void HandleMissingChartClick(string chartName, string chartKey = null, int difficulty = 0)
+        internal static void HandleMissingChartClick(string chartName, string chartKey = null, int difficulty = 0, string artist = null, string charter = null)
         {
             chartName = CleanChartName(chartName);
             if (string.IsNullOrWhiteSpace(chartName)) return;
 
-            System.Threading.Tasks.Task.Run(() => FindAndActivate(chartName, chartKey, difficulty));
+            System.Threading.Tasks.Task.Run(() => FindAndActivate(chartName, chartKey, difficulty, artist, charter));
         }
 
-        private static void FindAndActivate(string chartName, string chartKey, int difficulty)
+        private static void FindAndActivate(string chartName, string chartKey, int difficulty, string artist, string charter)
         {
             var locked = false;
             try
@@ -35,7 +35,7 @@ namespace MDEN.Managers
                 if (match.Status != MissingChartMatchStatus.Unique)
                 {
                     LogMatchFailure(chartName, match);
-                    if (TryHandleMuseDashToolSearch(chartName, chartKey, difficulty))
+                    if (TryHandleMuseDashToolSearch(chartName, chartKey, difficulty, artist, charter))
                     {
                         return;
                     }
@@ -57,14 +57,14 @@ namespace MDEN.Managers
             }
         }
 
-        private static bool TryHandleMuseDashToolSearch(string chartName, string chartKey, int difficulty)
+        private static bool TryHandleMuseDashToolSearch(string chartName, string chartKey, int difficulty, string artist, string charter)
         {
             if (!IsCustomChartKey(chartKey))
             {
                 return false;
             }
 
-            if (MuseDashToolBridge.OpenGlobalSearch(chartName, chartKey, difficulty))
+            if (MuseDashToolBridge.OpenGlobalSearch(chartName, chartKey, difficulty, artist, charter))
             {
                 MainThreadDispatcher.Enqueue(() => UiNotificationManager.RequestToast(I18nManager.T("missing_chart.musedashtool_opened")));
                 return true;
