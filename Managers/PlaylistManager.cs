@@ -149,10 +149,7 @@ namespace MDEN.Managers
             if (IsRookieReadySelectionActive())
             {
                 return !IsLocalPlayerReady() &&
-                       ChartManager.IsCurrentSelectedChart(PlaylistManager.GetCurrentPlaylistEntry()) &&
-                       ChartManager.IsCurrentSelectionPlayableDifficulty(
-                           ChartManager.CurrentSelectionMusicInfo,
-                           ChartManager.CurrentDifficulty);
+                       ChartManager.TryGetCurrentReadyDifficultyForEntry(GetCurrentPlaylistEntry(), out _);
             }
 
             if (!CanChangePlaylist) return false;

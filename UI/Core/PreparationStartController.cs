@@ -113,9 +113,7 @@ namespace MDEN.UI.Core
                 return;
             }
 
-            var difficulty = ChartManager.CurrentDifficulty;
-            if (!MDEN.Protocol.Rules.DifficultyDisplayRules.IsKnownDifficulty(difficulty) ||
-                !ChartManager.IsCurrentSelectionPlayableDifficulty(ChartManager.CurrentSelectionMusicInfo, difficulty))
+            if (!ChartManager.TryGetCurrentReadyDifficultyForEntry(entry, out var difficulty))
             {
                 ShowText.ShowInfo(I18nManager.T("prepare.valid_difficulty"));
                 return;

@@ -25,6 +25,7 @@ namespace MDEN.Bootstrap
             SettlementManager.Init();
             MainThreadWatchdog.Initialize();
             UiNotificationController.Initialize();
+            MuseDashToolStatusListener.Initialize();
             BattleHudController.Initialize();
             SettlementHudController.Initialize();
             RoomHudController.Initialize();
@@ -82,6 +83,7 @@ namespace MDEN.Bootstrap
             RoomHudController.SetBattleSceneActive(false);
             BattleHudController.Deinitialize();
             SettlementHudController.Deinitialize();
+            MuseDashToolStatusListener.Shutdown();
             UiNotificationController.Deinitialize();
             RoomHudController.Deinitialize();
             MainThreadWatchdog.Shutdown();

@@ -55,6 +55,18 @@ namespace MDEN.Managers
                    nativeDifficulty == GetHiddenTriggerDifficulty(checkUid, specialSongManager);
         }
 
+        public static bool HasHiddenDifficulty(MusicInfo musicInfo)
+        {
+            if (musicInfo == null) return false;
+
+            var specialSongManager = Singleton<SpecialSongManager>.instance;
+            if (specialSongManager?.m_HideBmsInfos == null) return false;
+
+            var checkUid = ChartManager.GetHiddenCheckUid(musicInfo);
+            return !string.IsNullOrEmpty(checkUid) &&
+                   specialSongManager.m_HideBmsInfos.ContainsKey(checkUid);
+        }
+
         public static bool IsHiddenInvoked(MusicInfo musicInfo)
         {
             if (musicInfo == null) return false;

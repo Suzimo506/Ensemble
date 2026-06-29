@@ -152,6 +152,26 @@ namespace MDEN.Managers
             return IsNativeDifficultyAvailable(musicInfo, difficulty);
         }
 
+        public static bool TryGetCurrentReadyDifficultyForEntry(PlaylistEntryViewModel entry, out int difficulty)
+        {
+            difficulty = 0;
+            if (entry == null || !IsCurrentSelectedChart(entry)) return false;
+
+            difficulty = CurrentDifficulty;
+            return IsEntryDifficultyPlayable(entry, difficulty) &&
+                   IsCurrentSelectionPlayableDifficulty(CurrentSelectionMusicInfo, difficulty);
+        }
+
+        public static bool IsEntryDifficultyPlayable(PlaylistEntryViewModel entry, int difficulty)
+        {
+            return entry != null && IsEntryDifficultyPlayable(entry.ChartKey, difficulty);
+        }
+
+        public static bool IsEntryDifficultyPlayable(string chartKey, int difficulty)
+        {
+            return IsMusicInfoDifficultyPlayable(GetMusicInfo(chartKey), difficulty);
+        }
+
         public static PlaylistEntryViewModel ParseEntry(string entry)
         {
             if (string.IsNullOrWhiteSpace(entry)) return null;
@@ -202,6 +222,13 @@ namespace MDEN.Managers
 
             var musicInfo = CurrentMusicInfo;
             var selectedUid = GlobalDataBase.dbMusicTag?.pnlSelectMusicUid;
+            if (SpecialChartVariantResolver.IsKnownVariantPair(entry.ChartKey) ||
+                SpecialChartVariantResolver.IsKnownVariantPair(selectedUid))
+            {
+                return selectedUid == entry.ChartKey &&
+                       IsSpecialUnlockSelection(musicInfo, selectedUid);
+            }
+
             if (selectedUid == entry.ChartKey && IsSpecialUnlockSelection(musicInfo, selectedUid))
             {
                 return true;
@@ -227,6 +254,22 @@ namespace MDEN.Managers
             var currentUid = musicInfo.uid;
             return currentUid == selectedUid ||
                    SpecialChartVariantResolver.GetBaseUid(currentUid) == SpecialChartVariantResolver.GetBaseUid(selectedUid);
+        }
+
+        private static bool IsMusicInfoDifficultyPlayable(MusicInfo musicInfo, int difficulty)
+        {
+            if (!DifficultyDisplayRules.IsKnownDifficulty(difficulty)) return false;
+            if (difficulty == DifficultyDisplayRules.Spell)
+            {
+                return SpecialDifficultyController.HasSpecialDifficulty(musicInfo);
+            }
+
+            if (difficulty == DifficultyDisplayRules.Hidden)
+            {
+                return HiddenDifficultyController.HasHiddenDifficulty(musicInfo);
+            }
+
+            return IsNativeDifficultyAvailable(musicInfo, difficulty);
         }
 
         private static bool IsNativeDifficultyAvailable(MusicInfo musicInfo, int difficulty)
@@ -607,6 +650,7 @@ namespace MDEN.Managers
                 Interlocked.Exchange(ref _albumLoadedRefreshQueued, 0);
                 RebuildCustomAlbumIndex();
                 PlayerManager.SyncChartStateFireAndForget();
+                MDEN.UI.Core.ChartPreviewController.RetryCurrentPreviewAfterChartRefresh();
             });
         }
 

@@ -38,6 +38,23 @@ namespace MDEN.UI.Core
             PreviewCurrentLockedLobby(lobby);
         }
 
+        public static void RetryCurrentPreviewAfterChartRefresh()
+        {
+            var lobby = LobbyManager.CurrentLobby;
+            if (lobby == null || !LobbyManager.IsInLobby || !lobby.Locked || lobby.IsPlaying)
+            {
+                return;
+            }
+
+            var entry = PlaylistManager.GetCurrentPlaylistEntry();
+            if (entry == null || string.IsNullOrWhiteSpace(entry.Entry))
+            {
+                return;
+            }
+
+            SchedulePreviewRetry(lobby.Id, entry.Entry, PreviewRetryCount);
+        }
+
         public static void HoldPreviewUntilResultPanelCloses()
         {
             _resultPreviewHeld = true;

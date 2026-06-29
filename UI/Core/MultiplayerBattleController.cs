@@ -194,6 +194,17 @@ namespace MDEN.UI.Core
                     return true;
                 }
 
+                if (!Managers.ChartManager.IsEntryDifficultyPlayable(entry, selectedDifficulty))
+                {
+                    ReportStartFailure(
+                        Managers.LobbyManager.CurrentLobby?.Id ?? 0,
+                        Managers.LobbyManager.CurrentLobby?.CurrentBattleId,
+                        entryText,
+                        "DifficultyUnavailable",
+                        I18nManager.T("prepare.valid_difficulty"));
+                    return true;
+                }
+
                 entry.Difficulty = selectedDifficulty;
             }
 
@@ -244,15 +255,9 @@ namespace MDEN.UI.Core
         {
             if (entry == null) return 0;
 
-            if (Managers.ChartManager.IsCurrentSelectedChart(entry))
+            if (Managers.ChartManager.TryGetCurrentReadyDifficultyForEntry(entry, out var currentDifficulty))
             {
-                var currentDifficulty = Managers.ChartManager.CurrentDifficulty;
-                if (Managers.ChartManager.IsCurrentSelectionPlayableDifficulty(
-                    Managers.ChartManager.CurrentSelectionMusicInfo,
-                    currentDifficulty))
-                {
-                    return currentDifficulty;
-                }
+                return currentDifficulty;
             }
 
             return entry.Difficulty;

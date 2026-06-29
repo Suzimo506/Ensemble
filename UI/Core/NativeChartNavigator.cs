@@ -31,9 +31,9 @@ namespace MDEN.UI.Core
             if (musicInfo == null || string.IsNullOrEmpty(chartKey)) return;
 
             var navigationUid = ResolveNavigationUid(chartKey, musicInfo);
-            NativeChartSelectionSync.Sync(musicInfo, difficulty, navigationUid);
+            NativeChartSelectionSync.Sync(musicInfo, difficulty, chartKey);
             JumpToChart(navigationUid);
-            NativeChartSelectionSync.Sync(musicInfo, difficulty, navigationUid);
+            NativeChartSelectionSync.Sync(musicInfo, difficulty, chartKey);
         }
 
         public static void JumpToChart(string uid)
