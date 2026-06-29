@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using MDEN.Network;
 using MDEN.Protocol.Messages.System;
@@ -10,10 +11,15 @@ namespace MDEN.Managers
     {
         private static readonly List<ApiServerEntry> FallbackOfficialServers = new List<ApiServerEntry>
         {
+            new ApiServerEntry { Id = "fallback-chengdu", Name = "成都", Address = "42.193.20.197:10423" },
             new ApiServerEntry { Id = "fallback-shanghai", Name = "上海", Address = "md.atri.wor1d:10423" },
             new ApiServerEntry { Id = "fallback-shandong", Name = "山东", Address = "mdcn.xmjjs.top:50160" },
             new ApiServerEntry { Id = "fallback-hongkong", Name = "香港", Address = "mdhk.xmjjs.top:10423" },
             new ApiServerEntry { Id = "fallback-hubei", Name = "湖北", Address = "mdcn2.xmjjs.top:31498" }
+        };
+        private static readonly List<ApiServerEntry> PinnedOfficialServers = new List<ApiServerEntry>
+        {
+            new ApiServerEntry { Id = "pinned-chengdu", Name = "成都", Address = "42.193.20.197:10423" }
         };
 
         private static List<ApiServerEntry> _officialServerDataCache;
@@ -34,7 +40,7 @@ namespace MDEN.Managers
                 }
                 else
                 {
-                    _officialServerDataCache = fetchedServers;
+                    _officialServerDataCache = MergeWithPinnedOfficialServers(fetchedServers);
                     IsUsingFallbackOfficialServers = false;
                 }
 
@@ -59,6 +65,26 @@ namespace MDEN.Managers
         private static List<ApiServerEntry> GetFallbackOfficialServers()
         {
             return new List<ApiServerEntry>(FallbackOfficialServers);
+        }
+
+        private static List<ApiServerEntry> MergeWithPinnedOfficialServers(List<ApiServerEntry> servers)
+        {
+            var merged = servers == null ? new List<ApiServerEntry>() : new List<ApiServerEntry>(servers);
+            var addresses = new HashSet<string>(
+                merged
+                    .Where(server => !string.IsNullOrWhiteSpace(server?.Address))
+                    .Select(server => server.Address),
+                System.StringComparer.OrdinalIgnoreCase);
+
+            foreach (var pinnedServer in PinnedOfficialServers)
+            {
+                if (addresses.Add(pinnedServer.Address))
+                {
+                    merged.Add(pinnedServer);
+                }
+            }
+
+            return merged;
         }
     }
 }

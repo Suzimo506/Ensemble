@@ -1019,6 +1019,12 @@ namespace MDEN.UI.Displays
             if (string.IsNullOrWhiteSpace(chartName)) return string.Empty;
 
             var value = Regex.Replace(DecodeEntryPart(chartName), "<.*?>", string.Empty);
+            var metadataIndex = value.IndexOf("#__mden_uri__", StringComparison.Ordinal);
+            if (metadataIndex >= 0)
+            {
+                value = value.Substring(0, metadataIndex);
+            }
+
             value = Regex.Replace(value, @"^\s*([【\[].*?[\]】]\s*)+", string.Empty);
             return value.Trim();
         }

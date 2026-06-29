@@ -189,7 +189,7 @@ namespace MDEN.Managers
                 };
             }
 
-            var chartName = parts.Length > 3 ? DecodeEntryPart(parts[3]) : null;
+            var chartName = parts.Length > 3 ? CleanEntryChartName(DecodeEntryPart(parts[3])) : null;
             var parsed = new PlaylistEntryViewModel
             {
                 Entry = entry,
@@ -600,6 +600,16 @@ namespace MDEN.Managers
             {
                 return value;
             }
+        }
+
+        private static string CleanEntryChartName(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value)) return value;
+
+            var metadataIndex = value.IndexOf("#__mden_uri__", StringComparison.Ordinal);
+            return metadataIndex >= 0
+                ? value.Substring(0, metadataIndex).TrimEnd()
+                : value;
         }
 
         private static string[] SplitEntry(string entry)
