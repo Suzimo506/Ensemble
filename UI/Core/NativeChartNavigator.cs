@@ -3,6 +3,8 @@ using Il2Cpp;
 using Il2CppArcadeController.UI.Panel.PnlHome;
 using Il2CppAssets.Scripts.Database;
 using Il2CppAssets.Scripts.UI.Panels;
+using MDEN.Managers;
+using MDEN.Protocol.Rules;
 using MelonLoader;
 using UnityEngine;
 using UnityEngine.UI;
@@ -28,9 +30,10 @@ namespace MDEN.UI.Core
         {
             if (musicInfo == null || string.IsNullOrEmpty(chartKey)) return;
 
-            NativeChartSelectionSync.Sync(musicInfo, difficulty, chartKey);
-            JumpToChart(chartKey);
-            NativeChartSelectionSync.Sync(musicInfo, difficulty, chartKey);
+            var navigationUid = ResolveNavigationUid(chartKey, musicInfo);
+            NativeChartSelectionSync.Sync(musicInfo, difficulty, navigationUid);
+            JumpToChart(navigationUid);
+            NativeChartSelectionSync.Sync(musicInfo, difficulty, navigationUid);
         }
 
         public static void JumpToChart(string uid)
@@ -66,7 +69,7 @@ namespace MDEN.UI.Core
                     return;
                 }
 
-                stage?.SelectAllTagAndJumpToAssginIndex(uid);
+                stage?.SelectAllTagAndJumpToAssginIndex(SpecialChartVariantResolver.GetBaseUid(uid) ?? uid);
             }
             catch (System.Exception ex)
             {
@@ -112,6 +115,13 @@ namespace MDEN.UI.Core
             dbMusicTag.curSelectedMusicIdx = targetIndex;
             stage.musicFancyScrollView?.ScrollToDataIndex(targetIndex, 0f, true);
             return true;
+        }
+
+        private static string ResolveNavigationUid(string chartKey, MusicInfo musicInfo)
+        {
+            return ChartSelectionRules.IsCustomChartKey(chartKey) && IsCustomAlbumUid(musicInfo?.uid)
+                ? musicInfo.uid
+                : chartKey;
         }
 
         private static bool IsCustomAlbumUid(string uid)

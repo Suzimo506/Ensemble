@@ -161,11 +161,12 @@ namespace MDEN.UI.Windows
 
                 var displayData = new List<Tuple<string, string>>();
                 var plainNames = new List<string>();
+                var usingFallbackNodes = ServerManager.IsUsingFallbackOfficialServers;
                 foreach (var server in servers)
                 {
                     var info = await ServerManager.PingServerAsync(server.Address);
                     string displayName = NormalizeServerDisplayName(server.Name);
-                    string desc = BuildServerStatsDescription(info);
+                    string desc = BuildServerStatsDescription(info, usingFallbackNodes, server.Address);
 
                     if (info != null && string.IsNullOrWhiteSpace(displayName))
                     {
@@ -268,10 +269,32 @@ namespace MDEN.UI.Windows
 
         private static string BuildServerStatsDescription(ServerInfoResponse info)
         {
-            if (info == null) return I18nManager.T("server.offline");
+            return BuildServerStatsDescription(info, false, null);
+        }
 
-            var version = string.IsNullOrWhiteSpace(info.Version) ? I18nManager.T("common.unknown") : info.Version;
-            return I18nManager.Tf("server.stats", Constants.ColorBlue, version, Constants.ColorYellow, info.PlayerCount, Constants.ColorCyan, info.RoomCount);
+        private static string BuildServerStatsDescription(ServerInfoResponse info, bool isFallbackNode, string address)
+        {
+            var status = info == null
+                ? I18nManager.T("server.offline")
+                : I18nManager.Tf(
+                    "server.stats",
+                    Constants.ColorBlue,
+                    string.IsNullOrWhiteSpace(info.Version) ? I18nManager.T("common.unknown") : info.Version,
+                    Constants.ColorYellow,
+                    info.PlayerCount,
+                    Constants.ColorCyan,
+                    info.RoomCount);
+
+            if (!isFallbackNode) return status;
+
+            return status + "\n\n" + BuildFallbackNodeDescription(address);
+        }
+
+        private static string BuildFallbackNodeDescription(string address)
+        {
+            return "未获取到在线节点列表，当前显示模组内置兜底节点。\n"
+                   + "这些节点可能不是最新列表；如果连接失败，可以点击刷新重新获取。\n"
+                   + $"节点地址: <color={Constants.ColorBlue}>{EscapeRichText(address)}</color>";
         }
 
         private static string BuildCustomServerDescription(CustomServerInfo server)

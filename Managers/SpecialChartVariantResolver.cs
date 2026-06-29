@@ -9,7 +9,8 @@ namespace MDEN.Managers
     {
         public static bool IsKnownVariantPair(string chartKey)
         {
-            return GetBaseUid(chartKey) != null;
+            return GetKnownBaseUid(chartKey) != null ||
+                   TryGetSpecialUnlockPair(chartKey, out _);
         }
 
         public static bool IsHiddenUnlockSong(string chartKey)
@@ -23,6 +24,18 @@ namespace MDEN.Managers
         }
 
         public static string GetBaseUid(string chartKey)
+        {
+            if (TryGetSpecialUnlockPair(chartKey, out var pair) &&
+                !string.IsNullOrEmpty(pair.BaseUid) &&
+                (chartKey == pair.BaseUid || chartKey == pair.HiddenUid))
+            {
+                return pair.BaseUid;
+            }
+
+            return GetKnownBaseUid(chartKey);
+        }
+
+        private static string GetKnownBaseUid(string chartKey)
         {
             return chartKey switch
             {
@@ -68,7 +81,7 @@ namespace MDEN.Managers
         private static bool TryGetSpecialUnlockPair(string chartKey, out SpecialUnlockPair pair)
         {
             pair = null;
-            if (!IsKnownVariantPair(chartKey)) return false;
+            if (string.IsNullOrEmpty(chartKey)) return false;
 
             try
             {
