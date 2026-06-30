@@ -7,6 +7,7 @@ namespace MDEN.Protocol.Messages.Auth
         public bool IsReconnect { get; set; }
         public string ClientVersion { get; set; }
         public int ProtocolVersion { get; set; }
+        public string[] Capabilities { get; set; }
     }
 
     public class LoginResponse

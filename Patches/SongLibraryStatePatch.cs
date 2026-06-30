@@ -36,7 +36,8 @@ namespace MDEN.Patches
 
             private static void Postfix()
             {
-                PlayerManager.SyncChartStateFireAndForget();
+                PlayerManager.InvalidateChartStateCache();
+                PlayerManager.SyncChartStateFireAndForget(true);
             }
         }
 

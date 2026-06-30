@@ -671,7 +671,8 @@ namespace MDEN.Managers
             {
                 Interlocked.Exchange(ref _albumLoadedRefreshQueued, 0);
                 RebuildCustomAlbumIndex();
-                PlayerManager.SyncChartStateFireAndForget();
+                PlayerManager.InvalidateChartStateCache();
+                PlayerManager.SyncChartStateFireAndForget(true);
                 MDEN.UI.Core.ChartPreviewController.RetryCurrentPreviewAfterChartRefresh();
             });
         }

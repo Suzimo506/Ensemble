@@ -93,11 +93,12 @@ namespace MDEN.UI.Core
         public static bool IsReady => IsHomeReady && IsNavigationReady;
         public static bool IsHomeVisible => GetHomeVisible();
         public static bool IsRoomInfoVisible => GetRoomInfoVisible();
+        private static bool IsVisible => _frame != null && _frame.activeSelf;
         public static void InvalidatePlayerColors()
         {
             PlayerColorCache.Clear();
             PendingColorRequests.Clear();
-            Refresh(LobbyManager.CurrentLobby);
+            Refresh(LobbyManager.CurrentLobby, IsVisible);
         }
 
         private static readonly string[] HiddenObjectPaths =
@@ -106,11 +107,17 @@ namespace MDEN.UI.Core
             "UI/Standerd/PnlHome/MuseShow/BtnInteraction"
         };
 
-        public static void Refresh(LobbySyncPush lobby)
+        public static void Refresh(LobbySyncPush lobby, bool chatVisible)
         {
             if (lobby == null)
             {
                 Destroy();
+                return;
+            }
+
+            if (!chatVisible)
+            {
+                Hide();
                 return;
             }
 
@@ -140,12 +147,12 @@ namespace MDEN.UI.Core
             if (_frame != null) _frame.SetActive(false);
         }
 
-        public static bool UpdateVisibility()
+        public static bool UpdateVisibility(bool chatVisible)
         {
             var lobby = LobbyManager.CurrentLobby;
             var homeVisible = IsHomeVisible;
             var nativeSettingsVisible = IsNativeSettingsVisible();
-            var visible = LobbyManager.IsInLobby && ShouldShowRoomInfo(lobby, homeVisible, nativeSettingsVisible);
+            var visible = chatVisible && LobbyManager.IsInLobby && ShouldShowRoomInfo(lobby, homeVisible, nativeSettingsVisible);
             if (visible)
             {
                 EnsureFrame();
@@ -865,7 +872,7 @@ namespace MDEN.UI.Core
             }
 
             PlayerColorCache[uid] = resolvedColor;
-            MainThreadDispatcher.Enqueue(() => Refresh(LobbyManager.CurrentLobby));
+            MainThreadDispatcher.Enqueue(() => Refresh(LobbyManager.CurrentLobby, IsVisible));
         }
 
         private static string NormalizeHexColor(string color)

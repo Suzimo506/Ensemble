@@ -33,6 +33,7 @@ namespace MDEN.UI.Displays
             || _sendInProgress
             || Time.frameCount <= _suppressGameInputUntilFrame;
         public bool IsCreated => _frame != null;
+        public bool IsVisible => _frame != null && _frame.activeInHierarchy;
         public void CreateEmpty() => Initialize();
 
         public void InvalidatePlayerColors()

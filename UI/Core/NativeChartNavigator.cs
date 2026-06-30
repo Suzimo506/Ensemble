@@ -13,6 +13,8 @@ namespace MDEN.UI.Core
 {
     internal static class NativeChartNavigator
     {
+        private const double SlowNavigatorStepWarningMs = 250.0;
+
         public static void JumpToChart(MusicInfo musicInfo)
         {
             if (musicInfo == null || string.IsNullOrEmpty(musicInfo.uid)) return;
@@ -44,24 +46,27 @@ namespace MDEN.UI.Core
             {
                 NativeChartSelectionSync.SyncDataHelperSelectedUid(uid);
 
-                var pnlMenu = GameObject.Find("UI/Standerd/PnlMenu")?.GetComponent<PnlMenu>();
-                if (pnlMenu != null && pnlMenu.gameObject.active)
+                MeasureSlow("NativeChartNavigator.OpenStage", () =>
                 {
-                    pnlMenu.backBtn.onClick.Invoke();
-                }
+                    var pnlMenu = GameObject.Find("UI/Standerd/PnlMenu")?.GetComponent<PnlMenu>();
+                    if (pnlMenu != null && pnlMenu.gameObject.active)
+                    {
+                        pnlMenu.backBtn.onClick.Invoke();
+                    }
 
-                var pageHome = GameObject.Find("UI/Standerd/PnlHome")?.GetComponent<PageHome>();
-                if (pageHome != null && pageHome.gameObject.active)
-                {
-                    pageHome.m_BtnEnter.onClick.Invoke();
-                }
+                    var pageHome = GameObject.Find("UI/Standerd/PnlHome")?.GetComponent<PageHome>();
+                    if (pageHome != null && pageHome.gameObject.active)
+                    {
+                        pageHome.m_BtnEnter.onClick.Invoke();
+                    }
 
-                var pnlPreparation = GameObject.Find("UI/Standerd/PnlPreparation");
-                if (pnlPreparation != null && pnlPreparation.active)
-                {
-                    var back = GameObject.Find("UI/Standerd/PnlNavigation/Top/BtnNavigationBack")?.GetComponent<Button>();
-                    back?.onClick.Invoke();
-                }
+                    var pnlPreparation = GameObject.Find("UI/Standerd/PnlPreparation");
+                    if (pnlPreparation != null && pnlPreparation.active)
+                    {
+                        var back = GameObject.Find("UI/Standerd/PnlNavigation/Top/BtnNavigationBack")?.GetComponent<Button>();
+                        back?.onClick.Invoke();
+                    }
+                });
 
                 var stage = GameObject.Find("UI/Standerd/PnlStage")?.GetComponent<PnlStage>();
                 if (TryJumpToCustomAlbumChart(stage, uid))
@@ -69,7 +74,9 @@ namespace MDEN.UI.Core
                     return;
                 }
 
-                stage?.SelectAllTagAndJumpToAssginIndex(SpecialChartVariantResolver.GetBaseUid(uid) ?? uid);
+                MeasureSlow(
+                    "NativeChartNavigator.SelectStageChart",
+                    () => stage?.SelectAllTagAndJumpToAssginIndex(SpecialChartVariantResolver.GetBaseUid(uid) ?? uid));
             }
             catch (System.Exception ex)
             {
@@ -99,7 +106,7 @@ namespace MDEN.UI.Core
             }
 
             dbMusicTag.selectedTagIndex = AlbumManager.Uid;
-            dbMusicTag.RefreshShowMusicUids(customUids);
+            MeasureSlow("NativeChartNavigator.RefreshCustomShowMusicUids", () => dbMusicTag.RefreshShowMusicUids(customUids));
 
             var showList = dbMusicTag.stageShowMusicList;
             if (!TryFindIndex(showList, uid, out var targetIndex))
@@ -111,9 +118,9 @@ namespace MDEN.UI.Core
             dbMusicTag.pnlSelectMusicUid = uid;
             dbMusicTag.m_CurSelectedMusicInfo = musicInfo;
             NativeChartSelectionSync.SyncDataHelperSelectedUid(uid);
-            dbMusicTag.SetSelectedMusic(musicInfo);
+            MeasureSlow("NativeChartNavigator.SetSelectedCustomMusic", () => dbMusicTag.SetSelectedMusic(musicInfo));
             dbMusicTag.curSelectedMusicIdx = targetIndex;
-            stage.musicFancyScrollView?.ScrollToDataIndex(targetIndex, 0f, true);
+            MeasureSlow("NativeChartNavigator.ScrollToCustomChart", () => stage.musicFancyScrollView?.ScrollToDataIndex(targetIndex, 0f, true));
             return true;
         }
 
@@ -162,6 +169,23 @@ namespace MDEN.UI.Core
             }
 
             return false;
+        }
+
+        private static void MeasureSlow(string name, System.Action action)
+        {
+            var startedAt = System.Diagnostics.Stopwatch.StartNew();
+            try
+            {
+                action();
+            }
+            finally
+            {
+                startedAt.Stop();
+                if (startedAt.Elapsed.TotalMilliseconds >= SlowNavigatorStepWarningMs)
+                {
+                    MDEN.Managers.ClientLogManager.SlowOperation($"[MDEN.Perf] {name} took {startedAt.Elapsed.TotalMilliseconds:F0}ms");
+                }
+            }
         }
     }
 }

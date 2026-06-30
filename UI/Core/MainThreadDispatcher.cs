@@ -80,8 +80,9 @@ namespace MDEN.UI.Core
         internal static void ProcessQueue()
         {
             var processed = 0;
+            var queuedAtFrameStart = _executionQueue.Count;
             var startedAt = System.Diagnostics.Stopwatch.GetTimestamp();
-            while (_executionQueue.TryDequeue(out var queued))
+            while (processed < queuedAtFrameStart && _executionQueue.TryDequeue(out var queued))
             {
                 try
                 {

@@ -23,7 +23,7 @@ namespace MDEN.UI.Core
             {
                 DestroyRootFallback();
             }
-            else if (FindRoot() != null)
+            else if (FindRootSlow() != null)
             {
                 DestroyRootFallback();
             }
@@ -33,13 +33,12 @@ namespace MDEN.UI.Core
 
         public static bool IsOpen()
         {
-            var rootExists = FindRoot() != null;
             if (TryReadIsOpenByApi(out var isOpen))
             {
-                return isOpen || rootExists;
+                return isOpen || FindRootFast() != null;
             }
 
-            return rootExists;
+            return FindRootFast() != null;
         }
 
         private static bool TryReadIsOpenByApi(out bool isOpen)
@@ -106,16 +105,21 @@ namespace MDEN.UI.Core
 
         private static void DestroyRootFallback()
         {
-            var root = FindRoot();
+            var root = FindRootSlow();
             if (root == null) return;
 
             UnityEngine.Object.Destroy(root);
             NativeInputBlocker.ClearAll();
         }
 
-        private static GameObject FindRoot()
+        private static GameObject FindRootFast()
         {
-            var activeRoot = GameObject.Find(RootName);
+            return GameObject.Find(RootName);
+        }
+
+        private static GameObject FindRootSlow()
+        {
+            var activeRoot = FindRootFast();
             if (activeRoot != null) return activeRoot;
 
             var objects = UnityEngine.Resources.FindObjectsOfTypeAll<GameObject>();

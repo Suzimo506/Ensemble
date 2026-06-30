@@ -12,12 +12,12 @@ namespace MDEN.UI.Core
         private const int StartRetryCount = 60;
         private const int StartRetryDelayFrames = 3;
         private const int StartNavigationRetryInterval = 10;
+        private const double SlowBattleStartStepWarningMs = 250.0;
         private static int _startedLobbyId;
         private static string _startedBattleId;
         private static string _startedBattleEntry;
         private static string _navigatedBattleId;
         private static int _startGeneration;
-        private static readonly System.Collections.Generic.HashSet<string> BattleStartSyncs = new System.Collections.Generic.HashSet<string>();
         private static readonly System.Collections.Generic.HashSet<string> MissingChartSyncs = new System.Collections.Generic.HashSet<string>();
 
         public static void OnLobbyChanged()
@@ -88,7 +88,6 @@ namespace MDEN.UI.Core
             _startedBattleId = null;
             _startedBattleEntry = null;
             _navigatedBattleId = null;
-            BattleStartSyncs.Clear();
             MissingChartSyncs.Clear();
         }
 
@@ -208,20 +207,18 @@ namespace MDEN.UI.Core
                 entry.Difficulty = selectedDifficulty;
             }
 
-            var syncKey = $"{battleId}:{entry.ChartKey}";
-            if (BattleStartSyncs.Add(syncKey))
+            if (ShouldNavigateToBattleChart(battleId, retriesRemaining))
             {
-                Managers.PlayerManager.SyncChartStateFireAndForget();
+                MeasureSlow(
+                    "BattleStart.JumpToChart",
+                    () => NativeChartNavigator.JumpToChart(entry.ChartKey, musicInfo, entry.Difficulty));
+                _navigatedBattleId = battleId;
                 return false;
             }
 
-            if (ShouldNavigateToBattleChart(battleId, retriesRemaining))
-            {
-                NativeChartNavigator.JumpToChart(entry.ChartKey, musicInfo, entry.Difficulty);
-                _navigatedBattleId = battleId;
-            }
-
-            SyncSelectedChart(entry.ChartKey, musicInfo, entry.Difficulty);
+            MeasureSlow(
+                "BattleStart.SyncSelectedChart",
+                () => SyncSelectedChart(entry.ChartKey, musicInfo, entry.Difficulty));
 
             if (!IsNativeChartSelectionReady(entry.ChartKey, musicInfo))
             {
@@ -241,7 +238,9 @@ namespace MDEN.UI.Core
             }
 
             Managers.BattleManager.MarkMultiplayerBattleStarting();
-            BattleHelper.GameBattleStart(new Il2CppSystem.Object());
+            MeasureSlow(
+                "BattleStart.GameBattleStart",
+                () => BattleHelper.GameBattleStart(new Il2CppSystem.Object()));
             return true;
         }
 
@@ -327,6 +326,23 @@ namespace MDEN.UI.Core
             Managers.BattleManager.ReportBattleStartFailed(lobbyId, battleId, entryText, reasonCode, reason);
         }
 
+        private static void MeasureSlow(string name, System.Action action)
+        {
+            var startedAt = System.Diagnostics.Stopwatch.StartNew();
+            try
+            {
+                action();
+            }
+            finally
+            {
+                startedAt.Stop();
+                if (startedAt.Elapsed.TotalMilliseconds >= SlowBattleStartStepWarningMs)
+                {
+                    Managers.ClientLogManager.SlowOperation($"[MDEN.Perf] {name} took {startedAt.Elapsed.TotalMilliseconds:F0}ms");
+                }
+            }
+        }
+
         private static async System.Threading.Tasks.Task SyncMissingChartThenReportAsync(
             int lobbyId,
             string battleId,
@@ -335,7 +351,7 @@ namespace MDEN.UI.Core
         {
             try
             {
-                await Managers.PlayerManager.SyncChartStateAsync();
+                await Managers.PlayerManager.SyncChartStateAsync(true);
             }
             catch (System.Exception ex)
             {

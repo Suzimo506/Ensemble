@@ -96,7 +96,8 @@ namespace MDEN.Managers
                     return;
                 }
 
-                PlayerManager.SyncChartStateFireAndForget();
+                PlayerManager.InvalidateChartStateCache();
+                PlayerManager.SyncChartStateFireAndForget(true);
                 MissingChartSearchNavigator.ShowActivated(entry.Info.Name);
             }
             catch (Exception ex)

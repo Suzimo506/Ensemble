@@ -28,6 +28,15 @@ namespace MDEN.Protocol.Messages.Battle
         public BattlePlayerEntry[] Players { get; set; }
     }
 
+    /// <summary>
+    /// 服务端广播给房间内所有人的对战增量数据 (Push)
+    /// </summary>
+    public class BattleDataDeltaPushMsg
+    {
+        public string BattleId { get; set; }
+        public BattlePlayerEntry[] Players { get; set; }
+    }
+
     public class BattleStartFailedNotify
     {
         public int LobbyId { get; set; }

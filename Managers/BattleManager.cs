@@ -15,7 +15,9 @@ namespace MDEN.Managers
 {
     public static class BattleManager
     {
-        private const int BattleUpdateIntervalMs = 200;
+        private const int SmallLobbyBattleUpdateIntervalMs = 2000;
+        private const int LargeLobbyBattleUpdateIntervalMs = 3000;
+        private const int LargeLobbyBattlePlayerThreshold = 5;
         private const int BattleReturnedRetryIntervalMs = 5000;
         private static readonly object BattleDataLock = new();
         private static readonly object BattleDataDispatchLock = new();
@@ -45,6 +47,7 @@ namespace MDEN.Managers
         public static void Init()
         {
             PushDispatcher.Instance.Register<BattleDataPushMsg>(OpCodes.BattleDataPush, OnBattleDataPush);
+            PushDispatcher.Instance.Register<BattleDataDeltaPushMsg>(OpCodes.BattleDataDeltaPush, OnBattleDataDeltaPush);
         }
 
         public static BattlePlayerEntry[] GetBattleDataSnapshot()
@@ -260,7 +263,7 @@ namespace MDEN.Managers
             while (!cancellationToken.IsCancellationRequested && IsActiveMultiplayerBattle)
             {
                 await SendCurrentAsync();
-                await Task.Delay(BattleUpdateIntervalMs, cancellationToken);
+                await Task.Delay(GetBattleUpdateIntervalMs(), cancellationToken);
             }
         }
 
@@ -434,7 +437,7 @@ namespace MDEN.Managers
                 {
                     BattleId = GetCurrentBattleId(),
                     Score = (uint)_taskStageTarget.GetScore(),
-                    Accuracy = AccuracyManager.GetCalculatedAccuracy(),
+                    Accuracy = RoundBattleAccuracy(AccuracyManager.GetCalculatedAccuracy()),
                     Perfects = (ushort)_taskStageTarget.m_PerfectResult,
                     Greats = (ushort)_taskStageTarget.m_GreatResult,
                     Earlies = (ushort)(_battleRoleAttributeComponent?.early ?? 0),
@@ -446,15 +449,43 @@ namespace MDEN.Managers
             }
         }
 
+        private static int GetBattleUpdateIntervalMs()
+        {
+            var playerCount = LobbyManager.CurrentLobby?.Players?.Length ?? 0;
+            return playerCount >= LargeLobbyBattlePlayerThreshold
+                ? LargeLobbyBattleUpdateIntervalMs
+                : SmallLobbyBattleUpdateIntervalMs;
+        }
+
+        private static float RoundBattleAccuracy(float accuracy)
+        {
+            if (float.IsNaN(accuracy) || float.IsInfinity(accuracy)) return 0f;
+            return (float)Math.Round(accuracy, 2);
+        }
+
         private static void OnBattleDataPush(BattleDataPushMsg push)
         {
+            ApplyPushedBattleData(push?.BattleId, push?.Players, replaceMissingRemote: true);
+        }
+
+        private static void OnBattleDataDeltaPush(BattleDataDeltaPushMsg push)
+        {
+            ApplyPushedBattleData(push?.BattleId, push?.Players, replaceMissingRemote: false);
+        }
+
+        private static void ApplyPushedBattleData(
+            string pushBattleId,
+            BattlePlayerEntry[] pushedPlayers,
+            bool replaceMissingRemote)
+        {
             var battleId = GetCurrentBattleId();
-            if (string.IsNullOrWhiteSpace(battleId) || push?.BattleId != battleId)
+            if (string.IsNullOrWhiteSpace(battleId) || pushBattleId != battleId)
             {
                 return;
             }
 
-            var players = push?.Players ?? Array.Empty<BattlePlayerEntry>();
+            var players = pushedPlayers ?? Array.Empty<BattlePlayerEntry>();
+            var pushedUids = replaceMissingRemote ? new HashSet<string>() : null;
             var changed = false;
             BattlePlayerEntry[] snapshot;
             lock (BattleDataLock)
@@ -462,6 +493,7 @@ namespace MDEN.Managers
                 foreach (var player in players)
                 {
                     if (player == null || string.IsNullOrWhiteSpace(player.Uid)) continue;
+                    pushedUids?.Add(player.Uid);
                     var normalizedPlayer = NormalizePushedBattleEntry(player);
                     if (!PlayerBattleData.TryGetValue(player.Uid, out var entry))
                     {
@@ -474,6 +506,26 @@ namespace MDEN.Managers
 
                     PlayerBattleData[player.Uid] = normalizedPlayer;
                     changed = true;
+                }
+
+                if (replaceMissingRemote && pushedUids != null)
+                {
+                    var localUid = PlayerManager.CurrentUid;
+                    var staleUids = new List<string>();
+                    foreach (var uid in PlayerBattleData.Keys)
+                    {
+                        if (uid == localUid) continue;
+                        if (!pushedUids.Contains(uid))
+                        {
+                            staleUids.Add(uid);
+                        }
+                    }
+
+                    foreach (var uid in staleUids)
+                    {
+                        PlayerBattleData.Remove(uid);
+                        changed = true;
+                    }
                 }
 
                 if (!changed) return;

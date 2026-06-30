@@ -16,6 +16,10 @@ namespace MDEN.Managers
     public static class PlayerManager
     {
         private const int SelectionSyncMinFrameInterval = 30;
+        private const int ChartStateSyncCacheMs = 10000;
+        private const double SlowChartStateStepWarningMs = 250.0;
+        private const double SlowChartStateSyncWarningMs = 750.0;
+        private static readonly object ChartStateSyncLock = new object();
 
         public static string CurrentUid { get; private set; }
         public static GetPlayerResponse CurrentProfile { get; private set; }
@@ -24,6 +28,8 @@ namespace MDEN.Managers
         private static GameSelectionInfo _lastSyncedFavSelection = new GameSelectionInfo(int.MinValue, int.MinValue);
         private static int _lastSelectionSyncFrame;
         private static bool _selectionSyncInProgress;
+        private static Task _chartStateSyncTask;
+        private static DateTime _lastChartStateSyncUtc;
 
         public static void SetCurrentUid(string uid)
         {
@@ -44,6 +50,7 @@ namespace MDEN.Managers
             _lastSyncedFavSelection = new GameSelectionInfo(int.MinValue, int.MinValue);
             _lastSelectionSyncFrame = 0;
             _selectionSyncInProgress = false;
+            InvalidateChartStateCache();
         }
 
         public static async Task<GetPlayerResponse> GetMyProfileAsync()
@@ -159,15 +166,77 @@ namespace MDEN.Managers
 
         public static async Task SyncChartStateAsync()
         {
-            await SyncCustomChartsAsync();
-            await SyncHiddenChartsAsync();
+            await SyncChartStateAsync(false);
+        }
+
+        public static Task SyncChartStateAsync(bool force)
+        {
+            lock (ChartStateSyncLock)
+            {
+                if (!force && IsChartStateSyncFreshUnsafe())
+                {
+                    return Task.CompletedTask;
+                }
+
+                if (_chartStateSyncTask != null && !_chartStateSyncTask.IsCompleted)
+                {
+                    return _chartStateSyncTask;
+                }
+
+                _chartStateSyncTask = SyncChartStateAsyncCore();
+                return _chartStateSyncTask;
+            }
+        }
+
+        private static async Task SyncChartStateAsyncCore()
+        {
+            var startedAt = System.Diagnostics.Stopwatch.StartNew();
+            try
+            {
+                var snapshot = await MainThreadDispatcher.InvokeAsync(CollectChartState);
+                await UpdateMyProfileAsync(new UpdatePlayerRequest
+                {
+                    Customs = snapshot.Customs,
+                    Hiddens = snapshot.Hiddens
+                });
+                lock (ChartStateSyncLock)
+                {
+                    _lastChartStateSyncUtc = DateTime.UtcNow;
+                }
+            }
+            finally
+            {
+                startedAt.Stop();
+                if (startedAt.Elapsed.TotalMilliseconds >= SlowChartStateSyncWarningMs)
+                {
+                    ClientLogManager.SlowOperation($"[MDEN.Perf] SyncChartStateAsync took {startedAt.Elapsed.TotalMilliseconds:F0}ms");
+                }
+
+                lock (ChartStateSyncLock)
+                {
+                    _chartStateSyncTask = null;
+                }
+            }
+        }
+
+        public static void InvalidateChartStateCache()
+        {
+            lock (ChartStateSyncLock)
+            {
+                _lastChartStateSyncUtc = default;
+            }
         }
 
         public static void SyncChartStateFireAndForget()
         {
+            SyncChartStateFireAndForget(false);
+        }
+
+        public static void SyncChartStateFireAndForget(bool force)
+        {
             if (!ConnectionManager.CanSendRequests || string.IsNullOrEmpty(CurrentUid)) return;
 
-            _ = SyncChartStateAsync().ContinueWith(task =>
+            _ = SyncChartStateAsync(force).ContinueWith(task =>
             {
                 if (task.IsFaulted)
                 {
@@ -361,17 +430,26 @@ namespace MDEN.Managers
 
         private static string[] CollectCustomChartMd5s()
         {
+            var startedAt = System.Diagnostics.Stopwatch.StartNew();
             var customs = new List<string>();
             foreach (var pair in AlbumManager.LoadedAlbums)
             {
                 customs.AddRange(ChartManager.GetCustomChartMd5s(pair.Value?.Uid));
             }
 
-            return customs.Distinct().ToArray();
+            var result = customs.Distinct().ToArray();
+            startedAt.Stop();
+            if (startedAt.Elapsed.TotalMilliseconds >= SlowChartStateStepWarningMs)
+            {
+                ClientLogManager.SlowOperation($"[MDEN.Perf] CollectCustomChartMd5s took {startedAt.Elapsed.TotalMilliseconds:F0}ms, albums={AlbumManager.LoadedAlbums.Count}, charts={result.Length}");
+            }
+
+            return result;
         }
 
         private static string[] CollectHiddenChartKeys()
         {
+            var startedAt = System.Diagnostics.Stopwatch.StartNew();
             var hiddens = new List<string>();
             var hiddenUids = GlobalDataBase.dbMusicTag?.Hide;
             if (hiddenUids != null)
@@ -386,7 +464,37 @@ namespace MDEN.Managers
                 }
             }
 
-            return hiddens.Distinct().ToArray();
+            var result = hiddens.Distinct().ToArray();
+            startedAt.Stop();
+            if (startedAt.Elapsed.TotalMilliseconds >= SlowChartStateStepWarningMs)
+            {
+                ClientLogManager.SlowOperation($"[MDEN.Perf] CollectHiddenChartKeys took {startedAt.Elapsed.TotalMilliseconds:F0}ms, hidden={hiddenUids?.Count ?? 0}, charts={result.Length}");
+            }
+
+            return result;
+        }
+
+        private static ChartStateSnapshot CollectChartState()
+        {
+            return new ChartStateSnapshot(CollectCustomChartMd5s(), CollectHiddenChartKeys());
+        }
+
+        private static bool IsChartStateSyncFreshUnsafe()
+        {
+            return _lastChartStateSyncUtc != default &&
+                   DateTime.UtcNow - _lastChartStateSyncUtc < TimeSpan.FromMilliseconds(ChartStateSyncCacheMs);
+        }
+
+        private readonly struct ChartStateSnapshot
+        {
+            public ChartStateSnapshot(string[] customs, string[] hiddens)
+            {
+                Customs = customs;
+                Hiddens = hiddens;
+            }
+
+            public readonly string[] Customs;
+            public readonly string[] Hiddens;
         }
     }
 }

@@ -172,7 +172,7 @@ namespace MDEN.UI.Core
                 return;
             }
 
-            var nativeSettingsOpen = RoomSceneOverlay.UpdateVisibility();
+            var nativeSettingsOpen = RoomSceneOverlay.UpdateVisibility(Chat.IsVisible);
             ClosePlayerInfoWindowsForNativeSettings(nativeSettingsOpen);
 
             if (ShouldPauseRoomHudUpdate())
@@ -217,8 +217,16 @@ namespace MDEN.UI.Core
 
             if (RoomSceneOverlay.IsNavigationReady)
             {
-                PlayerList.Update(lobby);
                 Chat.CreateEmpty();
+                if (Chat.IsVisible)
+                {
+                    PlayerList.Update(lobby);
+                }
+                else
+                {
+                    PlayerList.Destroy();
+                }
+
                 ReadyDisplay.Refresh(lobby);
             }
 
@@ -234,7 +242,7 @@ namespace MDEN.UI.Core
             if (!RoomSceneOverlay.IsHomeVisible)
             {
                 RoomCharacterDisplay.HideGeneratedObjects();
-                RoomSceneOverlay.Refresh(lobby);
+                RoomSceneOverlay.Refresh(lobby, Chat.IsVisible);
                 return;
             }
 
@@ -253,7 +261,7 @@ namespace MDEN.UI.Core
                 }
             }
 
-            RoomSceneOverlay.Refresh(lobby);
+            RoomSceneOverlay.Refresh(lobby, Chat.IsVisible);
 
             if ((NeedsRefreshRetry() || !characterReady) && retryCount < MaxRefreshRetries)
             {

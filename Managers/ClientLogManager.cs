@@ -21,5 +21,10 @@ namespace MDEN.Managers
                 MelonLogger.Warning(message);
             }
         }
+
+        public static void SlowOperation(string message)
+        {
+            MelonLogger.Warning(message);
+        }
     }
 }

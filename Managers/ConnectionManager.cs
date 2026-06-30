@@ -123,7 +123,8 @@ namespace MDEN.Managers
                             Name = displayName,
                             IsReconnect = isReconnect,
                             ClientVersion = GetClientVersion(),
-                            ProtocolVersion = ProtocolVersions.Current
+                            ProtocolVersion = ProtocolVersions.Current,
+                            Capabilities = new[] { ProtocolCapabilities.BattleDataDelta }
                         });
                 }
                 catch (Exception ex)
