@@ -148,21 +148,46 @@ namespace MDEN.Network
             });
         }
 
+        public async Task<bool> TrySendNotifyAsync<T>(ushort opCode, T message)
+        {
+            return await SendAsync(
+                new ClientEnvelope
+                {
+                    Op = opCode,
+                    Payload = message
+                },
+                waitForSendLock: false,
+                disconnectOnFailure: false);
+        }
+
         public async Task SendAsync(ClientEnvelope envelope)
         {
-            if (!_isConnected || _stream == null) return;
+            await SendAsync(envelope, waitForSendLock: true, disconnectOnFailure: true);
+        }
+
+        private async Task<bool> SendAsync(ClientEnvelope envelope, bool waitForSendLock, bool disconnectOnFailure)
+        {
+            if (!_isConnected || _stream == null) return false;
 
             var connectionId = _connectionId;
             var stream = _stream;
-            if (!await _sendSemaphore.WaitAsync(SendTimeoutMs))
+            var sendLockTaken = waitForSendLock
+                ? await _sendSemaphore.WaitAsync(SendTimeoutMs)
+                : await _sendSemaphore.WaitAsync(0);
+            if (!sendLockTaken)
             {
-                DisconnectIfCurrent(connectionId, true);
-                throw new TimeoutException("Timed out waiting for send lock.");
+                if (disconnectOnFailure)
+                {
+                    DisconnectIfCurrent(connectionId, true);
+                    throw new TimeoutException("Timed out waiting for send lock.");
+                }
+
+                return false;
             }
 
             try
             {
-                if (!IsCurrentConnection(connectionId) || !_isConnected || stream == null) return;
+                if (!IsCurrentConnection(connectionId) || !_isConnected || stream == null) return false;
 
                 var bytes = _framer.Encode(envelope);
                 var writeTask = stream.WriteAsync(bytes, 0, bytes.Length);
@@ -173,7 +198,7 @@ namespace MDEN.Network
 
                 await writeTask;
 
-                if (!IsCurrentConnection(connectionId) || !_isConnected) return;
+                if (!IsCurrentConnection(connectionId) || !_isConnected) return false;
 
                 var flushTask = stream.FlushAsync();
                 if (await Task.WhenAny(flushTask, Task.Delay(SendTimeoutMs)) != flushTask)
@@ -182,6 +207,7 @@ namespace MDEN.Network
                 }
 
                 await flushTask;
+                return true;
             }
             catch (Exception ex)
             {
@@ -346,7 +372,10 @@ namespace MDEN.Network
 
             try
             {
-                await SendNotifyAsync(OpCodes.PingReportNotify, new PingReportNotify { PingMS = ping });
+                if (!await TrySendNotifyAsync(OpCodes.PingReportNotify, new PingReportNotify { PingMS = ping }))
+                {
+                    MDEN.Managers.ClientLogManager.Warning("Skipped ping report because send queue is busy.");
+                }
             }
             catch (Exception ex)
             {

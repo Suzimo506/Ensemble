@@ -20,7 +20,12 @@ namespace MDEN.Managers
         public static event Action<LobbySyncPush> CurrentLobbyChanged;
         private static readonly HashSet<int> IgnoredLobbySyncIds = new HashSet<int>();
         private static readonly Dictionary<int, long> LobbySyncRevisions = new Dictionary<int, long>();
+        private static readonly object LobbySyncQueueLock = new object();
         private static int? _pendingJoinLobbyId;
+        private static LobbySyncPush _pendingLobbySyncPush;
+        private static bool _lobbySyncApplyQueued;
+        private static int _pendingLobbySyncCount;
+        private static int _lobbySyncGeneration;
 
         public static async Task<LobbyListEntry[]> RefreshLobbiesAsync()
         {
@@ -213,6 +218,7 @@ namespace MDEN.Managers
                 IgnoredLobbySyncIds.Add(leavingLobbyId.Value);
             }
 
+            ResetPendingLobbySync();
             _pendingJoinLobbyId = null;
             CurrentLobby = null;
             BattleManager.Reset();
@@ -448,6 +454,7 @@ namespace MDEN.Managers
             _pendingJoinLobbyId = null;
             IgnoredLobbySyncIds.Clear();
             LobbySyncRevisions.Clear();
+            ResetPendingLobbySync();
             BattleManager.Reset();
             NotifyCurrentLobbyChanged();
         }
@@ -518,7 +525,75 @@ namespace MDEN.Managers
 
         private static void OnLobbySync(LobbySyncPush push)
         {
+            if (push == null) return;
+
+            int generation;
+            lock (LobbySyncQueueLock)
+            {
+                if (!ShouldReplacePendingLobbySync(_pendingLobbySyncPush, push))
+                {
+                    return;
+                }
+
+                _pendingLobbySyncPush = push;
+                _pendingLobbySyncCount++;
+                if (_lobbySyncApplyQueued) return;
+
+                _lobbySyncApplyQueued = true;
+                generation = _lobbySyncGeneration;
+            }
+
+            MainThreadDispatcher.Enqueue(() => ApplyPendingLobbySync(generation));
+        }
+
+        private static void ApplyPendingLobbySync(int generation)
+        {
+            LobbySyncPush push;
+            int coalescedCount;
+            lock (LobbySyncQueueLock)
+            {
+                if (generation != _lobbySyncGeneration)
+                {
+                    _lobbySyncApplyQueued = false;
+                    _pendingLobbySyncPush = null;
+                    _pendingLobbySyncCount = 0;
+                    return;
+                }
+
+                push = _pendingLobbySyncPush;
+                coalescedCount = _pendingLobbySyncCount;
+                _pendingLobbySyncPush = null;
+                _pendingLobbySyncCount = 0;
+                _lobbySyncApplyQueued = false;
+            }
+
+            if (coalescedCount > 1)
+            {
+                MDEN.Managers.ClientLogManager.SlowOperation($"[MDEN.Perf] Coalesced {coalescedCount} lobby sync pushes, applying latest revision {push?.Revision ?? 0}");
+            }
+
             ApplyCurrentLobbySnapshot(push, false);
+        }
+
+        private static void ResetPendingLobbySync()
+        {
+            lock (LobbySyncQueueLock)
+            {
+                _pendingLobbySyncPush = null;
+                _lobbySyncApplyQueued = false;
+                _pendingLobbySyncCount = 0;
+                _lobbySyncGeneration++;
+            }
+        }
+
+        private static bool ShouldReplacePendingLobbySync(LobbySyncPush current, LobbySyncPush incoming)
+        {
+            if (current == null) return true;
+            if (incoming == null) return false;
+            if (current.Id != incoming.Id) return true;
+            if (current.Revision <= 0 || incoming.Revision <= 0) return true;
+
+            return incoming.Revision >= current.Revision;
         }
 
         private static void ApplyCurrentLobbySnapshot(LobbySyncPush push, bool force)
@@ -563,6 +638,7 @@ namespace MDEN.Managers
         private static void OnLobbyKicked(LobbyKickedPush push)
         {
             var reason = string.IsNullOrWhiteSpace(push?.Reason) ? I18nManager.T("lobby.kicked") : push.Reason;
+            ResetPendingLobbySync();
             _pendingJoinLobbyId = null;
             CurrentLobby = null;
             BattleManager.Reset();
