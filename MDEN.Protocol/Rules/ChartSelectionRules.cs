@@ -1,21 +1,8 @@
 using System;
-using System.Collections.Generic;
-
 namespace MDEN.Protocol.Rules
 {
     public static class ChartSelectionRules
     {
-        private static readonly HashSet<string> UnsupportedChartUidSet = new(StringComparer.Ordinal)
-        {
-            "95-0",
-            "93-0",
-            "84-0",
-            "72-0",
-            "41-0"
-        };
-
-        public static IReadOnlyCollection<string> UnsupportedChartUids => UnsupportedChartUidSet;
-
         public static bool IsValidChartKey(string chartKey)
         {
             return IsOfficialChartKey(chartKey) || IsCustomChartKey(chartKey);
@@ -53,7 +40,7 @@ namespace MDEN.Protocol.Rules
         public static bool IsUnsupportedChartKey(string chartKey)
         {
             return !string.IsNullOrWhiteSpace(chartKey) &&
-                   (!IsValidChartKey(chartKey) || UnsupportedChartUidSet.Contains(chartKey));
+                   !IsValidChartKey(chartKey);
         }
 
         public static bool IsUnsupportedPlaylistEntry(string entry)
