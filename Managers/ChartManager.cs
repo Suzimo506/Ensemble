@@ -239,6 +239,18 @@ namespace MDEN.Managers
                    currentKey == entry.ChartKey;
         }
 
+        public static bool IsCurrentSelectionLockedByPlaylistVariant(PlaylistEntryViewModel entry)
+        {
+            if (entry == null || !SpecialChartVariantResolver.IsKnownVariantPair(entry.ChartKey)) return false;
+
+            var selectedUid = GlobalDataBase.dbMusicTag?.pnlSelectMusicUid;
+            if (string.IsNullOrEmpty(selectedUid) || selectedUid == entry.ChartKey) return false;
+            if (!SpecialChartVariantResolver.IsKnownVariantPair(selectedUid)) return false;
+
+            return SpecialChartVariantResolver.GetBaseUid(selectedUid) ==
+                   SpecialChartVariantResolver.GetBaseUid(entry.ChartKey);
+        }
+
         private static MusicInfo ResolveSelectionMusicInfo(MusicInfo musicInfo, string selectedUid)
         {
             return SpecialChartVariantResolver.IsKnownVariantPair(selectedUid)

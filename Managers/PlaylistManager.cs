@@ -119,6 +119,11 @@ namespace MDEN.Managers
             if (!LobbyManager.IsInLobby) return I18nManager.T("prepare.play");
             if (IsRookieReadySelectionActive())
             {
+                if (ChartManager.IsCurrentSelectionLockedByPlaylistVariant(GetCurrentPlaylistEntry()))
+                {
+                    return I18nManager.T("playlist.variant_locked");
+                }
+
                 return IsLocalPlayerReady() ? I18nManager.T("playlist.ready") : I18nManager.T("playlist.select_and_ready");
             }
 

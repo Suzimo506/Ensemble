@@ -376,6 +376,7 @@ namespace MDEN.Managers
             Register("playlist.added", "成功加入歌曲列表", "Added to playlist", "已成功加入歌曲列表", "プレイリストに追加しました", "플레이리스트에 추가했습니다");
             Register("playlist.ready", "已准备", "Ready", "已準備", "準備完了", "준비 완료");
             Register("playlist.select_and_ready", "选择并准备", "Select and Ready", "選擇並準備", "選択して準備", "선택하고 준비");
+            Register("playlist.variant_locked", "本局已锁定加入列表时的表/里谱，请切换回对应谱面", "This round is locked to the chart variant added to the playlist. Switch back to that variant.", "本局已鎖定加入列表時的表/裏譜，請切換回對應譜面", "このラウンドは追加時の表/裏譜面に固定されています。対応する譜面に戻してください", "이번 라운드는 목록에 추가한 표/리 채보로 고정됩니다. 해당 채보로 다시 전환하세요");
             Register("playlist.wait_ready", "等待准备", "Waiting for ready", "等待準備", "準備待ち", "준비 대기");
             Register("playlist.wait_host", "等待房主选歌", "Waiting for host selection", "等待房主選歌", "ホストの選曲待ち", "방장 선곡 대기");
             Register("playlist.no_chart", "未选择谱面", "No chart selected", "未選擇譜面", "譜面未選択", "채보가 선택되지 않음");

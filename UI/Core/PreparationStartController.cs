@@ -107,6 +107,12 @@ namespace MDEN.UI.Core
         private static async System.Threading.Tasks.Task SetRookieReadyAsync()
         {
             var entry = PlaylistManager.GetCurrentPlaylistEntry();
+            if (ChartManager.IsCurrentSelectionLockedByPlaylistVariant(entry))
+            {
+                ShowText.ShowInfo(I18nManager.T("playlist.variant_locked"));
+                return;
+            }
+
             if (!ChartManager.IsCurrentSelectedChart(entry))
             {
                 ShowText.ShowInfo(I18nManager.T("prepare.select_chart_first"));

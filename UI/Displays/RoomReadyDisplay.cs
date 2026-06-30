@@ -420,7 +420,7 @@ namespace MDEN.UI.Displays
 
             var isRookie = PlaylistManager.IsRookieMode();
             var isReady = PlaylistManager.IsLocalPlayerReady();
-            var canClickMain = !lobby.IsPlaying && !_busy && (isRookie || !isReady);
+            var canClickMain = !lobby.IsPlaying && !_busy;
             var mainDisabled = !canClickMain;
             var mainImage = _buttonMain.GetComponent<Image>();
             var mainButton = _buttonMain.GetComponent<Button>();
