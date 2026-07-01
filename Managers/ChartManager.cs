@@ -29,6 +29,7 @@ namespace MDEN.Managers
     {
         private static bool _initialized;
         private static int _albumLoadedRefreshQueued;
+        private static readonly object CustomAlbumsByMd5Lock = new object();
         private static readonly Dictionary<string, Album> CustomAlbumsByMd5 = new Dictionary<string, Album>();
 
         public static int CurrentDifficulty
@@ -70,7 +71,7 @@ namespace MDEN.Managers
             if (_initialized) return;
             _initialized = true;
 
-            RebuildCustomAlbumIndex();
+            ClearCustomAlbumIndex();
             CustomAlbums.ModExtensions.Events.OnAlbumLoaded += OnAlbumLoaded;
             TrySubscribeOptionalAlbumEvent("OnAlbumRemoved", new CustomAlbums.ModExtensions.Events.LoadAlbumEvent(OnAlbumRemoved));
         }
@@ -126,7 +127,7 @@ namespace MDEN.Managers
 
             var md5 = GetMd5(musicInfo.uid);
             if (!string.IsNullOrEmpty(md5) &&
-                CustomAlbumsByMd5.TryGetValue(md5, out var album) &&
+                TryGetCachedCustomAlbum(md5, out var album) &&
                 IsAlbumAvailable(album))
             {
                 return album.Uid;
@@ -299,6 +300,17 @@ namespace MDEN.Managers
             return GetMd5(uid);
         }
 
+        public static void CacheCustomChartMd5s(IEnumerable<KeyValuePair<string, Album>> entries)
+        {
+            if (entries == null) return;
+
+            foreach (var entry in entries)
+            {
+                if (string.IsNullOrEmpty(entry.Key) || entry.Value == null) continue;
+                CacheCustomChartMd5(entry.Key, entry.Value);
+            }
+        }
+
         public static IEnumerable<string> GetCustomChartMd5s(string uid)
         {
             var album = AlbumManager.GetByUid(uid);
@@ -311,7 +323,7 @@ namespace MDEN.Managers
                 var md5 = sheet.Md5;
                 if (string.IsNullOrEmpty(md5)) continue;
 
-                CustomAlbumsByMd5[md5] = album;
+                CacheCustomChartMd5(md5, album);
                 yield return md5;
             }
         }
@@ -328,14 +340,14 @@ namespace MDEN.Managers
 
             if (IsCustomChartKey(chartKey))
             {
-                if (CustomAlbumsByMd5.TryGetValue(chartKey, out var cachedAlbum))
+                if (TryGetCachedCustomAlbum(chartKey, out var cachedAlbum))
                 {
                     if (IsAlbumAvailable(cachedAlbum) && AlbumManager.GetByUid(cachedAlbum.Uid) != null)
                     {
                         return GlobalDataBase.dbMusicTag.GetMusicInfoFromAll(cachedAlbum.Uid);
                     }
 
-                    CustomAlbumsByMd5.Remove(chartKey);
+                    RemoveCachedCustomAlbum(chartKey);
                 }
 
                 foreach (var pair in AlbumManager.LoadedAlbums)
@@ -345,7 +357,7 @@ namespace MDEN.Managers
 
                     if (AlbumHasSheetMd5(album, chartKey))
                     {
-                        CustomAlbumsByMd5[chartKey] = album;
+                        CacheCustomChartMd5(chartKey, album);
                         return GlobalDataBase.dbMusicTag.GetMusicInfoFromAll(album.Uid);
                     }
                 }
@@ -500,7 +512,7 @@ namespace MDEN.Managers
 
             var md5 = GetMd5(musicInfo.uid);
             if (!string.IsNullOrEmpty(md5) &&
-                CustomAlbumsByMd5.TryGetValue(md5, out album) &&
+                TryGetCachedCustomAlbum(md5, out album) &&
                 IsAlbumAvailable(album))
             {
                 return album;
@@ -544,7 +556,7 @@ namespace MDEN.Managers
             var sheet = GetSheet(album, difficulty);
             if (sheet != null)
             {
-                CustomAlbumsByMd5[sheet.Md5] = album;
+                CacheCustomChartMd5(sheet.Md5, album);
             }
 
             return sheet?.Md5;
@@ -578,7 +590,7 @@ namespace MDEN.Managers
                 if (sheet == null) continue;
                 if (sheet.Md5 != md5) continue;
 
-                CustomAlbumsByMd5[md5] = album;
+                CacheCustomChartMd5(md5, album);
                 return true;
             }
 
@@ -673,28 +685,44 @@ namespace MDEN.Managers
             MDEN.UI.Core.MainThreadDispatcher.Enqueue(() =>
             {
                 Interlocked.Exchange(ref _albumLoadedRefreshQueued, 0);
-                RebuildCustomAlbumIndex();
+                ClearCustomAlbumIndex();
                 PlayerManager.InvalidateChartStateCache();
                 PlayerManager.SyncChartStateFireAndForget(true);
                 MDEN.UI.Core.ChartPreviewController.RetryCurrentPreviewAfterChartRefresh();
             });
         }
 
-        private static void RebuildCustomAlbumIndex()
+        private static void ClearCustomAlbumIndex()
         {
-            CustomAlbumsByMd5.Clear();
-            foreach (var pair in AlbumManager.LoadedAlbums)
+            lock (CustomAlbumsByMd5Lock)
             {
-                var album = pair.Value;
-                if (!IsAlbumAvailable(album)) continue;
+                CustomAlbumsByMd5.Clear();
+            }
+        }
 
-                if (album.Sheets == null) continue;
+        private static void CacheCustomChartMd5(string md5, Album album)
+        {
+            if (string.IsNullOrEmpty(md5) || album == null) return;
 
-                foreach (var sheet in album.Sheets.Values)
-                {
-                    if (sheet == null) continue;
-                    CustomAlbumsByMd5[sheet.Md5] = album;
-                }
+            lock (CustomAlbumsByMd5Lock)
+            {
+                CustomAlbumsByMd5[md5] = album;
+            }
+        }
+
+        private static bool TryGetCachedCustomAlbum(string md5, out Album album)
+        {
+            lock (CustomAlbumsByMd5Lock)
+            {
+                return CustomAlbumsByMd5.TryGetValue(md5, out album);
+            }
+        }
+
+        private static void RemoveCachedCustomAlbum(string md5)
+        {
+            lock (CustomAlbumsByMd5Lock)
+            {
+                CustomAlbumsByMd5.Remove(md5);
             }
         }
 

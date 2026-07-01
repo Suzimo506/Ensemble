@@ -51,6 +51,11 @@ namespace MDEN.UI.Core
                 $"[MDEN.Watchdog] Main thread stalled for {stalledSeconds:F1}s, scene={_currentScene}, lastStage={previousStage}");
         }
 
+        public static void SetStage(string stage)
+        {
+            _lastStage = string.IsNullOrWhiteSpace(stage) ? "unknown" : stage;
+        }
+
         public static void SetScene(string sceneName)
         {
             _currentScene = string.IsNullOrWhiteSpace(sceneName) ? "unknown" : sceneName;

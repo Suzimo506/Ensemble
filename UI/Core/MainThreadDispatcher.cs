@@ -11,6 +11,7 @@ namespace MDEN.UI.Core
     {
         private const int MaxActionsPerFrame = 64;
         private const double MaxMillisecondsPerFrame = 4.0;
+        private const double SlowActionWarningMs = 250.0;
         private static readonly ConcurrentQueue<QueuedAction> _executionQueue = new ConcurrentQueue<QueuedAction>();
 
         public static void Enqueue(
@@ -20,9 +21,7 @@ namespace MDEN.UI.Core
         {
             if (action == null) return;
 
-            var actionName = PerfTrace.Enabled
-                ? BuildActionName(callerMemberName, callerFilePath)
-                : null;
+            var actionName = BuildActionName(callerMemberName, callerFilePath);
             _executionQueue.Enqueue(new QueuedAction(action, actionName));
         }
 
@@ -84,6 +83,12 @@ namespace MDEN.UI.Core
             var startedAt = System.Diagnostics.Stopwatch.GetTimestamp();
             while (processed < queuedAtFrameStart && _executionQueue.TryDequeue(out var queued))
             {
+                var actionStartedAt = System.Diagnostics.Stopwatch.StartNew();
+                if (!string.IsNullOrEmpty(queued.Name))
+                {
+                    MainThreadWatchdog.SetStage(queued.Name);
+                }
+
                 try
                 {
                     if (PerfTrace.Enabled && !string.IsNullOrEmpty(queued.Name))
@@ -101,6 +106,14 @@ namespace MDEN.UI.Core
                 catch (Exception ex)
                 {
                     MelonLogger.Error($"[MainThreadDispatcher] Error executing action: {ex}");
+                }
+                finally
+                {
+                    actionStartedAt.Stop();
+                    if (actionStartedAt.Elapsed.TotalMilliseconds >= SlowActionWarningMs)
+                    {
+                        MelonLogger.Warning($"[MDEN.Perf] {queued.Name ?? "MDEN.Queue.Unknown"} took {actionStartedAt.Elapsed.TotalMilliseconds:F0}ms");
+                    }
                 }
 
                 processed++;

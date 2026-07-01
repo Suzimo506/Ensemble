@@ -20,6 +20,7 @@ namespace MDEN.Managers
         private const double SlowChartStateStepWarningMs = 250.0;
         private const double SlowChartStateSyncWarningMs = 750.0;
         private static readonly object ChartStateSyncLock = new object();
+        private static readonly object CustomChartSnapshotLock = new object();
 
         public static string CurrentUid { get; private set; }
         public static GetPlayerResponse CurrentProfile { get; private set; }
@@ -30,6 +31,7 @@ namespace MDEN.Managers
         private static bool _selectionSyncInProgress;
         private static Task _chartStateSyncTask;
         private static DateTime _lastChartStateSyncUtc;
+        private static CustomChartSnapshotItem[] _customChartSnapshot = Array.Empty<CustomChartSnapshotItem>();
 
         public static void SetCurrentUid(string uid)
         {
@@ -154,8 +156,10 @@ namespace MDEN.Managers
 
         private static async Task SyncCustomChartsAsyncCore()
         {
-            var customs = await MainThreadDispatcher.InvokeAsync(CollectCustomChartMd5s);
-            await UpdateMyProfileAsync(new UpdatePlayerRequest { Customs = customs });
+            var snapshot = await MainThreadDispatcher.InvokeAsync(CollectCustomChartSnapshot);
+            var result = await Task.Run(() => CollectCustomChartMd5s(snapshot));
+            MainThreadDispatcher.Enqueue(() => ChartManager.CacheCustomChartMd5s(result.IndexEntries));
+            await UpdateMyProfileAsync(new UpdatePlayerRequest { Customs = result.Md5s });
         }
 
         private static async Task SyncHiddenChartsAsyncCore()
@@ -193,11 +197,15 @@ namespace MDEN.Managers
             var startedAt = System.Diagnostics.Stopwatch.StartNew();
             try
             {
-                var snapshot = await MainThreadDispatcher.InvokeAsync(CollectChartState);
+                var customSnapshot = await MainThreadDispatcher.InvokeAsync(CollectCustomChartSnapshot);
+                var customsTask = Task.Run(() => CollectCustomChartMd5s(customSnapshot));
+                var hiddens = await MainThreadDispatcher.InvokeAsync(CollectHiddenChartKeys);
+                var customResult = await customsTask;
+                MainThreadDispatcher.Enqueue(() => ChartManager.CacheCustomChartMd5s(customResult.IndexEntries));
                 await UpdateMyProfileAsync(new UpdatePlayerRequest
                 {
-                    Customs = snapshot.Customs,
-                    Hiddens = snapshot.Hiddens
+                    Customs = customResult.Md5s,
+                    Hiddens = hiddens
                 });
                 lock (ChartStateSyncLock)
                 {
@@ -224,6 +232,11 @@ namespace MDEN.Managers
             lock (ChartStateSyncLock)
             {
                 _lastChartStateSyncUtc = default;
+            }
+
+            lock (CustomChartSnapshotLock)
+            {
+                _customChartSnapshot = Array.Empty<CustomChartSnapshotItem>();
             }
         }
 
@@ -428,23 +441,56 @@ namespace MDEN.Managers
             MainThreadDispatcher.Enqueue(() => ProfileChanged?.Invoke());
         }
 
-        private static string[] CollectCustomChartMd5s()
+        private static CustomChartSnapshotItem[] CollectCustomChartSnapshot()
+        {
+            var snapshot = new List<CustomChartSnapshotItem>();
+            foreach (var pair in AlbumManager.LoadedAlbums)
+            {
+                var album = pair.Value;
+                if (album?.Sheets == null) continue;
+
+                foreach (var sheet in album.Sheets.Values)
+                {
+                    if (sheet == null) continue;
+
+                    snapshot.Add(new CustomChartSnapshotItem(album, sheet));
+                }
+            }
+
+            lock (CustomChartSnapshotLock)
+            {
+                _customChartSnapshot = snapshot.ToArray();
+                return _customChartSnapshot;
+            }
+        }
+
+        private static CustomChartMd5Result CollectCustomChartMd5s(CustomChartSnapshotItem[] snapshot)
         {
             var startedAt = System.Diagnostics.Stopwatch.StartNew();
             var customs = new List<string>();
-            foreach (var pair in AlbumManager.LoadedAlbums)
+            var indexEntries = new List<KeyValuePair<string, CustomAlbums.Data.Album>>();
+
+            foreach (var item in snapshot ?? Array.Empty<CustomChartSnapshotItem>())
             {
-                customs.AddRange(ChartManager.GetCustomChartMd5s(pair.Value?.Uid));
+                var md5 = item.Sheet?.Md5;
+                if (!string.IsNullOrEmpty(md5))
+                {
+                    customs.Add(md5);
+                    if (item.Album != null)
+                    {
+                        indexEntries.Add(new KeyValuePair<string, CustomAlbums.Data.Album>(md5, item.Album));
+                    }
+                }
             }
 
             var result = customs.Distinct().ToArray();
             startedAt.Stop();
             if (startedAt.Elapsed.TotalMilliseconds >= SlowChartStateStepWarningMs)
             {
-                ClientLogManager.SlowOperation($"[MDEN.Perf] CollectCustomChartMd5s took {startedAt.Elapsed.TotalMilliseconds:F0}ms, albums={AlbumManager.LoadedAlbums.Count}, charts={result.Length}");
+                ClientLogManager.SlowOperation($"[MDEN.Perf] CollectCustomChartMd5s took {startedAt.Elapsed.TotalMilliseconds:F0}ms, snapshot={snapshot?.Length ?? 0}, charts={result.Length}");
             }
 
-            return result;
+            return new CustomChartMd5Result(result, indexEntries.ToArray());
         }
 
         private static string[] CollectHiddenChartKeys()
@@ -474,27 +520,34 @@ namespace MDEN.Managers
             return result;
         }
 
-        private static ChartStateSnapshot CollectChartState()
-        {
-            return new ChartStateSnapshot(CollectCustomChartMd5s(), CollectHiddenChartKeys());
-        }
-
         private static bool IsChartStateSyncFreshUnsafe()
         {
             return _lastChartStateSyncUtc != default &&
                    DateTime.UtcNow - _lastChartStateSyncUtc < TimeSpan.FromMilliseconds(ChartStateSyncCacheMs);
         }
 
-        private readonly struct ChartStateSnapshot
+        private readonly struct CustomChartSnapshotItem
         {
-            public ChartStateSnapshot(string[] customs, string[] hiddens)
+            public CustomChartSnapshotItem(CustomAlbums.Data.Album album, CustomAlbums.Data.Sheet sheet)
             {
-                Customs = customs;
-                Hiddens = hiddens;
+                Album = album;
+                Sheet = sheet;
             }
 
-            public readonly string[] Customs;
-            public readonly string[] Hiddens;
+            public readonly CustomAlbums.Data.Album Album;
+            public readonly CustomAlbums.Data.Sheet Sheet;
+        }
+
+        private readonly struct CustomChartMd5Result
+        {
+            public CustomChartMd5Result(string[] md5s, KeyValuePair<string, CustomAlbums.Data.Album>[] indexEntries)
+            {
+                Md5s = md5s;
+                IndexEntries = indexEntries;
+            }
+
+            public readonly string[] Md5s;
+            public readonly KeyValuePair<string, CustomAlbums.Data.Album>[] IndexEntries;
         }
     }
 }
