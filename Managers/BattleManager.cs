@@ -15,8 +15,8 @@ namespace MDEN.Managers
 {
     public static class BattleManager
     {
-        private const int SmallLobbyBattleUpdateIntervalMs = 2000;
-        private const int LargeLobbyBattleUpdateIntervalMs = 3000;
+        private const int SmallLobbyBattleUpdateIntervalMs = 1000;
+        private const int LargeLobbyBattleUpdateIntervalMs = 2000;
         private const int LargeLobbyBattlePlayerThreshold = 5;
         private const int BattleReturnedRetryIntervalMs = 5000;
         private static readonly object BattleDataLock = new();

@@ -623,6 +623,7 @@ namespace MDEN.Managers
                 return;
             }
 
+            PreserveCachedAvatarData(CurrentLobby, push);
             var pingOnlySync = IsPingOnlyLobbySync(CurrentLobby, push);
 
             _pendingJoinLobbyId = null;
@@ -658,6 +659,33 @@ namespace MDEN.Managers
             if (push.Revision <= 0) return false;
             return LobbySyncRevisions.TryGetValue(push.Id, out var latestRevision) &&
                    push.Revision <= latestRevision;
+        }
+
+        private static void PreserveCachedAvatarData(LobbySyncPush previous, LobbySyncPush next)
+        {
+            if (previous?.PlayerDetails == null || next?.PlayerDetails == null) return;
+
+            var previousByUid = new Dictionary<string, PlayerSyncEntry>();
+            foreach (var player in previous.PlayerDetails)
+            {
+                if (player == null || string.IsNullOrWhiteSpace(player.Uid)) continue;
+                previousByUid[player.Uid] = player;
+            }
+
+            foreach (var player in next.PlayerDetails)
+            {
+                if (player == null ||
+                    !string.IsNullOrWhiteSpace(player.AvatarData) ||
+                    string.IsNullOrWhiteSpace(player.Uid))
+                {
+                    continue;
+                }
+
+                if (!previousByUid.TryGetValue(player.Uid, out var cached)) continue;
+                if (cached?.AvatarName != player.AvatarName) continue;
+
+                player.AvatarData = cached.AvatarData;
+            }
         }
 
         public static int GetReadyDifficulty(string uid)
