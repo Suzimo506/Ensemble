@@ -30,12 +30,15 @@ namespace MDEN.UI.Core
         private static bool _battleSceneActive;
         private static bool _roomHudDeferred;
         private static int _popupSuppressionCount;
+        private static int _chatScopeLobbyId = int.MinValue;
+        private static int _chatCommandTipLobbyId = -1;
 
         public static void Initialize()
         {
             if (_initialized) return;
             LobbyManager.CurrentLobbyChanged += HandleLobbyChanged;
             ChatManager.MessageReceived += HandleChatMessageReceived;
+            ConnectionManager.StateChanged += HandleConnectionStateChanged;
             PlayerManager.ProfileChanged += HandleProfileChanged;
             _initialized = true;
         }
@@ -45,6 +48,7 @@ namespace MDEN.UI.Core
             if (!_initialized) return;
             LobbyManager.CurrentLobbyChanged -= HandleLobbyChanged;
             ChatManager.MessageReceived -= HandleChatMessageReceived;
+            ConnectionManager.StateChanged -= HandleConnectionStateChanged;
             PlayerManager.ProfileChanged -= HandleProfileChanged;
             Destroy();
             _initialized = false;
@@ -58,6 +62,23 @@ namespace MDEN.UI.Core
         private static void HandleChatMessageReceived(ChatPushMsg message)
         {
             MainThreadDispatcher.Enqueue(() => AddChatMessage(message));
+        }
+
+        private static void HandleConnectionStateChanged(ConnectionLifecycleState state)
+        {
+            MainThreadDispatcher.Enqueue(() =>
+            {
+                if (state == ConnectionLifecycleState.Connected)
+                {
+                    RequestRefresh();
+                    return;
+                }
+
+                if (!LobbyManager.IsInLobby)
+                {
+                    Destroy();
+                }
+            });
         }
 
         private static void HandleProfileChanged()
@@ -209,11 +230,29 @@ namespace MDEN.UI.Core
 
             if (lobby == null || !LobbyManager.IsInLobby)
             {
-                Destroy();
+                if (CanShowServerChat())
+                {
+                    EnsureChatScope(-1);
+                    if (RoomSceneOverlay.IsNavigationReady)
+                    {
+                        Chat.CreateEmpty();
+                    }
+
+                    PlayerList.Destroy();
+                    ReadyDisplay.Destroy();
+                    RoomSceneOverlay.Hide();
+                    RoomCharacterDisplay.HideGeneratedObjects();
+                }
+                else
+                {
+                    Destroy();
+                }
+
                 return;
             }
 
             if (LobbyManager.CurrentLobby?.Id != lobby.Id) return;
+            EnsureChatScope(lobby.Id);
 
             if (RoomSceneOverlay.IsNavigationReady)
             {
@@ -428,6 +467,7 @@ namespace MDEN.UI.Core
             ChartPreviewController.ResetAll();
             MultiplayerBattleController.Reset();
             RestoreNativeInput();
+            _chatScopeLobbyId = int.MinValue;
         }
 
         public static void ResetSceneObjects()
@@ -451,9 +491,49 @@ namespace MDEN.UI.Core
             RestoreNativeInput();
         }
 
+        private static void EnsureChatScope(int lobbyId)
+        {
+            if (_chatScopeLobbyId == lobbyId) return;
+
+            _chatScopeLobbyId = lobbyId;
+            Chat.ResetSendMode();
+            Chat.ClearHistory();
+            if (lobbyId <= 0)
+            {
+                _chatCommandTipLobbyId = -1;
+                return;
+            }
+
+            if (lobbyId > 0)
+            {
+                AddRoomCommandTip(lobbyId);
+            }
+        }
+
+        private static void AddRoomCommandTip(int lobbyId)
+        {
+            if (_chatCommandTipLobbyId == lobbyId) return;
+
+            _chatCommandTipLobbyId = lobbyId;
+            Chat.AddMessage(new ChatPushMsg
+            {
+                AuthorUid = "system",
+                AuthorName = "System",
+                Message = I18nManager.T("chat.room_command_tip"),
+                IsSystem = true
+            });
+        }
+
         public static void AddChatMessage(ChatPushMsg message)
         {
-            if (!LobbyManager.IsInLobby) return;
+            if (!LobbyManager.IsInLobby)
+            {
+                if (!CanShowServerChat()) return;
+
+                Chat.AddMessage(message);
+                return;
+            }
+
             if (IsOwnEntranceMessage(message))
             {
                 var lobbyId = LobbyManager.CurrentLobby.Id;
@@ -469,7 +549,7 @@ namespace MDEN.UI.Core
             Chat.AddMessage(message, !hudPaused);
             if (hudPaused) return;
 
-            if (!message.IsSystem)
+            if (!message.IsSystem && message.Channel == ChatTargets.Lobby)
             {
                 RoomCharacterDisplay.ShowChatBubble(message.AuthorUid, message.Message);
             }
@@ -550,7 +630,7 @@ namespace MDEN.UI.Core
 
         private static void UpdateNativeInputBlock()
         {
-            var shouldBlock = LobbyManager.IsInLobby && Chat.IsConsumingInput;
+            var shouldBlock = (LobbyManager.IsInLobby || CanShowServerChat()) && Chat.IsConsumingInput;
             if (_nativeInputBlockedByChat == shouldBlock) return;
 
             _nativeInputBlockedByChat = shouldBlock;
@@ -568,6 +648,11 @@ namespace MDEN.UI.Core
         private static void SetNativeInputBlocked(bool blocked)
         {
             NativeInputBlocker.SetBlocked("RoomChat", blocked);
+        }
+
+        private static bool CanShowServerChat()
+        {
+            return ConnectionManager.CanSendRequests;
         }
     }
 }

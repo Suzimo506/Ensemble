@@ -264,7 +264,7 @@ namespace MDEN.UI.Core
 
         private static void SyncSelectedChart(string chartKey, MusicInfo musicInfo, int difficulty)
         {
-            NativeChartSelectionSync.Sync(musicInfo, difficulty, chartKey);
+            NativeChartSelectionSync.SyncForBattleStart(musicInfo, difficulty, chartKey);
         }
 
         private static bool IsRookieDifficultySelectionReady(MusicInfo musicInfo, int difficulty)

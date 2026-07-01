@@ -39,7 +39,9 @@ namespace MDEN.Protocol.Rules
 
         public static bool IsUnsupportedChartKey(string chartKey)
         {
-            return !string.IsNullOrWhiteSpace(chartKey) &&
+            if (string.IsNullOrWhiteSpace(chartKey)) return false;
+
+            return IsStrictUnsupportedChartKey(chartKey) ||
                    !IsValidChartKey(chartKey);
         }
 
@@ -55,6 +57,15 @@ namespace MDEN.Protocol.Rules
         private static bool IsCustomChartIdentity(string chartKey)
         {
             return IsCustomChartKey(chartKey) || IsCustomChartUid(chartKey);
+        }
+
+        private static bool IsStrictUnsupportedChartKey(string chartKey)
+        {
+            return chartKey == "95-0" ||
+                   chartKey == "93-0" ||
+                   chartKey == "84-0" ||
+                   chartKey == "72-0" ||
+                   chartKey == "41-0";
         }
 
         private static bool IsCustomChartUid(string chartKey)

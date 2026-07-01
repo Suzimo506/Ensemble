@@ -8,6 +8,7 @@ using MDEN.Protocol;
 using MDEN.Protocol.Messages.Chat;
 using MDEN.Protocol.Rules;
 using MDEN.UI.Core;
+using MDEN.UI.Windows;
 using MelonLoader;
 using UnityEngine;
 using UnityEngine.AddressableAssets;
@@ -28,6 +29,7 @@ namespace MDEN.UI.Displays
         private bool _gameInputBlocked;
         private int _clearSlashFrame = -1;
         private int _suppressGameInputUntilFrame = -1;
+        private ChatSendMode _sendMode = ChatSendMode.Room;
 
         public bool IsConsumingInput => (_inputField != null && _inputField.isFocused)
             || _sendInProgress
@@ -35,6 +37,16 @@ namespace MDEN.UI.Displays
         public bool IsCreated => _frame != null;
         public bool IsVisible => _frame != null && _frame.activeInHierarchy;
         public void CreateEmpty() => Initialize();
+        public void ClearHistory()
+        {
+            ClearMessages();
+            UpdateLayout();
+        }
+
+        public void ResetSendMode()
+        {
+            _sendMode = ChatSendMode.Room;
+        }
 
         public void InvalidatePlayerColors()
         {
@@ -77,6 +89,8 @@ namespace MDEN.UI.Displays
         private const string RedTextColor = "ff5555ff";
         private const string OrangeTextColor = "ff9f1aff";
         private const string PinkTextColor = Constants.ColorPink;
+        private const string WorldRoomColor = Constants.ColorYellow;
+        private const string GoldTextColor = "ffd966ff";
         private readonly Vector2 _entrySize = new Vector2(EntryWidth, FontSize + 8f);
 
         private Vector2 GetFrameSize(int lines)
@@ -298,6 +312,11 @@ namespace MDEN.UI.Displays
                 MainThreadDispatcher.Enqueue(ClearSlashShortcutText);
             }
 
+            if (_inputField.isFocused)
+            {
+                HandleTabSendModeSwitch();
+            }
+
             UpdateInputVisualState(_inputField, _clearButton, _inputField.isFocused);
             UpdateBackgroundFocusState(_inputField.isFocused);
             HandleManualScrollWheel();
@@ -478,7 +497,8 @@ namespace MDEN.UI.Displays
         {
             var missingChart = GetMissingChartClickData(msg);
             var previewChart = GetPreviewableChartData(msg);
-            if (!missingChart.HasValue && !previewChart.HasValue) return;
+            var invite = GetInviteClickData(msg);
+            if (!missingChart.HasValue && !previewChart.HasValue && !invite.HasValue) return;
 
             text.raycastTarget = true;
             var button = text.gameObject.GetComponent<Button>() ?? text.gameObject.AddComponent<Button>();
@@ -495,6 +515,12 @@ namespace MDEN.UI.Displays
                         missingChart.Value.Difficulty,
                         missingChart.Value.Artist,
                         missingChart.Value.Charter);
+                    return;
+                }
+
+                if (invite.HasValue)
+                {
+                    JoinInviteLobby(invite.Value.LobbyId, invite.Value.IsPrivate);
                     return;
                 }
 
@@ -659,7 +685,9 @@ namespace MDEN.UI.Displays
                 }
                 else
                 {
-                    await ChatManager.SendAsync(message);
+                    var target = GetSendTarget(message);
+                    await ChatManager.SendAsync(message, target);
+                    ShowRoomWorldCommandSuccess(message, target);
                 }
 
                 MainThreadDispatcher.Enqueue(ClearSubmittedInput);
@@ -683,6 +711,66 @@ namespace MDEN.UI.Displays
             _inputField.text = string.Empty;
             UpdateInputVisualState(_inputField, _clearButton, true);
             _inputField.ActivateInputField();
+        }
+
+        private byte GetSendTarget(string message)
+        {
+            if (!LobbyManager.IsInLobby) return ChatTargets.Default;
+            if (StartsWithCommand(message, "/invite") || StartsWithCommand(message, "/world")) return ChatTargets.Default;
+
+            return _sendMode switch
+            {
+                ChatSendMode.World => ChatTargets.World,
+                ChatSendMode.Invite => ChatTargets.Invite,
+                _ => ChatTargets.Default
+            };
+        }
+
+        private static void ShowRoomWorldCommandSuccess(string message, byte target)
+        {
+            if (target == ChatTargets.Invite || StartsWithCommand(message, "/invite"))
+            {
+                MainThreadDispatcher.Enqueue(() => ShowText.ShowInfo(I18nManager.T("chat.invite_sent")));
+                return;
+            }
+
+            if (target == ChatTargets.World || StartsWithCommand(message, "/world"))
+            {
+                MainThreadDispatcher.Enqueue(() => ShowText.ShowInfo(I18nManager.T("chat.world_sent")));
+            }
+        }
+
+        private void HandleTabSendModeSwitch()
+        {
+            if (!LobbyManager.IsInLobby) return;
+            if (!Input.GetKeyDown(KeyCode.Tab)) return;
+
+            _sendMode = _sendMode switch
+            {
+                ChatSendMode.Room => ChatSendMode.World,
+                ChatSendMode.World => ChatSendMode.Invite,
+                _ => ChatSendMode.Room
+            };
+
+            _suppressGameInputUntilFrame = Time.frameCount + 2;
+            ShowText.ShowInfo(GetSendModeLabel(_sendMode));
+        }
+
+        private static string GetSendModeLabel(ChatSendMode mode)
+        {
+            return mode switch
+            {
+                ChatSendMode.World => I18nManager.T("chat.mode.world"),
+                ChatSendMode.Invite => I18nManager.T("chat.mode.invite"),
+                _ => I18nManager.T("chat.mode.room")
+            };
+        }
+
+        private static bool StartsWithCommand(string message, string command)
+        {
+            if (string.IsNullOrWhiteSpace(message)) return false;
+            return message.Equals(command, StringComparison.OrdinalIgnoreCase) ||
+                   message.StartsWith(command + " ", StringComparison.OrdinalIgnoreCase);
         }
 
         private void FinishFailedSubmit()
@@ -713,11 +801,33 @@ namespace MDEN.UI.Displays
             }
 
             var name = string.IsNullOrWhiteSpace(msg.AuthorName) ? msg.AuthorUid : msg.AuthorName;
+            if (msg.Channel == ChatTargets.World)
+            {
+                var worldPrefix = ColorText("【世界】", WorldRoomColor);
+                var room = ParseRoomBroadcastData(msg);
+                if (room.HasValue && !string.IsNullOrWhiteSpace(room.Value.RoomName))
+                {
+                    return $"{worldPrefix}{ColorText($"【{EscapeRichText(room.Value.RoomName)}】", WorldRoomColor)}{ColorText(EscapeRichText(name), GetMessageAuthorColor(msg, room.Value.AuthorColor))}: {ColorText(EscapeRichText(msg.Message), WhiteTextColor)}";
+                }
+
+                return $"{worldPrefix}{ColorText(EscapeRichText(name), GetMessageAuthorColor(msg, msg.ExtraData))}: {ColorText(EscapeRichText(msg.Message), WhiteTextColor)}";
+            }
+
             return $"{ColorText(EscapeRichText(name), GetPlayerColor(msg.AuthorUid, msg.AuthorName))}: {EscapeRichText(msg.Message)}";
         }
 
         private string FormatSystemMessage(ChatPushMsg msg)
         {
+            if (msg.Channel == ChatTargets.Invite)
+            {
+                return FormatInviteMessage(msg);
+            }
+
+            if (msg.Channel == ChatTargets.ApBroadcast)
+            {
+                return FormatApBroadcastMessage(msg);
+            }
+
             if (!string.IsNullOrWhiteSpace(msg.Message) && msg.Message.StartsWith("【来自喵斯兔】"))
             {
                 return ColorText(EscapeRichText(msg.Message), PinkTextColor);
@@ -824,6 +934,21 @@ namespace MDEN.UI.Displays
             return $"{SystemPrefix()} {EscapeRichText(msg.Message)}";
         }
 
+        private string FormatInviteMessage(ChatPushMsg msg)
+        {
+            var name = string.IsNullOrWhiteSpace(msg.AuthorName) ? msg.AuthorUid : msg.AuthorName;
+            return ColorText($"【点击此条播报加入房间】{EscapeRichText(name)}：{EscapeRichText(msg.Message)}", PinkTextColor);
+        }
+
+        private string FormatApBroadcastMessage(ChatPushMsg msg)
+        {
+            var name = string.IsNullOrWhiteSpace(msg.AuthorName) ? msg.AuthorUid : msg.AuthorName;
+            var ap = ParseApBroadcastData(msg);
+            var player = ColorText(EscapeRichText(name), GetMessageAuthorColor(msg, ap?.AuthorColor));
+            var chartText = FormatApChartText(msg.Message, ap?.Difficulty ?? 0);
+            return $"{player}{ColorText("刚刚AP了", GoldTextColor)}{ColorText(chartText, GoldTextColor)}{ColorText("！", GoldTextColor)}";
+        }
+
         private static bool TryParsePlayerFinishedMessage(string message, out string playerName)
         {
             playerName = null;
@@ -880,6 +1005,44 @@ namespace MDEN.UI.Displays
             return playlistEvent.HasValue
                 ? (CleanChartNameForDisplay(playlistEvent.Value.ChartName), playlistEvent.Value.ChartKey, playlistEvent.Value.Difficulty)
                 : null;
+        }
+
+        private static (int LobbyId, bool IsPrivate)? GetInviteClickData(ChatPushMsg msg)
+        {
+            if (msg?.Channel != ChatTargets.Invite) return null;
+
+            var invite = ParseInviteData(msg);
+            return invite.HasValue ? (invite.Value.LobbyId, invite.Value.IsPrivate) : null;
+        }
+
+        private static async void JoinInviteLobby(int lobbyId, bool isPrivate)
+        {
+            if (lobbyId <= 0) return;
+
+            if (isPrivate)
+            {
+                ShowText.ShowInfo(I18nManager.T("chat.invite_private_blocked"));
+                return;
+            }
+
+            try
+            {
+                ShowText.ShowInfo(I18nManager.T("lobby.joining"));
+                await LobbyManager.JoinLobbyAsync(lobbyId);
+                await LobbyManager.RefreshCurrentLobbyAsync();
+
+                MainThreadDispatcher.Enqueue(() =>
+                {
+                    NavigationButton.RefreshRoomButton();
+                    WindowStackController.OpenWindow(new MyRoomWindow());
+                });
+            }
+            catch (Exception ex)
+            {
+                MDEN.Managers.ClientLogManager.Warning($"Join invite lobby failed: {ex.Message}");
+                MainThreadDispatcher.Enqueue(() => ShowText.ShowInfo(I18nManager.Tf("lobby.join_failed", ex.Message)));
+                LobbyManager.CancelPendingJoin(lobbyId);
+            }
         }
 
         private static void JumpToPlaylistChartPreview(string chartName, string chartKey, int difficulty)
@@ -982,6 +1145,48 @@ namespace MDEN.UI.Displays
             if (parts.Length < 2) return null;
 
             return (parts[0], parts[1]);
+        }
+
+        private static (int LobbyId, string RoomName, bool IsPrivate, string AuthorColor)? ParseInviteData(ChatPushMsg msg)
+        {
+            if (string.IsNullOrWhiteSpace(msg?.ExtraData)) return null;
+
+            var parts = msg.ExtraData.Split('#');
+            if (parts.Length < 3 || !int.TryParse(parts[0], out var lobbyId)) return null;
+
+            return (
+                lobbyId,
+                parts[1],
+                parts[2] == "1",
+                parts.Length > 3 ? parts[3] : null);
+        }
+
+        private static (int LobbyId, string RoomName, string AuthorColor)? ParseRoomBroadcastData(ChatPushMsg msg)
+        {
+            if (string.IsNullOrWhiteSpace(msg?.ExtraData)) return null;
+
+            var parts = msg.ExtraData.Split('#');
+            if (parts.Length < 2 || !int.TryParse(parts[0], out var lobbyId)) return null;
+
+            return (
+                lobbyId,
+                parts[1],
+                parts.Length > 2 ? parts[2] : null);
+        }
+
+        private static (string AuthorColor, int Difficulty)? ParseApBroadcastData(ChatPushMsg msg)
+        {
+            if (string.IsNullOrWhiteSpace(msg?.ExtraData)) return null;
+
+            var parts = msg.ExtraData.Split('#');
+            var authorColor = parts.Length > 0 ? parts[0] : null;
+            var difficulty = 0;
+            if (parts.Length > 1)
+            {
+                int.TryParse(parts[1], out difficulty);
+            }
+
+            return (authorColor, difficulty);
         }
 
         private static (string ChartName, string Players)? ParseTextMissingChart(string message)
@@ -1149,6 +1354,14 @@ namespace MDEN.UI.Displays
             return WhiteTextColor;
         }
 
+        private string GetMessageAuthorColor(ChatPushMsg msg, string fallbackColor)
+        {
+            var normalized = NormalizeHexColor(fallbackColor);
+            if (!string.IsNullOrEmpty(normalized)) return normalized;
+
+            return GetPlayerColor(msg?.AuthorUid, msg?.AuthorName);
+        }
+
         private string FindPlayerUidByName(string playerName)
         {
             if (string.IsNullOrWhiteSpace(playerName)) return null;
@@ -1262,6 +1475,14 @@ namespace MDEN.UI.Displays
         {
             var normalized = NormalizeHexColor(color) ?? WhiteTextColor;
             return $"<color=#{normalized}>{text}</color>";
+        }
+
+        private static string FormatApChartText(string chartName, int difficulty)
+        {
+            var text = EscapeRichText(chartName);
+            if (!DifficultyDisplayRules.IsKnownDifficulty(difficulty)) return text;
+
+            return $"{text} {EscapeRichText(LobbyRuleTextFormatter.GetDifficultyName(difficulty))}";
         }
 
         private static string EscapeRichText(string value)
@@ -1452,5 +1673,12 @@ namespace MDEN.UI.Displays
             _gameInputBlocked = blocked;
             NativeInputBlocker.SetBlocked("RoomChatInput", blocked);
         }
+    }
+
+    internal enum ChatSendMode
+    {
+        Room,
+        World,
+        Invite
     }
 }

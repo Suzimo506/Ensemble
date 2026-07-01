@@ -23,6 +23,7 @@ namespace MDEN.UI.Core
         {
             if (lobby == null || !lobby.Locked)
             {
+                SpecialChartVariantResolver.RestoreVariantSelectionOverride();
                 ResetAll();
                 return;
             }
@@ -195,7 +196,7 @@ namespace MDEN.UI.Core
             }
 
             var difficulty = ResolvePreviewDifficulty(entry);
-            NativeChartNavigator.JumpToChart(entry.ChartKey, musicInfo, difficulty);
+            NativeChartNavigator.PreviewChart(entry.ChartKey, musicInfo, difficulty);
         }
 
         private static int ResolvePreviewDifficulty(PlaylistEntryViewModel entry)

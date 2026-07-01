@@ -17,19 +17,20 @@ namespace MDEN.Managers
             PushDispatcher.Instance.Register<ChatPushMsg>(OpCodes.ChatPush, OnChatPush);
         }
 
-        public static async Task SendAsync(string message)
+        public static async Task SendAsync(string message, byte target = ChatTargets.Default)
         {
             if (string.IsNullOrWhiteSpace(message)) return;
             ConnectionManager.EnsureCanSendRequest();
+            var text = message.Trim();
 
-            if (!LobbyManager.IsInLobby)
+            if (!LobbyManager.IsInLobby && (IsRoomWorldCommand(text) || target == ChatTargets.World || target == ChatTargets.Invite))
             {
                 throw new InvalidOperationException(I18nManager.T("player.not_in_room"));
             }
 
             await NetworkClient.Instance.SendNotifyAsync(
                 OpCodes.ChatNotify,
-                new ChatNotifyMsg { Message = message.Trim() });
+                new ChatNotifyMsg { Message = text, Target = target });
         }
 
         public static async Task SendMdtHostReplyAsync(string reply)
@@ -54,6 +55,18 @@ namespace MDEN.Managers
         private static void OnChatPush(ChatPushMsg message)
         {
             MainThreadDispatcher.Enqueue(() => MessageReceived?.Invoke(message));
+        }
+
+        private static bool IsRoomWorldCommand(string message)
+        {
+            return StartsWithCommand(message, "/invite") || StartsWithCommand(message, "/world");
+        }
+
+        private static bool StartsWithCommand(string message, string command)
+        {
+            if (string.IsNullOrWhiteSpace(message)) return false;
+            return message.Equals(command, StringComparison.OrdinalIgnoreCase) ||
+                   message.StartsWith(command + " ", StringComparison.OrdinalIgnoreCase);
         }
     }
 }

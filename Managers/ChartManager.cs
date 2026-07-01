@@ -38,6 +38,7 @@ namespace MDEN.Managers
                 var diff = GlobalDataBase.dbMusicTag.selectedDiffTglIndex;
                 var musicInfo = GlobalDataBase.dbMusicTag.m_CurSelectedMusicInfo;
                 var selectedUid = GlobalDataBase.dbMusicTag.pnlSelectMusicUid;
+                selectedUid = SpecialChartVariantResolver.ResolveSelectedUid(musicInfo, selectedUid);
                 if (SpecialChartVariantResolver.IsKnownVariantPair(selectedUid))
                 {
                     musicInfo = GetMusicInfo(selectedUid) ?? musicInfo;
@@ -80,6 +81,7 @@ namespace MDEN.Managers
             if (musicInfo == null) return null;
 
             var selectedUid = GlobalDataBase.dbMusicTag?.pnlSelectMusicUid;
+            selectedUid = SpecialChartVariantResolver.ResolveSelectedUid(musicInfo, selectedUid);
             if (IsSpecialUnlockSelection(musicInfo, selectedUid))
             {
                 var selectedMusicInfo = ResolveSelectionMusicInfo(musicInfo, selectedUid);
@@ -222,6 +224,7 @@ namespace MDEN.Managers
 
             var musicInfo = CurrentMusicInfo;
             var selectedUid = GlobalDataBase.dbMusicTag?.pnlSelectMusicUid;
+            selectedUid = SpecialChartVariantResolver.ResolveSelectedUid(musicInfo, selectedUid);
             if (SpecialChartVariantResolver.IsKnownVariantPair(entry.ChartKey) ||
                 SpecialChartVariantResolver.IsKnownVariantPair(selectedUid))
             {

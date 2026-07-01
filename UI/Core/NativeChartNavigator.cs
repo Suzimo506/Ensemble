@@ -30,15 +30,30 @@ namespace MDEN.UI.Core
 
         public static void JumpToChart(string chartKey, MusicInfo musicInfo, int difficulty)
         {
+            JumpToChart(chartKey, musicInfo, difficulty, false);
+        }
+
+        public static void PreviewChart(string chartKey, MusicInfo musicInfo, int difficulty)
+        {
+            JumpToChart(chartKey, musicInfo, difficulty, true);
+        }
+
+        private static void JumpToChart(string chartKey, MusicInfo musicInfo, int difficulty, bool allowBaseVariantNavigation)
+        {
             if (musicInfo == null || string.IsNullOrEmpty(chartKey)) return;
 
             var navigationUid = ResolveNavigationUid(chartKey, musicInfo);
             NativeChartSelectionSync.Sync(musicInfo, difficulty, chartKey);
-            JumpToChart(navigationUid);
+            JumpToChart(navigationUid, allowBaseVariantNavigation || SpecialChartVariantResolver.IsKnownVariantPair(chartKey));
             NativeChartSelectionSync.Sync(musicInfo, difficulty, chartKey);
         }
 
         public static void JumpToChart(string uid)
+        {
+            JumpToChart(uid, false);
+        }
+
+        private static void JumpToChart(string uid, bool allowBaseVariantNavigation)
         {
             if (string.IsNullOrEmpty(uid)) return;
 
@@ -76,7 +91,10 @@ namespace MDEN.UI.Core
 
                 MeasureSlow(
                     "NativeChartNavigator.SelectStageChart",
-                    () => stage?.SelectAllTagAndJumpToAssginIndex(SpecialChartVariantResolver.GetBaseUid(uid) ?? uid));
+                    () => stage?.SelectAllTagAndJumpToAssginIndex(
+                        allowBaseVariantNavigation
+                            ? SpecialChartVariantResolver.GetBaseUid(uid) ?? uid
+                            : uid));
             }
             catch (System.Exception ex)
             {

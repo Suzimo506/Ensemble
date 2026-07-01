@@ -460,7 +460,14 @@ namespace MDEN.Managers
             Register("chat.finished", "已完成", "finished", "已完成", "完了", "완료");
             Register("chat.cancel_ready", "取消准备", "cancelled ready", "取消準備", "準備解除", "준비 취소");
             Register("chat.chart_not_in_playlist", "未在歌曲列表找到该谱面", "Chart not found in the playlist", "未在歌曲列表找到該譜面", "プレイリストにこの譜面が見つかりません", "플레이리스트에서 이 채보를 찾지 못했습니다");
-            Register("chat.system_prefix", "[系统]", "[System]", "[系統]", "[システム]", "[시스템]");
+            Register("chat.invite_private_blocked", "有密码无法自动加入", "Room has a password and cannot be joined automatically", "有密碼無法自動加入", "パスワード付きのため自動参加できません", "비밀번호가 있어 자동 참가할 수 없습니다");
+            Register("chat.invite_sent", "邀请播报已发送", "Invite broadcast sent", "邀請播報已送出", "招待のお知らせを送信しました", "초대 알림을 보냈습니다");
+            Register("chat.world_sent", "世界频道消息已发送", "World message sent", "世界頻道訊息已送出", "ワールドメッセージを送信しました", "월드 메시지를 보냈습니다");
+            Register("chat.mode.room", "发送方式：房间", "Send mode: Room", "發送方式：房間", "送信先：ルーム", "전송 방식: 방");
+            Register("chat.mode.world", "发送方式：世界", "Send mode: World", "發送方式：世界", "送信先：ワールド", "전송 방식: 월드");
+            Register("chat.mode.invite", "发送方式：邀请", "Send mode: Invite", "發送方式：邀請", "送信先：招待", "전송 방식: 초대");
+            Register("chat.room_command_tip", "/world 内容：向世界频道发送消息；/invite 内容：向世界频道发送可点击加入房间的邀请播报。输入框选中时按 Tab 可切换【房间】【世界】【邀请】发送方式。", "/world text sends a world message; /invite text sends a clickable room invite. Press Tab while the input is focused to switch Room/World/Invite mode.", "/world 內容：向世界頻道發送訊息；/invite 內容：向世界頻道發送可點擊加入房間的邀請播報。輸入框選中時按 Tab 可切換【房間】【世界】【邀請】發送方式。", "/world 内容でワールドに送信、/invite 内容でクリック参加できる招待を送信します。入力欄選択中に Tab でルーム/ワールド/招待を切り替えます。", "/world 내용: 월드 채널로 메시지를 보냅니다. /invite 내용: 클릭해 방에 참가할 수 있는 초대 알림을 보냅니다. 입력칸 선택 중 Tab으로 방/월드/초대 전송 방식을 바꿀 수 있습니다.");
+            Register("chat.system_prefix", "【系统】", "[System]", "【系統】", "[システム]", "[시스템]");
 
             Register("connection.version_old", "服务器版本过旧，请更换节点或等待服务器更新。", "Server version is too old. Choose another node or wait for an update.", "伺服器版本過舊，請更換節點或等待伺服器更新。", "サーバーバージョンが古すぎます。別のノードを選ぶか更新をお待ちください。", "서버 버전이 너무 오래되었습니다. 다른 서버를 선택하거나 업데이트를 기다려 주세요.");
             Register("connection.reconnecting", "正在重连服务器，请稍候。", "Reconnecting to server. Please wait.", "正在重新連線伺服器，請稍候。", "サーバーに再接続中です。お待ちください。", "서버에 재연결 중입니다. 잠시만 기다려 주세요.");

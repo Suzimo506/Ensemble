@@ -243,6 +243,12 @@ namespace MDEN.Managers
             }
         }
 
+        public static Task RefreshCurrentLobbyAsync()
+        {
+            EnsureReady();
+            return RefreshCurrentLobbyAfterReconnectAsync();
+        }
+
         private static async Task RefreshCurrentLobbyAfterReconnectAsync()
         {
             var response = await NetworkClient.Instance.SendRequestAsync<GetCurrentLobbyRequest, GetCurrentLobbyResponse>(

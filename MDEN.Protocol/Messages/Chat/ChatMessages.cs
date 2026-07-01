@@ -9,6 +9,8 @@ namespace MDEN.Protocol.Messages.Chat
     public class ChatNotifyMsg
     {
         public string Message { get; set; }
+
+        public byte Target { get; set; }
     }
 
     /// <summary>
@@ -24,5 +26,16 @@ namespace MDEN.Protocol.Messages.Chat
         public string ExtraData { get; set; }
 
         public bool IsSystem { get; set; }
+
+        public byte Channel { get; set; }
+    }
+
+    public static class ChatTargets
+    {
+        public const byte Default = 0;
+        public const byte Lobby = 1;
+        public const byte World = 2;
+        public const byte Invite = 3;
+        public const byte ApBroadcast = 4;
     }
 }

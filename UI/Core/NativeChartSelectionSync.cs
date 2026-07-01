@@ -12,14 +12,38 @@ namespace MDEN.UI.Core
 
         public static int Sync(MusicInfo musicInfo, int difficulty, string selectedUid)
         {
+            return Sync(musicInfo, difficulty, selectedUid, false);
+        }
+
+        public static int SyncForBattleStart(MusicInfo musicInfo, int difficulty, string selectedUid)
+        {
+            return Sync(musicInfo, difficulty, selectedUid, true);
+        }
+
+        private static int Sync(MusicInfo musicInfo, int difficulty, string selectedUid, bool forceSelectMusic)
+        {
             if (musicInfo == null || string.IsNullOrEmpty(musicInfo.uid)) return difficulty;
 
             if (string.IsNullOrEmpty(selectedUid)) selectedUid = musicInfo.uid;
+            if (SpecialChartVariantResolver.IsKnownVariantPair(selectedUid))
+            {
+                SpecialChartVariantResolver.ApplyVariantSelection(selectedUid);
+            }
+            else
+            {
+                SpecialChartVariantResolver.RestoreVariantSelectionOverride();
+            }
+
             var nativeDifficulty = HiddenDifficultyController.Sync(musicInfo, difficulty);
             var dbMusicTag = GlobalDataBase.dbMusicTag;
             if (dbMusicTag != null)
             {
                 nativeDifficulty = SpecialDifficultyController.Sync(musicInfo, nativeDifficulty);
+                if (forceSelectMusic)
+                {
+                    dbMusicTag.SetSelectedMusic(musicInfo, false, true);
+                }
+
                 dbMusicTag.selectedDiffTglIndex = nativeDifficulty;
                 dbMusicTag.pnlSelectMusicUid = selectedUid;
                 dbMusicTag.m_CurSelectedMusicInfo = musicInfo;
