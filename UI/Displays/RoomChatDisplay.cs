@@ -807,7 +807,7 @@ namespace MDEN.UI.Displays
                 var room = ParseRoomBroadcastData(msg);
                 if (room.HasValue && !string.IsNullOrWhiteSpace(room.Value.RoomName))
                 {
-                    return $"{worldPrefix}{ColorText($"【{EscapeRichText(room.Value.RoomName)}】", WorldRoomColor)}{ColorText(EscapeRichText(name), GetMessageAuthorColor(msg, room.Value.AuthorColor))}: {ColorText(EscapeRichText(msg.Message), WhiteTextColor)}";
+                    return $"{ColorText($"【{EscapeRichText(room.Value.RoomName)}】", WorldRoomColor)}{ColorText(EscapeRichText(name), GetMessageAuthorColor(msg, room.Value.AuthorColor))}: {ColorText(EscapeRichText(msg.Message), WhiteTextColor)}";
                 }
 
                 return $"{worldPrefix}{ColorText(EscapeRichText(name), GetMessageAuthorColor(msg, msg.ExtraData))}: {ColorText(EscapeRichText(msg.Message), WhiteTextColor)}";
