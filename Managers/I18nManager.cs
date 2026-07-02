@@ -237,7 +237,7 @@ namespace MDEN.Managers
             Register("create.players.title", "人数", "Players", "人數", "人数", "인원");
             Register("create.players.desc", "最多人数: {0}\n点击后输入人数，范围 2-10", "Max players: {0}\nClick to enter a value from 2 to 10", "最多人數: {0}\n點擊後輸入人數，範圍 2-10", "最大人数: {0}\nクリックして 2-10 の範囲で入力します", "최대 인원: {0}\n클릭해서 2-10 범위로 입력하세요");
             Register("create.play_mode.title", "游玩模式", "Play Mode", "遊玩模式", "プレイモード", "플레이 모드");
-            Register("create.play_mode.desc", "游玩模式: {0}\n点击切换为{1}", "Play mode: {0}\nClick to switch to {1}", "遊玩模式: {0}\n點擊切換為{1}", "プレイモード: {0}\nクリックで {1} に切り替え", "플레이 모드: {0}\n클릭하면 {1}(으)로 전환");
+            Register("create.play_mode.desc", "游玩模式: {0}\n点击切换为{1}\n{2}", "Play mode: {0}\nClick to switch to {1}\n{2}", "遊玩模式: {0}\n點擊切換為{1}\n{2}", "プレイモード: {0}\nクリックで {1} に切り替え\n{2}", "플레이 모드: {0}\n클릭하면 {1}(으)로 전환\n{2}");
             Register("create.playlist_size.title", "歌曲列表长度", "Playlist Size", "歌曲列表長度", "プレイリスト長", "플레이리스트 길이");
             Register("create.playlist_size.desc", "列表长度: {0}\n点击后输入歌曲列表长度，范围 2-32", "Playlist size: {0}\nClick to enter a value from 2 to 32", "列表長度: {0}\n點擊後輸入歌曲列表長度，範圍 2-32", "リスト長: {0}\nクリックして 2-32 の範囲で入力します", "목록 길이: {0}\n클릭해서 2-32 범위로 입력하세요");
             Register("tenzi.songs_per_player.title", "每人点歌数", "Songs Per Player", "每人點歌數", "1人あたりの曲数", "1인당 선곡 수");
@@ -407,6 +407,10 @@ namespace MDEN.Managers
             Register("mode.rookie", "新手模式", "Rookie Mode", "新手模式", "ルーキーモード", "초보 모드");
             Register("mode.fearless", "无畏模式", "Fearless Mode", "無畏模式", "無畏モード", "무외 모드");
             Register("mode.tenzi", "天子模式", "Tenzi Mode", "天子模式", "天子モード", "텐지 모드");
+            Register("mode.normal.desc", "标准联机规则，所有人按选择的谱面正常进行对战。", "Standard multiplayer rules. Everyone plays the selected chart normally.", "標準聯機規則，所有人按選擇的譜面正常進行對戰。", "標準のマルチプレイルールです。選んだ譜面を通常どおりプレイします。", "표준 멀티플레이 규칙입니다. 선택한 채보를 모두 정상적으로 플레이합니다.");
+            Register("mode.rookie.desc", "适合新手的模式，只能选择较低难度谱面。", "A beginner-friendly mode that only allows lower-difficulty charts.", "適合新手的模式，只能選擇較低難度譜面。", "初心者向けのモードです。低めの難易度の譜面のみ選べます。", "초보자에게 적합한 모드로, 낮은 난이도 채보만 선택할 수 있습니다.");
+            Register("mode.fearless.desc", "挑战高难度的模式，只能选择大触或隐藏难度谱面。", "A high-difficulty challenge mode that only allows Master or Hidden charts.", "挑戰高難度的模式，只能選擇大觸或隱藏難度譜面。", "高難度に挑むモードです。大触または隠し難易度のみ選べます。", "고난도에 도전하는 모드로, 마스터 또는 히든 난이도 채보만 선택할 수 있습니다.");
+            Register("mode.tenzi.desc", "每名玩家轮流点歌，随机抽取本轮要玩的谱面。", "Each player picks songs, then one chart is randomly drawn for the round.", "每名玩家輪流點歌，隨機抽取本輪要玩的譜面。", "各プレイヤーが曲を選び、その中から今回プレイする譜面をランダムに抽選します。", "각 플레이어가 곡을 고르고, 이번 라운드에 플레이할 채보를 무작위로 뽑습니다.");
             Register("difficulty.easy", "萌新", "Easy", "萌新", "萌新", "쉬움");
             Register("difficulty.hard", "高手", "Hard", "高手", "高手", "어려움");
             Register("difficulty.master", "大触", "Master", "大觸", "大触", "마스터");

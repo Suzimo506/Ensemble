@@ -79,7 +79,7 @@ namespace MDEN.UI.Windows
 
             _btnPlayMode = new ForumObject(
                 new LocalString(I18nManager.T("create.play_mode.title")),
-                new LocalString(I18nManager.Tf("create.play_mode.desc", FormatPlayMode(_playMode), FormatPlayMode(LobbyRuleTextFormatter.GetNextPlayMode((byte)_playMode)))));
+                new LocalString(I18nManager.Tf("create.play_mode.desc", FormatPlayMode(_playMode), FormatPlayMode(LobbyRuleTextFormatter.GetNextPlayMode((byte)_playMode)), LobbyRuleTextFormatter.GetPlayModeDescription((byte)_playMode))));
             _btnPlayMode.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("OptionsPanel.png")?.texture;
             _window.ForumObjects.Add(_btnPlayMode);
 

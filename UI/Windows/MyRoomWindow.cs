@@ -224,7 +224,7 @@ namespace MDEN.UI.Windows
             {
                 _btnPlayMode = new ForumObject(
                     new LocalString(I18nManager.T("create.play_mode.title")),
-                    new LocalString(I18nManager.Tf("room.setting.desc", Highlight(LobbyRuleTextFormatter.GetPlayModeName(lobby.PlayMode), LobbyRuleTextFormatter.GetPlayModeColor(lobby.PlayMode)), Highlight(LobbyRuleTextFormatter.GetPlayModeName((byte)LobbyRuleTextFormatter.GetNextPlayMode(lobby.PlayMode)), LobbyRuleTextFormatter.GetPlayModeColor((byte)LobbyRuleTextFormatter.GetNextPlayMode(lobby.PlayMode))))));
+                    new LocalString(BuildPlayModeSettingDescription(lobby.PlayMode)));
                 _btnPlayMode.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("OptionsPanel.png")?.texture;
                 _window.ForumObjects.Add(_btnPlayMode);
 
@@ -406,6 +406,16 @@ namespace MDEN.UI.Windows
                 Highlight(lobby.JoinLocked ? I18nManager.T("common.locked") : I18nManager.T("common.open"), lobby.JoinLocked ? Constants.ColorYellow : RoomListWindow.WaitingStatusColor),
                 Highlight(lobby.IsPrivate ? I18nManager.T("common.set") : I18nManager.T("common.no"), lobby.IsPrivate ? Constants.ColorYellow : RoomListWindow.WaitingStatusColor),
                 RoomListWindow.GetColoredLobbyStatus(lobby.IsPlaying, lobby.Locked, lobby.JoinLocked));
+        }
+
+        private static string BuildPlayModeSettingDescription(byte playMode)
+        {
+            return I18nManager.Tf(
+                "room.setting.desc",
+                Highlight(LobbyRuleTextFormatter.GetPlayModeName(playMode), LobbyRuleTextFormatter.GetPlayModeColor(playMode)),
+                Highlight(LobbyRuleTextFormatter.GetPlayModeName((byte)LobbyRuleTextFormatter.GetNextPlayMode(playMode)), LobbyRuleTextFormatter.GetPlayModeColor((byte)LobbyRuleTextFormatter.GetNextPlayMode(playMode)))) +
+                   "\n" +
+                   LobbyRuleTextFormatter.GetPlayModeDescription(playMode);
         }
 
         private static int GetPlayerCount(MDEN.Protocol.Messages.Lobby.LobbySyncPush lobby)

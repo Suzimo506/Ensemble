@@ -28,6 +28,17 @@ namespace MDEN.UI.Core
             };
         }
 
+        public static string GetPlayModeDescription(byte mode)
+        {
+            return LobbyPlayModeRules.Normalize(mode) switch
+            {
+                LobbyPlayMode.Rookie => I18nManager.T("mode.rookie.desc"),
+                LobbyPlayMode.Fearless => I18nManager.T("mode.fearless.desc"),
+                LobbyPlayMode.Tenzi => I18nManager.T("mode.tenzi.desc"),
+                _ => I18nManager.T("mode.normal.desc")
+            };
+        }
+
         public static string GetPlayModeColor(byte mode)
         {
             return LobbyPlayModeRules.Normalize(mode) switch
