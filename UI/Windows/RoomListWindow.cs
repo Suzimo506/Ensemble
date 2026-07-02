@@ -16,6 +16,13 @@ using UnityEngine;
 
 namespace MDEN.UI.Windows
 {
+    public enum RoomListBackTarget
+    {
+        ServerSelection,
+        MainMenu,
+        MyRoom
+    }
+
     public class RoomListWindow : MDENWindowBase
     {
         private const int AutoRefreshIntervalMs = 3000;
@@ -34,7 +41,7 @@ namespace MDEN.UI.Windows
         private int? _joiningLobbyId;
         private int _lastSelectedIndex = -1;
         private bool _suppressNextCompletion;
-        private readonly bool _readOnly;
+        private readonly RoomListBackTarget _backTarget;
 
         public RoomListWindow()
         {
@@ -42,7 +49,12 @@ namespace MDEN.UI.Windows
 
         public RoomListWindow(bool readOnly)
         {
-            _readOnly = readOnly;
+            _backTarget = readOnly ? RoomListBackTarget.MyRoom : RoomListBackTarget.ServerSelection;
+        }
+
+        public RoomListWindow(RoomListBackTarget backTarget)
+        {
+            _backTarget = backTarget;
         }
 
         public override async void Show()
@@ -154,31 +166,17 @@ namespace MDEN.UI.Windows
             _window.ForumObjects.Clear();
             _lastSelectedIndex = -1;
 
-            if (!_readOnly)
-            {
-                _btnBack = new ForumObject(new LocalString(I18nManager.T("common.back.button")), new LocalString(I18nManager.T("common.back.server_list")));
-                _btnBack.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("OptionsPanel.png")?.texture;
-                _window.ForumObjects.Add(_btnBack);
-            }
-            else
-            {
-                _btnBack = null;
-            }
+            _btnBack = new ForumObject(new LocalString(I18nManager.T("common.back.button")), new LocalString(GetBackDescription()));
+            _btnBack.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("OptionsPanel.png")?.texture;
+            _window.ForumObjects.Add(_btnBack);
 
             _btnRefresh = new ForumObject(new LocalString(I18nManager.T("server.refresh.button")), new LocalString(I18nManager.T("lobby.refresh.desc")));
             _btnRefresh.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("RoomList.png")?.texture;
             _window.ForumObjects.Add(_btnRefresh);
 
-            if (!_readOnly)
-            {
-                _btnCreateRoom = new ForumObject(new LocalString(I18nManager.T("lobby.create.button")), new LocalString(I18nManager.T("lobby.create.desc")));
-                _btnCreateRoom.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("HomePanel.png")?.texture;
-                _window.ForumObjects.Add(_btnCreateRoom);
-            }
-            else
-            {
-                _btnCreateRoom = null;
-            }
+            _btnCreateRoom = new ForumObject(new LocalString(I18nManager.T("lobby.create.button")), new LocalString(I18nManager.T("lobby.create.desc")));
+            _btnCreateRoom.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("HomePanel.png")?.texture;
+            _window.ForumObjects.Add(_btnCreateRoom);
 
             if (_lobbies.Length == 0)
             {
@@ -317,15 +315,13 @@ namespace MDEN.UI.Windows
             if (button == _btnBack)
             {
                 Close();
-                WindowStackController.OpenWindow(LobbyManager.IsInLobby
-                    ? new MyRoomWindow()
-                    : new ServerSelectionWindow());
+                WindowStackController.OpenWindow(CreateBackWindow());
             }
             else if (button == _btnRefresh)
             {
                 await RefreshLobbiesAsync();
             }
-            else if (!_readOnly && button == _btnCreateRoom)
+            else if (button == _btnCreateRoom)
             {
                 Close();
                 WindowStackController.OpenWindow(new CreateRoomWindow());
@@ -336,11 +332,6 @@ namespace MDEN.UI.Windows
             }
             else
             {
-                if (_readOnly)
-                {
-                    return;
-                }
-
                 var lobbyIndex = objectIndex - GetLobbyStartIndex();
                 if (lobbyIndex >= 0 && lobbyIndex < _lobbies.Length)
                 {
@@ -444,7 +435,27 @@ namespace MDEN.UI.Windows
 
         private int GetLobbyStartIndex()
         {
-            return _readOnly ? 1 : 3;
+            return 3;
+        }
+
+        private string GetBackDescription()
+        {
+            return _backTarget switch
+            {
+                RoomListBackTarget.MainMenu => I18nManager.T("common.back.main_menu"),
+                RoomListBackTarget.MyRoom => I18nManager.T("common.back.previous_window"),
+                _ => I18nManager.T("common.back.server_list")
+            };
+        }
+
+        private MDENWindowBase CreateBackWindow()
+        {
+            return _backTarget switch
+            {
+                RoomListBackTarget.MainMenu => new MainMenuWindow(),
+                RoomListBackTarget.MyRoom => new MyRoomWindow(),
+                _ => LobbyManager.IsInLobby ? new MyRoomWindow() : new ServerSelectionWindow()
+            };
         }
 
         private async System.Threading.Tasks.Task RefreshLobbiesAsync()

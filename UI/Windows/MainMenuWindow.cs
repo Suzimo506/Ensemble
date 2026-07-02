@@ -166,8 +166,8 @@ namespace MDEN.UI.Windows
                 }
 
                 Close();
-                WindowStackController.OpenWindow(LobbyManager.IsInLobby
-                    ? new RoomListWindow()
+                WindowStackController.OpenWindow(ConnectionManager.CanSendRequests
+                    ? new RoomListWindow(RoomListBackTarget.MainMenu)
                     : new ServerSelectionWindow());
             }
             else if (button == _btnSettings)
