@@ -118,8 +118,8 @@ namespace MDEN.UI.Core
                         return;
                     }
 
-                    WindowStackController.OpenWindow(LobbyManager.IsInLobby
-                        ? new RoomListWindow(true)
+                    WindowStackController.OpenWindow(ConnectionManager.CanSendRequests
+                        ? new RoomListWindow(RoomListBackTarget.MainMenu)
                         : new MainMenuWindow());
                 }));
             }
