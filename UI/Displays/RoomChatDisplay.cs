@@ -29,6 +29,7 @@ namespace MDEN.UI.Displays
         private Text _worldMuteLabel;
         private Image _worldMuteIndicator;
         private Text _worldMuteCheckMark;
+        private GameObject _chatGuideOverlay;
         private bool _sendInProgress;
         private bool _gameInputBlocked;
         private bool _worldChannelMuted;
@@ -36,7 +37,8 @@ namespace MDEN.UI.Displays
         private int _suppressGameInputUntilFrame = -1;
         private ChatSendMode _sendMode = ChatSendMode.Room;
 
-        public bool IsConsumingInput => (_inputField != null && _inputField.isFocused)
+        public bool IsConsumingInput => _chatGuideOverlay != null
+            || (_inputField != null && _inputField.isFocused)
             || _sendInProgress
             || Time.frameCount <= _suppressGameInputUntilFrame;
         public bool IsCreated => _frame != null;
@@ -88,16 +90,18 @@ namespace MDEN.UI.Displays
         private const float ManualScrollStep = 0.14f;
         private const float BottomSnapThreshold = 0.02f;
         private const int MaxMessages = 50;
+        private const int ChatGuideOverlaySortingOrder = 32767;
+        private const string ChatGuideInputBlockReason = "RoomChatGuide";
         private static readonly Color BackgroundDefaultColor = new Color(0f, 0f, 0f, 0.15f);
         private static readonly Color BackgroundFocusedColor = new Color(0f, 0f, 0f, 0.32f);
         private static readonly Color InputDefaultColor = new Color(0f, 0f, 0f, 0.15f);
         private static readonly Color InputFocusedColor = new Color(0f, 0f, 0f, 0.4f);
         private static readonly Color InputClearButtonBgColor = new Color(0.42f, 0.16f, 0.66f, 0.95f);
         private static readonly Color InputClearButtonIconColor = new Color(0.88f, 0.46f, 1f, 1f);
-        private static readonly Color WorldMuteToggleDefaultColor = new Color(0f, 0f, 0f, 0.22f);
-        private static readonly Color WorldMuteToggleActiveColor = new Color(0.42f, 0.16f, 0.66f, 0.92f);
-        private static readonly Color WorldMuteIndicatorDefaultColor = new Color(1f, 1f, 1f, 0.16f);
-        private static readonly Color WorldMuteIndicatorActiveColor = new Color(1f, 0.86f, 0.26f, 1f);
+        private static readonly Color WorldMuteToggleColor = new Color(0.34f, 0.08f, 0.54f, 1f);
+        private static readonly Color WorldMuteLabelColor = new Color(1f, 0.86f, 0.22f, 1f);
+        private static readonly Color WorldMuteIndicatorColor = new Color(0.16f, 0.04f, 0.24f, 1f);
+        private static readonly Color WorldMuteCheckMarkColor = new Color(1f, 0.34f, 0.72f, 1f);
         private const string WhiteTextColor = "ffffffff";
         private const string GreenTextColor = "66ff66ff";
         private const string RedTextColor = "ff5555ff";
@@ -238,6 +242,7 @@ namespace MDEN.UI.Displays
 
         private void DestroyInternal(bool clearMessages)
         {
+            DestroyChatGuideOverlay();
             SetGameInputBlocked(false);
             _sendInProgress = false;
             _clearSlashFrame = -1;
@@ -426,6 +431,7 @@ namespace MDEN.UI.Displays
             toggleImage.sprite = _btnBaseSprite;
 
             _worldMuteButton = toggleObj.AddComponent<Button>();
+            _worldMuteButton.transition = Selectable.Transition.None;
             _worldMuteButton.targetGraphic = toggleImage;
             _worldMuteButton.onClick.AddListener((UnityAction)new Action(ToggleWorldChannelMuted));
 
@@ -440,7 +446,8 @@ namespace MDEN.UI.Displays
             indicatorRect.sizeDelta = new Vector2(WorldMuteToggleIndicatorSize, WorldMuteToggleIndicatorSize);
 
             _worldMuteIndicator = indicatorObj.AddComponent<Image>();
-            _worldMuteIndicator.type = Image.Type.Simple;
+            _worldMuteIndicator.type = _btnBaseSprite == null ? Image.Type.Simple : Image.Type.Sliced;
+            _worldMuteIndicator.sprite = _btnBaseSprite;
             _worldMuteIndicator.raycastTarget = false;
 
             var checkObj = new GameObject("CheckMark");
@@ -531,31 +538,25 @@ namespace MDEN.UI.Displays
             if (_worldMuteLabel != null)
             {
                 _worldMuteLabel.text = I18nManager.T("chat.world_mute.label");
-                _worldMuteLabel.color = _worldChannelMuted
-                    ? new Color(1f, 0.9f, 0.35f, 1f)
-                    : new Color(1f, 1f, 1f, 0.86f);
+                _worldMuteLabel.color = WorldMuteLabelColor;
             }
 
             if (_worldMuteIndicator != null)
             {
-                _worldMuteIndicator.color = _worldChannelMuted
-                    ? WorldMuteIndicatorActiveColor
-                    : WorldMuteIndicatorDefaultColor;
+                _worldMuteIndicator.color = WorldMuteIndicatorColor;
             }
 
             if (_worldMuteCheckMark != null)
             {
                 _worldMuteCheckMark.color = _worldChannelMuted
-                    ? new Color(0.1f, 0.03f, 0.18f, 1f)
+                    ? WorldMuteCheckMarkColor
                     : new Color(1f, 1f, 1f, 0f);
             }
 
             var image = _worldMuteButton?.targetGraphic as Image;
             if (image != null)
             {
-                image.color = _worldChannelMuted
-                    ? WorldMuteToggleActiveColor
-                    : WorldMuteToggleDefaultColor;
+                image.color = WorldMuteToggleColor;
             }
         }
 
@@ -1102,6 +1103,15 @@ namespace MDEN.UI.Displays
                 }
             }
 
+            if (msg.Message == "LobbyInviteDeclined")
+            {
+                var player = ParseLobbyInviteDeclinedData(msg);
+                if (player.HasValue)
+                {
+                    return $"{SystemPrefix()} {I18nManager.Tf("chat.invite_declined", ColorText(EscapeRichText(player.Value.Name), player.Value.Color))}";
+                }
+            }
+
             if (msg.Message == "房主已开始游戏，请准备")
             {
                 return $"{SystemPrefix()} {ColorText(I18nManager.T("chat.host_started"), GreenTextColor)}";
@@ -1153,11 +1163,117 @@ namespace MDEN.UI.Displays
             return msg?.IsSystem == true && msg.Message == RoomHudController.ChatGuideMessageKey;
         }
 
-        private static void ShowChatGuideDialog()
+        private void ShowChatGuideDialog()
         {
-            NativeConfirmDialog.ShowMessage(
-                I18nManager.T("chat.guide.title"),
-                I18nManager.T("chat.guide.body"));
+            DestroyChatGuideOverlay();
+
+            _chatGuideOverlay = new GameObject("MDENChatGuideOverlay");
+            var rootRect = _chatGuideOverlay.AddComponent<RectTransform>();
+            rootRect.anchorMin = Vector2.zero;
+            rootRect.anchorMax = Vector2.one;
+            rootRect.offsetMin = Vector2.zero;
+            rootRect.offsetMax = Vector2.zero;
+
+            var canvas = _chatGuideOverlay.AddComponent<Canvas>();
+            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            canvas.overrideSorting = true;
+            canvas.sortingOrder = ChatGuideOverlaySortingOrder;
+
+            var scaler = _chatGuideOverlay.AddComponent<CanvasScaler>();
+            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+            scaler.referenceResolution = new Vector2(1920f, 1080f);
+            scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
+            scaler.matchWidthOrHeight = 0.5f;
+
+            _chatGuideOverlay.AddComponent<GraphicRaycaster>();
+            CreateChatGuideShade(rootRect);
+            CreateChatGuideTitle(rootRect);
+            CreateChatGuideBody(rootRect);
+            NativeInputBlocker.SetBlocked(ChatGuideInputBlockReason, true);
+        }
+
+        private void CreateChatGuideShade(RectTransform parent)
+        {
+            var shade = new GameObject("Shade");
+            var shadeRect = shade.AddComponent<RectTransform>();
+            shadeRect.SetParent(parent, false);
+            shadeRect.anchorMin = Vector2.zero;
+            shadeRect.anchorMax = Vector2.one;
+            shadeRect.offsetMin = Vector2.zero;
+            shadeRect.offsetMax = Vector2.zero;
+
+            var shadeImage = shade.AddComponent<Image>();
+            shadeImage.color = new Color(0f, 0f, 0f, 0.82f);
+            shadeImage.raycastTarget = true;
+
+            var closeButton = shade.AddComponent<Button>();
+            closeButton.transition = Selectable.Transition.None;
+            closeButton.targetGraphic = shadeImage;
+            closeButton.onClick.AddListener((UnityAction)new Action(DestroyChatGuideOverlay));
+        }
+
+        private void CreateChatGuideTitle(RectTransform parent)
+        {
+            var title = CreateChatGuideText(parent, "Title", I18nManager.T("chat.guide.title"), 40, TextAnchor.MiddleCenter);
+            title.color = new Color(1f, 0.86f, 0.42f, 1f);
+            title.fontStyle = FontStyle.Bold;
+            title.resizeTextForBestFit = true;
+            title.resizeTextMinSize = 28;
+            title.resizeTextMaxSize = 40;
+
+            var titleRect = title.rectTransform;
+            titleRect.anchorMin = new Vector2(0f, 1f);
+            titleRect.anchorMax = new Vector2(1f, 1f);
+            titleRect.pivot = new Vector2(0.5f, 1f);
+            titleRect.offsetMin = new Vector2(170f, -120f);
+            titleRect.offsetMax = new Vector2(-170f, -48f);
+        }
+
+        private void CreateChatGuideBody(RectTransform parent)
+        {
+            var body = CreateChatGuideText(parent, "Body", I18nManager.T("chat.guide.body"), 28, TextAnchor.UpperLeft);
+            body.color = new Color(0.94f, 0.92f, 1f, 1f);
+            body.lineSpacing = 1.08f;
+            body.resizeTextForBestFit = true;
+            body.resizeTextMinSize = 18;
+            body.resizeTextMaxSize = 28;
+            body.verticalOverflow = VerticalWrapMode.Truncate;
+
+            var bodyRect = body.rectTransform;
+            bodyRect.anchorMin = Vector2.zero;
+            bodyRect.anchorMax = Vector2.one;
+            bodyRect.offsetMin = new Vector2(180f, 120f);
+            bodyRect.offsetMax = new Vector2(-180f, -150f);
+        }
+
+        private Text CreateChatGuideText(RectTransform parent, string name, string value, int fontSize, TextAnchor alignment)
+        {
+            var obj = new GameObject(name);
+            var rect = obj.AddComponent<RectTransform>();
+            rect.SetParent(parent, false);
+            rect.localScale = Vector3.one;
+
+            var text = obj.AddComponent<Text>();
+            ApplyGameFont(text);
+            text.text = value;
+            text.fontSize = fontSize;
+            text.alignment = alignment;
+            text.horizontalOverflow = HorizontalWrapMode.Wrap;
+            text.verticalOverflow = VerticalWrapMode.Overflow;
+            text.supportRichText = true;
+            text.raycastTarget = false;
+            return text;
+        }
+
+        private void DestroyChatGuideOverlay()
+        {
+            if (_chatGuideOverlay != null)
+            {
+                DestroyObject(_chatGuideOverlay);
+                _chatGuideOverlay = null;
+            }
+
+            NativeInputBlocker.Clear(ChatGuideInputBlockReason);
         }
 
         private string FormatApBroadcastMessage(ChatPushMsg msg)
@@ -1372,6 +1488,19 @@ namespace MDEN.UI.Displays
             if (parts.Length < 2) return null;
 
             return (parts[0], parts[1]);
+        }
+
+        private static (string Uid, string Name, string Color)? ParseLobbyInviteDeclinedData(ChatPushMsg msg)
+        {
+            if (string.IsNullOrWhiteSpace(msg?.ExtraData)) return null;
+
+            var parts = msg.ExtraData.Split('#');
+            if (parts.Length < 2) return null;
+
+            return (
+                parts[0],
+                parts[1],
+                parts.Length > 2 ? parts[2] : null);
         }
 
         private static (int LobbyId, string RoomName, bool IsPrivate, string AuthorColor)? ParseInviteData(ChatPushMsg msg)

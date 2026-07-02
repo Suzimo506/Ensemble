@@ -13,11 +13,5 @@ namespace MDEN.UI.Core
                 new Action(() => onCompleted?.Invoke(true)),
                 new Action(() => onCompleted?.Invoke(false)));
         }
-
-        public static void ShowMessage(string title, string message)
-        {
-            var body = string.IsNullOrWhiteSpace(title) ? message : $"{title}\n{message}";
-            CommonMessageBox.ShowOnlyWindowWithShut(body);
-        }
     }
 }
