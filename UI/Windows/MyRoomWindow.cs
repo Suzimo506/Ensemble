@@ -304,7 +304,8 @@ namespace MDEN.UI.Windows
                         AvatarName = player.AvatarName,
                         AvatarData = player.AvatarData,
                         PingMS = player.PingMS,
-                        Status = player.Status
+                        Status = player.Status,
+                        TotalMultiplayerGames = player.TotalMultiplayerGames
                     };
                     var item = new ForumObject(new LocalString(name), new LocalString(BuildPlayerDescription(entry)));
                     item.Texture = AvatarManager.GetAvatarTexture(entry.Uid, entry.AvatarName, entry.AvatarData);
@@ -329,7 +330,10 @@ namespace MDEN.UI.Windows
                         Title = uid == PlayerManager.CurrentUid ? PlayerManager.CurrentProfile?.Title : null,
                         ChatColor = uid == PlayerManager.CurrentUid ? PlayerManager.CurrentProfile?.ChatColor : null,
                         AvatarName = uid == PlayerManager.CurrentUid ? PlayerManager.CurrentProfile?.AvatarName : null,
-                        AvatarData = uid == PlayerManager.CurrentUid ? PlayerManager.CurrentProfile?.AvatarData : null
+                        AvatarData = uid == PlayerManager.CurrentUid ? PlayerManager.CurrentProfile?.AvatarData : null,
+                        TotalMultiplayerGames = uid == PlayerManager.CurrentUid
+                            ? PlayerManager.CurrentProfile?.TotalMultiplayerGames ?? 0
+                            : 0
                     };
                     var item = new ForumObject(new LocalString(name), new LocalString(BuildPlayerDescription(entry)));
                     item.Texture = AvatarManager.GetAvatarTexture(entry.Uid, entry.AvatarName, entry.AvatarData);

@@ -76,6 +76,7 @@ namespace MDEN.Protocol.Messages.Player
         public int FavGirlIndex { get; set; }
         public int FavElfinIndex { get; set; }
         public ushort PingMS { get; set; }
+        public int TotalMultiplayerGames { get; set; }
         public string[] Friends { get; set; }
         public string[] FriendRequests { get; set; }
         public Dictionary<long, byte> Achievements { get; set; }

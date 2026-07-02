@@ -9,6 +9,7 @@ namespace MDEN.UI.Core
         public static string Build(PlayerSyncEntry player, double? ratingLevel, bool ratingLevelLoaded)
         {
             return $"{Colorize(EscapeRichText(GetDisplayBio(player)), Constants.ColorProfilePink)}\n\n\n" +
+                   $"{Colorize(I18nManager.Tf("player.total_multiplayer_games", GetTotalMultiplayerGames(player)), Constants.ColorBlue)}\n" +
                    $"{Colorize($"RL：{GetRatingLevelText(ratingLevel, ratingLevelLoaded)}", Constants.ColorYellow)}\n" +
                    $"{Colorize($"ping：{GetRealtimePing(player)} ms", GetPingColor(player))}";
         }
@@ -28,6 +29,16 @@ namespace MDEN.UI.Core
             }
 
             return player?.PingMS ?? 0;
+        }
+
+        private static int GetTotalMultiplayerGames(PlayerSyncEntry player)
+        {
+            if (player?.Uid == PlayerManager.CurrentUid)
+            {
+                return PlayerManager.CurrentProfile?.TotalMultiplayerGames ?? player.TotalMultiplayerGames;
+            }
+
+            return player?.TotalMultiplayerGames ?? 0;
         }
 
         private static string GetDisplayBio(PlayerSyncEntry player)

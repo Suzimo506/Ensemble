@@ -132,7 +132,8 @@ namespace MDEN.Managers
                             AvatarName = PlayerManager.CurrentProfile?.AvatarName,
                             AvatarData = PlayerManager.CurrentProfile?.AvatarData,
                             PingMS = 0,
-                            Status = (byte)PlayerStatus.InLobby
+                            Status = (byte)PlayerStatus.InLobby,
+                            TotalMultiplayerGames = PlayerManager.CurrentProfile?.TotalMultiplayerGames ?? 0
                         }
                     }
             };
@@ -517,7 +518,8 @@ namespace MDEN.Managers
                             AvatarName = PlayerManager.CurrentProfile?.AvatarName,
                             AvatarData = PlayerManager.CurrentProfile?.AvatarData,
                             PingMS = 0,
-                            Status = (byte)PlayerStatus.InLobby
+                            Status = (byte)PlayerStatus.InLobby,
+                            TotalMultiplayerGames = PlayerManager.CurrentProfile?.TotalMultiplayerGames ?? 0
                         }
                     }
             };
@@ -878,7 +880,8 @@ namespace MDEN.Managers
                     a.ChatColor != b.ChatColor ||
                     a.AvatarName != b.AvatarName ||
                     a.AvatarData != b.AvatarData ||
-                    a.Status != b.Status)
+                    a.Status != b.Status ||
+                    a.TotalMultiplayerGames != b.TotalMultiplayerGames)
                 {
                     return false;
                 }

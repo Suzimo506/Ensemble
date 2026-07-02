@@ -14,6 +14,7 @@ namespace MDEN.Protocol.Models
         public string AvatarData { get; set; }
         public ushort PingMS { get; set; }
         public byte Status { get; set; }
+        public int TotalMultiplayerGames { get; set; }
     }
 
     /// <summary>

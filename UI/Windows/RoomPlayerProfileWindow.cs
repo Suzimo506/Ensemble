@@ -204,10 +204,16 @@ namespace MDEN.UI.Windows
         {
             return $"{I18nManager.T("player.profile.title_label")}\n{EscapeRichText(GetDisplayTitle())}\n\n" +
                 $"UID\n{EscapeRichText(_player.Uid)}\n\n" +
+                $"{I18nManager.T("player.profile.total_multiplayer_games_label")}\n{GetTotalMultiplayerGames()}\n\n" +
                 $"{I18nManager.T("player.profile.status_label")}\n{GetStatusText(_player.Status)}\n\n" +
                 $"{I18nManager.T("player.profile.color_label")}\n{EscapeRichText(GetDisplayColor())}\n\n" +
                 $"{I18nManager.T("player.profile.entrance_label")}\n{EscapeRichText(GetDisplayEntranceMessage())}\n\n" +
                 $"{I18nManager.T("player.profile.bio_label")}\n{EscapeRichText(GetDisplayBio())}";
+        }
+
+        private int GetTotalMultiplayerGames()
+        {
+            return _profile?.TotalMultiplayerGames ?? _player.TotalMultiplayerGames;
         }
 
         private string GetDisplayName()

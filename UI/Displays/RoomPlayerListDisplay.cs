@@ -103,7 +103,8 @@ namespace MDEN.UI.Displays
                         AvatarName = player.AvatarName,
                         AvatarData = player.AvatarData,
                         PingMS = player.PingMS,
-                        Status = player.Status
+                        Status = player.Status,
+                        TotalMultiplayerGames = player.TotalMultiplayerGames
                     };
                 }
 
@@ -125,7 +126,10 @@ namespace MDEN.UI.Displays
                     Title = uid == PlayerManager.CurrentUid ? PlayerManager.CurrentProfile?.Title : null,
                     ChatColor = uid == PlayerManager.CurrentUid ? PlayerManager.CurrentProfile?.ChatColor : null,
                     AvatarName = uid == PlayerManager.CurrentUid ? PlayerManager.CurrentProfile?.AvatarName : null,
-                    AvatarData = uid == PlayerManager.CurrentUid ? PlayerManager.CurrentProfile?.AvatarData : null
+                    AvatarData = uid == PlayerManager.CurrentUid ? PlayerManager.CurrentProfile?.AvatarData : null,
+                    TotalMultiplayerGames = uid == PlayerManager.CurrentUid
+                        ? PlayerManager.CurrentProfile?.TotalMultiplayerGames ?? 0
+                        : 0
                 };
             }
         }

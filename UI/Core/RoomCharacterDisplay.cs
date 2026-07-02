@@ -1283,6 +1283,7 @@ namespace MDEN.UI.Core
                     GirlIndex = GetLocalDisplaySelection().GirlIndex,
                     ElfinIndex = GetLocalDisplaySelection().ElfinIndex,
                     Status = (byte)PlayerStatus.InLobby,
+                    TotalMultiplayerGames = PlayerManager.CurrentProfile?.TotalMultiplayerGames ?? 0,
                     IsHost = IsSameUid(uid, lobby.HostUid)
                 };
         }
@@ -1322,6 +1323,7 @@ namespace MDEN.UI.Core
                         ChatColor = GetDisplayColor(player),
                         PingMS = player.PingMS,
                         Status = player.Status,
+                        TotalMultiplayerGames = player.TotalMultiplayerGames,
                         GirlIndex = GetGirlIndex(uid, character),
                         ElfinIndex = GetElfinIndex(uid, character),
                         IsHost = IsSameUid(uid, lobby.HostUid)
@@ -1348,6 +1350,9 @@ namespace MDEN.UI.Core
                     GirlIndex = GetGirlIndex(uid, character),
                     ElfinIndex = GetElfinIndex(uid, character),
                     Status = (byte)PlayerStatus.InLobby,
+                    TotalMultiplayerGames = IsSameUid(uid, PlayerManager.CurrentUid)
+                        ? PlayerManager.CurrentProfile?.TotalMultiplayerGames ?? 0
+                        : 0,
                     IsHost = IsSameUid(uid, lobby.HostUid)
                 };
             }
@@ -1421,7 +1426,8 @@ namespace MDEN.UI.Core
                 Title = player.Title,
                 ChatColor = player.ChatColor,
                 PingMS = player.PingMS,
-                Status = player.Status
+                Status = player.Status,
+                TotalMultiplayerGames = player.TotalMultiplayerGames
             };
         }
 
@@ -1952,6 +1958,7 @@ namespace MDEN.UI.Core
             public string ChatColor { get; set; }
             public ushort PingMS { get; set; }
             public byte Status { get; set; }
+            public int TotalMultiplayerGames { get; set; }
             public int GirlIndex { get; set; }
             public int ElfinIndex { get; set; }
             public bool IsHost { get; set; }
