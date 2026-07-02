@@ -1,7 +1,7 @@
 using MelonLoader;
 using MDEN.Bootstrap;
 
-[assembly: MelonInfo(typeof(MDEN.Main), "Ensemble", "0.4.3", "MDENTeam")]
+[assembly: MelonInfo(typeof(MDEN.Main), "Ensemble", "0.5.1", "MDENTeam")]
 [assembly: MelonGame("PeroPeroGames", "MuseDash")]
 [assembly: MelonOptionalDependencies("FavGirl")]
 
