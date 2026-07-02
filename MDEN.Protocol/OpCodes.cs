@@ -80,6 +80,14 @@ namespace MDEN.Protocol
         public const ushort GetFriendsReq = 0x0702;
         public const ushort GetFriendsResp = 0x0703;
         public const ushort FriendNotifyPush = 0x0704;
+        public const ushort GetNodePlayersReq = 0x0710;
+        public const ushort GetNodePlayersResp = 0x0711;
+        public const ushort SendLobbyInviteReq = 0x0712;
+        public const ushort SendLobbyInviteResp = 0x0713;
+        public const ushort RespondLobbyInviteReq = 0x0714;
+        public const ushort RespondLobbyInviteResp = 0x0715;
+        public const ushort PlayerPresenceNotify = 0x0716;
+        public const ushort LobbyInvitePush = 0x0717;
 
         // === 房间状态推送 (0x0800 ~ 0x08FF) ===
         public const ushort LobbySyncPush = 0x0800;

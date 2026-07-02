@@ -5,7 +5,8 @@ namespace MDEN.Protocol.Enums
         Offline = 0,
         Online = 1,
         InLobby = 2,
-        InBattle = 3
+        InBattle = 3,
+        SinglePlaying = 4
     }
 
     public enum LobbyGoal : byte

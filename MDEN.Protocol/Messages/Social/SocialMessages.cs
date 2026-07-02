@@ -33,4 +33,60 @@ namespace MDEN.Protocol.Messages.Social
         public string PlayerUid { get; set; }
         public string PlayerName { get; set; }
     }
+
+    public class GetNodePlayersRequest
+    {
+    }
+
+    public class GetNodePlayersResponse
+    {
+        public NodePlayerEntry[] Players { get; set; }
+    }
+
+    public class NodePlayerEntry
+    {
+        public string Uid { get; set; }
+        public string Name { get; set; }
+        public string ChatColor { get; set; }
+        public byte Status { get; set; }
+        public int LobbyId { get; set; }
+        public string LobbyName { get; set; }
+    }
+
+    public class SendLobbyInviteRequest
+    {
+        public string TargetUid { get; set; }
+    }
+
+    public class SendLobbyInviteResponse
+    {
+        public bool Sent { get; set; }
+        public string Reason { get; set; }
+    }
+
+    public class LobbyInvitePush
+    {
+        public string InviteId { get; set; }
+        public int LobbyId { get; set; }
+        public string LobbyName { get; set; }
+        public string InviterUid { get; set; }
+        public string InviterName { get; set; }
+        public string InviterColor { get; set; }
+    }
+
+    public class RespondLobbyInviteRequest
+    {
+        public string InviteId { get; set; }
+        public bool Accepted { get; set; }
+    }
+
+    public class RespondLobbyInviteResponse
+    {
+        public int LobbyId { get; set; }
+    }
+
+    public class PlayerPresenceNotify
+    {
+        public byte Status { get; set; }
+    }
 }

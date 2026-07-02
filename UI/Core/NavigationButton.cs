@@ -19,6 +19,7 @@ namespace MDEN.UI.Core
         private static GameObject _startBtn;
         private static GameObject _serverLabelObj;
         private static Text _serverLabel;
+        private static Button _serverLabelButton;
         private static Sprite _serverLabelBackgroundSprite;
         private static bool _connectionStateSubscribed;
         private static ConnectionLifecycleState _lastConnectionState = ConnectionLifecycleState.Disconnected;
@@ -256,7 +257,12 @@ namespace MDEN.UI.Core
             background.sprite = GetServerLabelBackgroundSprite();
             background.type = Image.Type.Sliced;
             background.color = new Color(0.24f, 0.07f, 0.46f, 0.94f);
-            background.raycastTarget = false;
+            background.raycastTarget = true;
+
+            _serverLabelButton = _serverLabelObj.AddComponent<Button>();
+            _serverLabelButton.transition = Selectable.Transition.None;
+            _serverLabelButton.targetGraphic = background;
+            _serverLabelButton.onClick.AddListener((UnityAction)new Action(NodePlayersOverlay.Show));
 
             var textObj = new GameObject("TxtNodeName");
             var textRect = textObj.AddComponent<RectTransform>();
@@ -315,11 +321,13 @@ namespace MDEN.UI.Core
         {
             if (_serverLabelObj != null)
             {
+                _serverLabelButton?.onClick.RemoveAllListeners();
                 DestroyObject(_serverLabelObj);
             }
 
             _serverLabelObj = null;
             _serverLabel = null;
+            _serverLabelButton = null;
         }
 
         private static void ApplyGameFont(Text text)
@@ -843,6 +851,7 @@ namespace MDEN.UI.Core
                     _serverLabel = labelTransform == null
                         ? _serverLabelObj.GetComponent<Text>()
                         : labelTransform.GetComponent<Text>();
+                    _serverLabelButton = _serverLabelObj.GetComponent<Button>();
                 }
             }
         }
@@ -863,6 +872,7 @@ namespace MDEN.UI.Core
             _startBtn = null;
             _serverLabelObj = null;
             _serverLabel = null;
+            _serverLabelButton = null;
         }
     }
 }

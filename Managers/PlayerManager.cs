@@ -24,6 +24,7 @@ namespace MDEN.Managers
 
         public static string CurrentUid { get; private set; }
         public static GetPlayerResponse CurrentProfile { get; private set; }
+        public static bool IsSinglePlaying => _lastPresenceStatus == PlayerStatus.SinglePlaying && !LobbyManager.IsInLobby;
         public static event Action ProfileChanged;
         private static GameSelectionInfo _lastSyncedSelection = new GameSelectionInfo(int.MinValue, int.MinValue);
         private static GameSelectionInfo _lastSyncedFavSelection = new GameSelectionInfo(int.MinValue, int.MinValue);
@@ -32,6 +33,7 @@ namespace MDEN.Managers
         private static Task _chartStateSyncTask;
         private static DateTime _lastChartStateSyncUtc;
         private static CustomChartSnapshotItem[] _customChartSnapshot = Array.Empty<CustomChartSnapshotItem>();
+        private static PlayerStatus? _lastPresenceStatus;
 
         public static void SetCurrentUid(string uid)
         {
@@ -52,7 +54,22 @@ namespace MDEN.Managers
             _lastSyncedFavSelection = new GameSelectionInfo(int.MinValue, int.MinValue);
             _lastSelectionSyncFrame = 0;
             _selectionSyncInProgress = false;
+            _lastPresenceStatus = null;
             InvalidateChartStateCache();
+        }
+
+        public static void SyncPresenceIfChanged(PlayerStatus status)
+        {
+            if (LobbyManager.IsInLobby) return;
+            if (_lastPresenceStatus == status) return;
+
+            _lastPresenceStatus = status;
+            if (CurrentProfile != null)
+            {
+                CurrentProfile.Status = (byte)status;
+            }
+
+            SocialManager.SyncPresence(status);
         }
 
         public static async Task<GetPlayerResponse> GetMyProfileAsync()
@@ -343,6 +360,10 @@ namespace MDEN.Managers
 
         private static GetPlayerResponse CreateLocalProfile(string uid, string fallbackName, PlayerStatus status)
         {
+            var totalMultiplayerGames = CurrentProfile != null && CurrentProfile.Uid == uid
+                ? CurrentProfile.TotalMultiplayerGames
+                : 0;
+
             return new GetPlayerResponse
             {
                 Uid = uid,
@@ -353,7 +374,8 @@ namespace MDEN.Managers
                 EntranceMessage = ModConfigManager.PlayerEntranceMessage,
                 Title = ModConfigManager.PlayerTitle,
                 AvatarName = ModConfigManager.PlayerAvatarName,
-                AvatarData = AvatarManager.GetLocalAvatarData()
+                AvatarData = AvatarManager.GetLocalAvatarData(),
+                TotalMultiplayerGames = totalMultiplayerGames
             };
         }
 

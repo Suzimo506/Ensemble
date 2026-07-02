@@ -1,6 +1,7 @@
 using System.IO;
 using MDEN.Managers;
 using MDEN.Network;
+using MDEN.Protocol.Enums;
 using MDEN.Threading;
 using MDEN.UI.Core;
 using MelonLoader;
@@ -111,6 +112,7 @@ namespace MDEN.Bootstrap
             RoomHudController.Refresh();
             RoomHudController.RequestRefresh();
             VersionCheckManager.CheckOnce();
+            PlayerManager.SyncPresenceIfChanged(PlayerStatus.Online);
         }
 
         private static void HandleGameSceneLoaded()
@@ -123,6 +125,10 @@ namespace MDEN.Bootstrap
             RoomHudController.SetBattleSceneActive(true);
             PerfTrace.SetGameMain(true);
             Patches.BattleFlowPatch.SceneLoaded();
+            if (!LobbyManager.IsInLobby)
+            {
+                PlayerManager.SyncPresenceIfChanged(PlayerStatus.SinglePlaying);
+            }
         }
     }
 }
