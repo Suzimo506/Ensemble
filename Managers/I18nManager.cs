@@ -408,7 +408,7 @@ namespace MDEN.Managers
             Register("mode.fearless", "无畏模式", "Fearless Mode", "無畏模式", "無畏モード", "무외 모드");
             Register("mode.tenzi", "天子模式", "Tenzi Mode", "天子模式", "天子モード", "텐지 모드");
             Register("mode.normal.desc", "标准联机规则，所有人按选择的谱面正常进行对战。", "Standard multiplayer rules. Everyone plays the selected chart normally.", "標準聯機規則，所有人按選擇的譜面正常進行對戰。", "標準のマルチプレイルールです。選んだ譜面を通常どおりプレイします。", "표준 멀티플레이 규칙입니다. 선택한 채보를 모두 정상적으로 플레이합니다.");
-            Register("mode.rookie.desc", "适合新手的模式，只能选择较低难度谱面。", "A beginner-friendly mode that only allows lower-difficulty charts.", "適合新手的模式，只能選擇較低難度譜面。", "初心者向けのモードです。低めの難易度の譜面のみ選べます。", "초보자에게 적합한 모드로, 낮은 난이도 채보만 선택할 수 있습니다.");
+            Register("mode.rookie.desc", "每个人都可以选择同一张谱面的不同难度进行游戏，结算时正常按照规则排行。", "Everyone can choose a different difficulty of the same chart. Settlement ranking follows the normal rules.", "每個人都可以選擇同一張譜面的不同難度進行遊戲，結算時正常按照規則排行。", "同じ譜面の別難易度を各プレイヤーが選んで遊べます。リザルトでは通常どおりルールに従って順位付けされます。", "각 플레이어가 같은 채보의 서로 다른 난이도를 선택해 플레이할 수 있으며, 정산 시에는 정상 규칙에 따라 순위가 매겨집니다.");
             Register("mode.fearless.desc", "挑战高难度的模式，只能选择大触或隐藏难度谱面。", "A high-difficulty challenge mode that only allows Master or Hidden charts.", "挑戰高難度的模式，只能選擇大觸或隱藏難度譜面。", "高難度に挑むモードです。大触または隠し難易度のみ選べます。", "고난도에 도전하는 모드로, 마스터 또는 히든 난이도 채보만 선택할 수 있습니다.");
             Register("mode.tenzi.desc", "每名玩家轮流点歌，随机抽取本轮要玩的谱面。", "Each player picks songs, then one chart is randomly drawn for the round.", "每名玩家輪流點歌，隨機抽取本輪要玩的譜面。", "各プレイヤーが曲を選び、その中から今回プレイする譜面をランダムに抽選します。", "각 플레이어가 곡을 고르고, 이번 라운드에 플레이할 채보를 무작위로 뽑습니다.");
             Register("difficulty.easy", "萌新", "Easy", "萌新", "萌新", "쉬움");
@@ -466,6 +466,7 @@ namespace MDEN.Managers
             Register("chat.chart_not_in_playlist", "未在歌曲列表找到该谱面", "Chart not found in the playlist", "未在歌曲列表找到該譜面", "プレイリストにこの譜面が見つかりません", "플레이리스트에서 이 채보를 찾지 못했습니다");
             Register("chat.invite_private_blocked", "有密码无法自动加入", "Room has a password and cannot be joined automatically", "有密碼無法自動加入", "パスワード付きのため自動参加できません", "비밀번호가 있어 자동 참가할 수 없습니다");
             Register("chat.invite_sent", "邀请播报已发送", "Invite broadcast sent", "邀請播報已送出", "招待のお知らせを送信しました", "초대 알림을 보냈습니다");
+            Register("chat.invite_declined", "{0}拒绝了你的邀请", "{0} declined your invite", "{0}拒絕了你的邀請", "{0} が招待を拒否しました", "{0}님이 초대를 거절했습니다");
             Register("chat.world_sent", "世界频道消息已发送", "World message sent", "世界頻道訊息已送出", "ワールドメッセージを送信しました", "월드 메시지를 보냈습니다");
             Register("chat.world_mute.label", "屏蔽世界", "Hide World", "屏蔽世界", "ワールド非表示", "월드 숨김");
             Register("chat.ap.just_ap", "刚刚AP了", " just APed ", "剛剛 AP 了", "が AP しました：", " 방금 AP를 달성했습니다: ");
@@ -545,6 +546,7 @@ namespace MDEN.Managers
             Register("player.profile.fallback_title", "玩家资料", "Player Profile", "玩家資料", "プレイヤープロフィール", "플레이어 프로필");
             Register("player.profile.title_label", "头衔", "Title", "頭銜", "称号", "칭호");
             Register("player.profile.status_label", "状态", "Status", "狀態", "状態", "상태");
+            Register("player.profile.total_multiplayer_games_label", "联机局数", "Multiplayer Games", "聯機局數", "マルチプレイ回数", "멀티플레이 판수");
             Register("player.profile.color_label", "名字颜色", "Name Color", "名字顏色", "名前色", "이름 색상");
             Register("player.profile.entrance_label", "入场提示", "Entrance Message", "入場提示", "入室メッセージ", "입장 메시지");
             Register("player.profile.bio_label", "个人介绍", "Bio", "個人介紹", "自己紹介", "소개");
@@ -554,6 +556,7 @@ namespace MDEN.Managers
             Register("player.status.online", "在线", "Online", "在線", "オンライン", "온라인");
             Register("player.status.in_lobby", "房间中", "In room", "房間中", "ルーム内", "방에 있음");
             Register("player.status.in_battle", "游戏中", "In game", "遊戲中", "ゲーム中", "게임 중");
+            Register("player.total_multiplayer_games", "联机局数：{0}", "Multiplayer Games: {0}", "聯機局數：{0}", "マルチプレイ回数：{0}", "멀티플레이 판수: {0}");
             Register("player.bio.empty", "暂无简介", "No bio", "暫無簡介", "自己紹介なし", "소개 없음");
 
             Register("tenzi.title", "天子抽曲", "Tenzi Draw", "天子抽曲", "天子抽選", "텐지 추첨");
@@ -569,6 +572,19 @@ namespace MDEN.Managers
             Register("social.notify.removed", "{0} 已删除好友关系", "{0} removed the friendship", "{0} 已刪除好友關係", "{0} がフレンド関係を削除しました", "{0}님이 친구 관계를 삭제했습니다");
             Register("social.notify.cancelled", "{0} 已取消好友请求", "{0} cancelled the friend request", "{0} 已取消好友請求", "{0} がフレンド申請を取り消しました", "{0}님이 친구 요청을 취소했습니다");
             Register("social.notify.declined", "{0} 拒绝了你的好友请求", "{0} declined your friend request", "{0} 拒絕了你的好友請求", "{0} がフレンド申請を拒否しました", "{0}님이 친구 요청을 거절했습니다");
+            Register("node.players.title", "当前节点: {0}", "Current node: {0}", "目前節點: {0}", "現在のノード: {0}", "현재 노드: {0}");
+            Register("node.players.loading", "正在获取节点玩家...", "Loading node players...", "正在取得節點玩家...", "ノードのプレイヤーを取得中...", "노드 플레이어를 불러오는 중...");
+            Register("node.players.empty", "当前节点暂无在线玩家", "No players are online on this node", "目前節點暫無在線玩家", "このノードにオンラインプレイヤーはいません", "현재 노드에 온라인 플레이어가 없습니다");
+            Register("node.players.load_failed", "获取节点玩家失败: {0}", "Failed to load node players: {0}", "取得節點玩家失敗: {0}", "ノードプレイヤーの取得に失敗しました: {0}", "노드 플레이어를 불러오지 못했습니다: {0}");
+            Register("node.players.status.idle", "【空闲】", "[Idle]", "【空閒】", "【空き】", "[대기]");
+            Register("node.players.status.single", "【单人游戏中】", "[Solo]", "【單人遊戲中】", "【ソロプレイ中】", "[솔로 플레이 중]");
+            Register("node.players.status.room", "【{0}】", "[{0}]", "【{0}】", "【{0}】", "[{0}]");
+            Register("node.players.invite", "邀请", "Invite", "邀請", "招待", "초대");
+            Register("node.players.invite_sent", "已发送邀请", "Invite Sent", "已發送邀請", "招待送信済み", "초대 전송됨");
+            Register("node.players.invite_unavailable", "不可邀请", "Unavailable", "不可邀請", "招待不可", "초대 불가");
+            Register("node.players.invite_failed", "邀请失败: {0}", "Invite failed: {0}", "邀請失敗: {0}", "招待に失敗しました: {0}", "초대 실패: {0}");
+            Register("node.invite.title", "房间邀请", "Room Invite", "房間邀請", "ルーム招待", "방 초대");
+            Register("node.invite.confirm", "{0}邀请你加入{1}，是否同意？", "{0} invited you to join {1}. Accept?", "{0}邀請你加入{1}，是否同意？", "{0} が {1} に招待しています。参加しますか？", "{0}님이 {1}에 초대했습니다. 수락할까요?");
 
             Register("settlement.title", "结算", "Settlement", "結算", "リザルト", "정산");
             Register("settlement.subtitle", "结算结果", "Settlement Result", "結算結果", "リザルト結果", "정산 결과");
