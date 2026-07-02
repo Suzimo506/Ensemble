@@ -159,6 +159,12 @@ namespace MDEN.UI.Windows
             }
             else if (button == _btnLobbies)
             {
+                if (NavigationButton.IsMultiplayerBlockedByOutdatedVersion())
+                {
+                    Il2CppAssets.Scripts.UI.Controls.ShowText.ShowInfo(I18nManager.T("version.multiplayer_blocked"));
+                    return;
+                }
+
                 Close();
                 WindowStackController.OpenWindow(LobbyManager.IsInLobby
                     ? new RoomListWindow()

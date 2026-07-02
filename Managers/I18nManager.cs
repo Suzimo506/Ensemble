@@ -579,7 +579,8 @@ namespace MDEN.Managers
             Register("settlement.confirm", "确认", "Confirm", "確認", "確認", "확인");
             Register("settlement.name_separator", "，", ", ", "，", "、", ", ");
 
-            Register("version.outdated", "当前Ensemble版本过低，请前往喵斯兔群聊更新最新模组\n点击确认自动跳转至更新网站\n<color=#ff3333>不更新无法进行游戏</color>", "Your Ensemble version is too old. Please update the mod from the Museto group.\nClick Confirm to open the update site.\n<color=#ff3333>You cannot play without updating.</color>", "目前 Ensemble 版本過低，請前往喵斯兔群聊更新最新模組\n點擊確認會自動跳轉至更新網站\n<color=#ff3333>不更新無法進行遊戲</color>", "現在の Ensemble バージョンが古すぎます。Museto グループで最新 Mod に更新してください。\n確認を押すと更新サイトを開きます。\n<color=#ff3333>更新しないとプレイできません</color>", "현재 Ensemble 버전이 너무 낮습니다. Museto 그룹에서 최신 모드를 업데이트하세요.\n확인을 누르면 업데이트 사이트로 이동합니다.\n<color=#ff3333>업데이트하지 않으면 플레이할 수 없습니다</color>");
+            Register("version.outdated", "检测到当前Ensemble版本过低，请点击确认前往网站进行更新\n<color=#ff3333>不更新无法进行多人游戏！</color>", "Your current Ensemble version is too old. Click Confirm to open the update website.\n<color=#ff3333>You cannot play multiplayer without updating!</color>", "偵測到目前 Ensemble 版本過低，請點擊確認前往網站更新\n<color=#ff3333>不更新無法進行多人遊戲！</color>", "現在の Ensemble バージョンが古すぎます。確認を押して更新サイトへ移動してください。\n<color=#ff3333>更新しないとマルチプレイはできません！</color>", "현재 Ensemble 버전이 너무 낮습니다. 확인을 눌러 업데이트 사이트로 이동하세요.\n<color=#ff3333>업데이트하지 않으면 멀티플레이를 할 수 없습니다!</color>");
+            Register("version.multiplayer_blocked", "请先更新Ensemble模组", "Please update the Ensemble mod first", "請先更新 Ensemble 模組", "先に Ensemble Mod を更新してください", "먼저 Ensemble 모드를 업데이트하세요");
             Register("lobby.kicked", "你已被移出房间", "You have been removed from the room", "你已被移出房間", "ルームから退出させられました", "방에서 내보내졌습니다");
             Register("config.custom_server.default_name", "节点{0}", "Server {0}", "節點{0}", "ノード{0}", "서버 {0}");
             Register("chart.unknown", "未知谱面", "Unknown Chart", "未知譜面", "不明な譜面", "알 수 없는 채보");

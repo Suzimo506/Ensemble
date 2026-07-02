@@ -12,6 +12,7 @@ namespace MDEN.Managers
     public static class VersionCheckManager
     {
         private const string VersionCheckUrl = "https://mden.top/api/?r=version";
+        private const string DefaultDownloadUrl = "https://mden.top";
         private const bool ForceShowUpdateDialogForTest = false;
         private static readonly HttpClient Http = new HttpClient
         {
@@ -19,6 +20,7 @@ namespace MDEN.Managers
         };
         private static bool _checkStarted;
         private static bool _warningShown;
+        public static bool IsMultiplayerBlockedByOutdatedVersion { get; private set; }
 
         public static void CheckOnce()
         {
@@ -56,6 +58,7 @@ namespace MDEN.Managers
 
                 var downloadUrl = GetDownloadUrl(document.RootElement);
                 MDEN.Managers.ClientLogManager.Warning($"New Ensemble version available: {remoteVersion} (current: {currentVersion})");
+                IsMultiplayerBlockedByOutdatedVersion = true;
                 MainThreadDispatcher.Enqueue(() => ShowOutdatedWarning(downloadUrl));
             }
             catch (Exception ex)
@@ -72,8 +75,8 @@ namespace MDEN.Managers
             _warningShown = true;
             CommonMessageBox.ShowConfrimAndCancel(
                 I18nManager.T("version.outdated"),
-                new Action(() => OpenDownloadAndQuit(downloadUrl)),
-                new Action(QuitGame));
+                new Action(() => OpenDownloadPage(downloadUrl)),
+                new Action(() => { }));
         }
 
         private static string GetDownloadUrl(JsonElement root)
@@ -101,19 +104,9 @@ namespace MDEN.Managers
             return !string.IsNullOrWhiteSpace(value);
         }
 
-        private static void OpenDownloadAndQuit(string downloadUrl)
+        private static void OpenDownloadPage(string downloadUrl)
         {
-            if (!string.IsNullOrWhiteSpace(downloadUrl))
-            {
-                Application.OpenURL(downloadUrl);
-            }
-
-            Application.Quit();
-        }
-
-        private static void QuitGame()
-        {
-            Application.Quit();
+            Application.OpenURL(string.IsNullOrWhiteSpace(downloadUrl) ? DefaultDownloadUrl : downloadUrl);
         }
 
         private static Version GetCurrentVersion()

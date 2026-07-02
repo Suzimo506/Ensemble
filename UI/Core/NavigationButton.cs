@@ -112,6 +112,12 @@ namespace MDEN.UI.Core
                 button.onClick = new Button.ButtonClickedEvent();
                 button.onClick.AddListener((UnityAction)new Action(() => 
                 {
+                    if (IsMultiplayerBlockedByOutdatedVersion())
+                    {
+                        ShowText.ShowInfo(I18nManager.T("version.multiplayer_blocked"));
+                        return;
+                    }
+
                     WindowStackController.OpenWindow(LobbyManager.IsInLobby
                         ? new RoomListWindow(true)
                         : new MainMenuWindow());
@@ -192,6 +198,11 @@ namespace MDEN.UI.Core
 
             RefreshRoomActionButtonStates();
             RefreshServerLabel();
+        }
+
+        public static bool IsMultiplayerBlockedByOutdatedVersion()
+        {
+            return VersionCheckManager.IsMultiplayerBlockedByOutdatedVersion;
         }
 
         public static void RefreshServerLabel()
