@@ -25,8 +25,13 @@ namespace MDEN.UI.Displays
         private ScrollRect _scrollRect;
         private InputField _inputField;
         private Button _clearButton;
+        private Button _worldMuteButton;
+        private Text _worldMuteLabel;
+        private Image _worldMuteIndicator;
+        private Text _worldMuteCheckMark;
         private bool _sendInProgress;
         private bool _gameInputBlocked;
+        private bool _worldChannelMuted;
         private int _clearSlashFrame = -1;
         private int _suppressGameInputUntilFrame = -1;
         private ChatSendMode _sendMode = ChatSendMode.Room;
@@ -66,6 +71,7 @@ namespace MDEN.UI.Displays
 
         private const float EntryWidth = 480f;
         private const int FontSize = 20;
+        private const int ApBroadcastFontSize = 24;
         private const float EmptyVisibleLines = 0.75f;
         private const int MaxVisibleLines = 9;
         private const float OutlineOffset = 25f;
@@ -75,6 +81,10 @@ namespace MDEN.UI.Displays
         private const float InputLeftPadding = 10f;
         private const float InputRightPadding = 42f;
         private const float InputVerticalPadding = 2f;
+        private const float WorldMuteToggleWidth = 136f;
+        private const float WorldMuteToggleHeight = 34f;
+        private const float WorldMuteToggleGap = 8f;
+        private const float WorldMuteToggleIndicatorSize = 18f;
         private const float ManualScrollStep = 0.14f;
         private const float BottomSnapThreshold = 0.02f;
         private const int MaxMessages = 50;
@@ -84,6 +94,10 @@ namespace MDEN.UI.Displays
         private static readonly Color InputFocusedColor = new Color(0f, 0f, 0f, 0.4f);
         private static readonly Color InputClearButtonBgColor = new Color(0.42f, 0.16f, 0.66f, 0.95f);
         private static readonly Color InputClearButtonIconColor = new Color(0.88f, 0.46f, 1f, 1f);
+        private static readonly Color WorldMuteToggleDefaultColor = new Color(0f, 0f, 0f, 0.22f);
+        private static readonly Color WorldMuteToggleActiveColor = new Color(0.42f, 0.16f, 0.66f, 0.92f);
+        private static readonly Color WorldMuteIndicatorDefaultColor = new Color(1f, 1f, 1f, 0.16f);
+        private static readonly Color WorldMuteIndicatorActiveColor = new Color(1f, 0.86f, 0.26f, 1f);
         private const string WhiteTextColor = "ffffffff";
         private const string GreenTextColor = "66ff66ff";
         private const string RedTextColor = "ff5555ff";
@@ -95,7 +109,8 @@ namespace MDEN.UI.Displays
 
         private Vector2 GetFrameSize(int lines)
         {
-            return GetScrollFrameSize(lines);
+            var scrollSize = GetScrollFrameSize(lines);
+            return new Vector2(scrollSize.x + WorldMuteToggleGap + WorldMuteToggleWidth, scrollSize.y);
         }
 
         private Vector2 GetScrollFrameSize(int lines)
@@ -193,8 +208,12 @@ namespace MDEN.UI.Displays
                 return;
             }
 
+            CreateWorldMuteToggle(_frame.transform);
+
             foreach (var msg in _messages)
             {
+                if (!ShouldDisplayMessage(msg)) continue;
+
                 var text = AddTextToContent(msg, _scrollRect.content);
                 text.text = FormatMessage(msg);
             }
@@ -233,6 +252,11 @@ namespace MDEN.UI.Displays
                 _clearButton.onClick.RemoveAllListeners();
             }
 
+            if (_worldMuteButton != null)
+            {
+                _worldMuteButton.onClick.RemoveAllListeners();
+            }
+
             foreach (var txt in _textList.Values)
             {
                 DestroyComponentObject(txt);
@@ -245,6 +269,10 @@ namespace MDEN.UI.Displays
             }
             _inputField = null;
             _clearButton = null;
+            _worldMuteButton = null;
+            _worldMuteLabel = null;
+            _worldMuteIndicator = null;
+            _worldMuteCheckMark = null;
             _backgroundImage = null;
 
             if (_frame != null)
@@ -268,6 +296,12 @@ namespace MDEN.UI.Displays
             if (_frame == null || _scrollRect == null) return;
 
             var shouldKeepAtBottom = IsScrolledToBottom();
+            if (!ShouldDisplayMessage(message))
+            {
+                UpdateLayout();
+                return;
+            }
+
             var text = AddTextToContent(message, _scrollRect.content);
             text.text = FormatMessage(message);
 
@@ -374,6 +408,160 @@ namespace MDEN.UI.Displays
             return true;
         }
 
+        private void CreateWorldMuteToggle(Transform parent)
+        {
+            var toggleObj = new GameObject("MDENWorldMuteToggle");
+            var toggleRect = toggleObj.AddComponent<RectTransform>();
+            toggleRect.SetParent(parent, false);
+            toggleRect.localScale = Vector3.one;
+            toggleRect.anchorMin = new Vector2(0f, 1f);
+            toggleRect.anchorMax = new Vector2(0f, 1f);
+            toggleRect.pivot = new Vector2(0f, 1f);
+            toggleRect.sizeDelta = new Vector2(WorldMuteToggleWidth, WorldMuteToggleHeight);
+
+            var toggleImage = toggleObj.AddComponent<Image>();
+            toggleImage.type = _btnBaseSprite == null ? Image.Type.Simple : Image.Type.Sliced;
+            toggleImage.sprite = _btnBaseSprite;
+
+            _worldMuteButton = toggleObj.AddComponent<Button>();
+            _worldMuteButton.targetGraphic = toggleImage;
+            _worldMuteButton.onClick.AddListener((UnityAction)new Action(ToggleWorldChannelMuted));
+
+            var indicatorObj = new GameObject("Indicator");
+            var indicatorRect = indicatorObj.AddComponent<RectTransform>();
+            indicatorRect.SetParent(toggleObj.transform, false);
+            indicatorRect.localScale = Vector3.one;
+            indicatorRect.anchorMin = new Vector2(0f, 0.5f);
+            indicatorRect.anchorMax = new Vector2(0f, 0.5f);
+            indicatorRect.pivot = new Vector2(0f, 0.5f);
+            indicatorRect.anchoredPosition = new Vector2(10f, 0f);
+            indicatorRect.sizeDelta = new Vector2(WorldMuteToggleIndicatorSize, WorldMuteToggleIndicatorSize);
+
+            _worldMuteIndicator = indicatorObj.AddComponent<Image>();
+            _worldMuteIndicator.type = Image.Type.Simple;
+            _worldMuteIndicator.raycastTarget = false;
+
+            var checkObj = new GameObject("CheckMark");
+            var checkRect = checkObj.AddComponent<RectTransform>();
+            checkRect.SetParent(indicatorObj.transform, false);
+            checkRect.localScale = Vector3.one;
+            checkRect.anchorMin = Vector2.zero;
+            checkRect.anchorMax = Vector2.one;
+            checkRect.offsetMin = Vector2.zero;
+            checkRect.offsetMax = Vector2.zero;
+
+            _worldMuteCheckMark = checkObj.AddComponent<Text>();
+            ApplyGameFont(_worldMuteCheckMark);
+            _worldMuteCheckMark.text = "✓";
+            _worldMuteCheckMark.fontSize = 16;
+            _worldMuteCheckMark.alignment = TextAnchor.MiddleCenter;
+            _worldMuteCheckMark.horizontalOverflow = HorizontalWrapMode.Overflow;
+            _worldMuteCheckMark.verticalOverflow = VerticalWrapMode.Overflow;
+            _worldMuteCheckMark.supportRichText = false;
+            _worldMuteCheckMark.raycastTarget = false;
+
+            var labelObj = new GameObject("Label");
+            var labelRect = labelObj.AddComponent<RectTransform>();
+            labelRect.SetParent(toggleObj.transform, false);
+            labelRect.localScale = Vector3.one;
+            labelRect.anchorMin = Vector2.zero;
+            labelRect.anchorMax = Vector2.one;
+            labelRect.offsetMin = new Vector2(34f, 0f);
+            labelRect.offsetMax = new Vector2(-8f, 0f);
+
+            _worldMuteLabel = labelObj.AddComponent<Text>();
+            ApplyGameFont(_worldMuteLabel);
+            _worldMuteLabel.fontSize = 18;
+            _worldMuteLabel.alignment = TextAnchor.MiddleLeft;
+            _worldMuteLabel.horizontalOverflow = HorizontalWrapMode.Overflow;
+            _worldMuteLabel.verticalOverflow = VerticalWrapMode.Truncate;
+            _worldMuteLabel.supportRichText = false;
+            _worldMuteLabel.raycastTarget = false;
+
+            UpdateWorldMuteTogglePosition(GetScrollFrameSize(0));
+            UpdateWorldMuteToggleVisual();
+        }
+
+        private void ToggleWorldChannelMuted()
+        {
+            _worldChannelMuted = !_worldChannelMuted;
+            UpdateWorldMuteToggleVisual();
+            RebuildVisibleMessages();
+        }
+
+        private void RebuildVisibleMessages()
+        {
+            if (_scrollRect?.content == null) return;
+
+            foreach (var text in _textList.Values)
+            {
+                DestroyComponentObject(text);
+            }
+
+            _textList.Clear();
+
+            foreach (var msg in _messages)
+            {
+                if (!ShouldDisplayMessage(msg)) continue;
+
+                var text = AddTextToContent(msg, _scrollRect.content);
+                text.text = FormatMessage(msg);
+            }
+
+            Canvas.ForceUpdateCanvases();
+            ResizeMessageTexts();
+            UpdateLayout();
+            ScrollToBottom();
+        }
+
+        private void UpdateWorldMuteTogglePosition(Vector2 scrollSize)
+        {
+            if (_worldMuteButton == null) return;
+
+            var rect = _worldMuteButton.GetComponent<RectTransform>();
+            if (rect == null) return;
+
+            rect.anchoredPosition = new Vector2(scrollSize.x + WorldMuteToggleGap, 0f);
+        }
+
+        private void UpdateWorldMuteToggleVisual()
+        {
+            if (_worldMuteLabel != null)
+            {
+                _worldMuteLabel.text = I18nManager.T("chat.world_mute.label");
+                _worldMuteLabel.color = _worldChannelMuted
+                    ? new Color(1f, 0.9f, 0.35f, 1f)
+                    : new Color(1f, 1f, 1f, 0.86f);
+            }
+
+            if (_worldMuteIndicator != null)
+            {
+                _worldMuteIndicator.color = _worldChannelMuted
+                    ? WorldMuteIndicatorActiveColor
+                    : WorldMuteIndicatorDefaultColor;
+            }
+
+            if (_worldMuteCheckMark != null)
+            {
+                _worldMuteCheckMark.color = _worldChannelMuted
+                    ? new Color(0.1f, 0.03f, 0.18f, 1f)
+                    : new Color(1f, 1f, 1f, 0f);
+            }
+
+            var image = _worldMuteButton?.targetGraphic as Image;
+            if (image != null)
+            {
+                image.color = _worldChannelMuted
+                    ? WorldMuteToggleActiveColor
+                    : WorldMuteToggleDefaultColor;
+            }
+        }
+
+        private bool ShouldDisplayMessage(ChatPushMsg message)
+        {
+            return message != null && (!_worldChannelMuted || message.Channel != ChatTargets.World);
+        }
+
         private void ConfigureInputField(InputField inputField, Button clearButton)
         {
             inputField.text = string.Empty;
@@ -477,7 +665,7 @@ namespace MDEN.UI.Displays
 
             var text = obj.AddComponent<Text>();
             ApplyGameFont(text);
-            text.fontSize = FontSize;
+            text.fontSize = GetMessageFontSize(msg);
             text.alignment = TextAnchor.UpperLeft;
             text.horizontalOverflow = HorizontalWrapMode.Wrap;
             text.verticalOverflow = VerticalWrapMode.Overflow;
@@ -491,6 +679,11 @@ namespace MDEN.UI.Displays
                 ConfigureMessageClick(text, msg);
             }
             return text;
+        }
+
+        private static int GetMessageFontSize(ChatPushMsg msg)
+        {
+            return msg?.Channel == ChatTargets.ApBroadcast ? ApBroadcastFontSize : FontSize;
         }
 
         private void ConfigureMessageClick(Text text, ChatPushMsg msg)
@@ -540,7 +733,8 @@ namespace MDEN.UI.Displays
             var scrollSize = GetScrollFrameSize(totalLines);
             var frameSize = GetFrameSize(totalLines);
             _frame.GetComponent<RectTransform>().sizeDelta = frameSize;
-            _scrollFrame.GetComponent<RectTransform>().sizeDelta = frameSize;
+            _scrollFrame.GetComponent<RectTransform>().sizeDelta = scrollSize;
+            UpdateWorldMuteTogglePosition(scrollSize);
 
             float currentY = 0f;
             foreach (var msg in _messages)
@@ -946,7 +1140,10 @@ namespace MDEN.UI.Displays
             var ap = ParseApBroadcastData(msg);
             var player = ColorText(EscapeRichText(name), GetMessageAuthorColor(msg, ap?.AuthorColor));
             var chartText = FormatApChartText(msg.Message, ap?.Difficulty ?? 0);
-            return $"{player}{ColorText("刚刚AP了", GoldTextColor)}{ColorText(chartText, GoldTextColor)}{ColorText("！", GoldTextColor)}";
+            var sleepwalkClaim = ap?.AppendSleepwalkClaim == true
+                ? ColorText(EscapeRichText(I18nManager.T("chat.ap.sleepwalk_claim")), GoldTextColor)
+                : string.Empty;
+            return $"{player}{ColorText(I18nManager.T("chat.ap.just_ap"), GoldTextColor)}{ColorText(chartText, GoldTextColor)}{ColorText(I18nManager.T("chat.ap.exclamation"), GoldTextColor)}{sleepwalkClaim}";
         }
 
         private static bool TryParsePlayerFinishedMessage(string message, out string playerName)
@@ -1174,7 +1371,7 @@ namespace MDEN.UI.Displays
                 parts.Length > 2 ? parts[2] : null);
         }
 
-        private static (string AuthorColor, int Difficulty)? ParseApBroadcastData(ChatPushMsg msg)
+        private static (string AuthorColor, int Difficulty, bool AppendSleepwalkClaim)? ParseApBroadcastData(ChatPushMsg msg)
         {
             if (string.IsNullOrWhiteSpace(msg?.ExtraData)) return null;
 
@@ -1186,7 +1383,7 @@ namespace MDEN.UI.Displays
                 int.TryParse(parts[1], out difficulty);
             }
 
-            return (authorColor, difficulty);
+            return (authorColor, difficulty, parts.Length > 2 && parts[2] == "sleepwalk");
         }
 
         private static (string ChartName, string Players)? ParseTextMissingChart(string message)

@@ -463,6 +463,10 @@ namespace MDEN.Managers
             Register("chat.invite_private_blocked", "有密码无法自动加入", "Room has a password and cannot be joined automatically", "有密碼無法自動加入", "パスワード付きのため自動参加できません", "비밀번호가 있어 자동 참가할 수 없습니다");
             Register("chat.invite_sent", "邀请播报已发送", "Invite broadcast sent", "邀請播報已送出", "招待のお知らせを送信しました", "초대 알림을 보냈습니다");
             Register("chat.world_sent", "世界频道消息已发送", "World message sent", "世界頻道訊息已送出", "ワールドメッセージを送信しました", "월드 메시지를 보냈습니다");
+            Register("chat.world_mute.label", "屏蔽世界", "Hide World", "屏蔽世界", "ワールド非表示", "월드 숨김");
+            Register("chat.ap.just_ap", "刚刚AP了", " just APed ", "剛剛 AP 了", "が AP しました：", " 방금 AP를 달성했습니다: ");
+            Register("chat.ap.exclamation", "！", "!", "！", "！", "!");
+            Register("chat.ap.sleepwalk_claim", "（梦游少女：其实是我打的！）", " (Sleepwalker Girl: I actually played it!)", "（夢遊少女：其實是我打的！）", "（夢遊少女：実は私がプレイしたの！）", " (몽유소녀: 사실 내가 한 거야!)");
             Register("chat.mode.room", "发送方式：房间", "Send mode: Room", "發送方式：房間", "送信先：ルーム", "전송 방식: 방");
             Register("chat.mode.world", "发送方式：世界", "Send mode: World", "發送方式：世界", "送信先：ワールド", "전송 방식: 월드");
             Register("chat.mode.invite", "发送方式：邀请", "Send mode: Invite", "發送方式：邀請", "送信先：招待", "전송 방식: 초대");
