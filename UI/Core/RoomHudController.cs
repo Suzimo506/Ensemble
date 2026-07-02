@@ -8,6 +8,7 @@ namespace MDEN.UI.Core
 {
     public static class RoomHudController
     {
+        internal const string ChatGuideMessageKey = "ChatGuide";
         private const int MaxRefreshRetries = 120;
         private const int EntranceFallbackDelayFrames = 20;
         private const int CharacterRepairCooldownFrames = 30;
@@ -31,7 +32,6 @@ namespace MDEN.UI.Core
         private static bool _roomHudDeferred;
         private static int _popupSuppressionCount;
         private static int _chatScopeLobbyId = int.MinValue;
-        private static int _chatCommandTipLobbyId = -1;
 
         public static void Initialize()
         {
@@ -498,28 +498,16 @@ namespace MDEN.UI.Core
             _chatScopeLobbyId = lobbyId;
             Chat.ResetSendMode();
             Chat.ClearHistory();
-            if (lobbyId <= 0)
-            {
-                _chatCommandTipLobbyId = -1;
-                return;
-            }
-
-            if (lobbyId > 0)
-            {
-                AddRoomCommandTip(lobbyId);
-            }
+            AddRoomCommandTip(lobbyId);
         }
 
         private static void AddRoomCommandTip(int lobbyId)
         {
-            if (_chatCommandTipLobbyId == lobbyId) return;
-
-            _chatCommandTipLobbyId = lobbyId;
             Chat.AddMessage(new ChatPushMsg
             {
                 AuthorUid = "system",
                 AuthorName = "System",
-                Message = I18nManager.T("chat.room_command_tip"),
+                Message = ChatGuideMessageKey,
                 IsSystem = true
             });
         }

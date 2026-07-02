@@ -105,6 +105,8 @@ namespace MDEN.UI.Displays
         private const string PinkTextColor = Constants.ColorPink;
         private const string WorldRoomColor = Constants.ColorYellow;
         private const string GoldTextColor = "ffd966ff";
+        private const string SoftRedTextColor = "ff8f8fff";
+        private const string ChatGuideTextColor = "ffd966ff";
         private readonly Vector2 _entrySize = new Vector2(EntryWidth, FontSize + 8f);
 
         private Vector2 GetFrameSize(int lines)
@@ -691,7 +693,8 @@ namespace MDEN.UI.Displays
             var missingChart = GetMissingChartClickData(msg);
             var previewChart = GetPreviewableChartData(msg);
             var invite = GetInviteClickData(msg);
-            if (!missingChart.HasValue && !previewChart.HasValue && !invite.HasValue) return;
+            var chatGuide = IsChatGuideMessage(msg);
+            if (!missingChart.HasValue && !previewChart.HasValue && !invite.HasValue && !chatGuide) return;
 
             text.raycastTarget = true;
             var button = text.gameObject.GetComponent<Button>() ?? text.gameObject.AddComponent<Button>();
@@ -700,6 +703,12 @@ namespace MDEN.UI.Displays
             button.onClick.RemoveAllListeners();
             button.onClick.AddListener((UnityAction)(() =>
             {
+                if (chatGuide)
+                {
+                    ShowChatGuideDialog();
+                    return;
+                }
+
                 if (missingChart.HasValue)
                 {
                     MissingChartImportManager.HandleMissingChartClick(
@@ -1012,6 +1021,11 @@ namespace MDEN.UI.Displays
 
         private string FormatSystemMessage(ChatPushMsg msg)
         {
+            if (IsChatGuideMessage(msg))
+            {
+                return ColorText(I18nManager.T("chat.guide.entry"), ChatGuideTextColor);
+            }
+
             if (msg.Channel == ChatTargets.Invite)
             {
                 return FormatInviteMessage(msg);
@@ -1134,16 +1148,32 @@ namespace MDEN.UI.Displays
             return ColorText($"【点击此条播报加入房间】{EscapeRichText(name)}：{EscapeRichText(msg.Message)}", PinkTextColor);
         }
 
+        private static bool IsChatGuideMessage(ChatPushMsg msg)
+        {
+            return msg?.IsSystem == true && msg.Message == RoomHudController.ChatGuideMessageKey;
+        }
+
+        private static void ShowChatGuideDialog()
+        {
+            NativeConfirmDialog.ShowMessage(
+                I18nManager.T("chat.guide.title"),
+                I18nManager.T("chat.guide.body"));
+        }
+
         private string FormatApBroadcastMessage(ChatPushMsg msg)
         {
             var name = string.IsNullOrWhiteSpace(msg.AuthorName) ? msg.AuthorUid : msg.AuthorName;
             var ap = ParseApBroadcastData(msg);
             var player = ColorText(EscapeRichText(name), GetMessageAuthorColor(msg, ap?.AuthorColor));
             var chartText = FormatApChartText(msg.Message, ap?.Difficulty ?? 0);
+            var broadcastColor = ap?.IsTheoreticalPerfect == true ? SoftRedTextColor : GoldTextColor;
+            var achievementText = ap?.IsTheoreticalPerfect == true
+                ? I18nManager.T("chat.ap.just_tp")
+                : I18nManager.T("chat.ap.just_ap");
             var sleepwalkClaim = ap?.AppendSleepwalkClaim == true
-                ? ColorText(EscapeRichText(I18nManager.T("chat.ap.sleepwalk_claim")), GoldTextColor)
+                ? ColorText(EscapeRichText(I18nManager.T("chat.ap.sleepwalk_claim")), broadcastColor)
                 : string.Empty;
-            return $"{player}{ColorText(I18nManager.T("chat.ap.just_ap"), GoldTextColor)}{ColorText(chartText, GoldTextColor)}{ColorText(I18nManager.T("chat.ap.exclamation"), GoldTextColor)}{sleepwalkClaim}";
+            return $"{player}{ColorText(achievementText, broadcastColor)}{ColorText(chartText, broadcastColor)}{ColorText(I18nManager.T("chat.ap.exclamation"), broadcastColor)}{sleepwalkClaim}";
         }
 
         private static bool TryParsePlayerFinishedMessage(string message, out string playerName)
@@ -1371,7 +1401,7 @@ namespace MDEN.UI.Displays
                 parts.Length > 2 ? parts[2] : null);
         }
 
-        private static (string AuthorColor, int Difficulty, bool AppendSleepwalkClaim)? ParseApBroadcastData(ChatPushMsg msg)
+        private static (string AuthorColor, int Difficulty, bool AppendSleepwalkClaim, bool IsTheoreticalPerfect)? ParseApBroadcastData(ChatPushMsg msg)
         {
             if (string.IsNullOrWhiteSpace(msg?.ExtraData)) return null;
 
@@ -1383,7 +1413,21 @@ namespace MDEN.UI.Displays
                 int.TryParse(parts[1], out difficulty);
             }
 
-            return (authorColor, difficulty, parts.Length > 2 && parts[2] == "sleepwalk");
+            var appendSleepwalkClaim = false;
+            var isTheoreticalPerfect = false;
+            for (var i = 2; i < parts.Length; i++)
+            {
+                if (parts[i] == "sleepwalk")
+                {
+                    appendSleepwalkClaim = true;
+                }
+                else if (parts[i] == "tp")
+                {
+                    isTheoreticalPerfect = true;
+                }
+            }
+
+            return (authorColor, difficulty, appendSleepwalkClaim, isTheoreticalPerfect);
         }
 
         private static (string ChartName, string Players)? ParseTextMissingChart(string message)
