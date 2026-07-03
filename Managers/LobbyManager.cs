@@ -373,6 +373,26 @@ namespace MDEN.Managers
             });
         }
 
+        public static Task SetMaxPlayersAsync(ushort maxPlayers)
+        {
+            return SetLobbySettingsAsync(new LobbySettingsRequest
+            {
+                JoinLocked = CurrentLobby?.JoinLocked == true,
+                UpdateMaxPlayers = true,
+                MaxPlayers = maxPlayers
+            });
+        }
+
+        public static Task SetPlaylistSizeAsync(ushort playlistSize)
+        {
+            return SetLobbySettingsAsync(new LobbySettingsRequest
+            {
+                JoinLocked = CurrentLobby?.JoinLocked == true,
+                UpdatePlaylistSize = true,
+                PlaylistSize = playlistSize
+            });
+        }
+
         public static Task SetTenziSongsPerPlayerAsync(byte value)
         {
             return SetLobbySettingsAsync(new LobbySettingsRequest
@@ -411,6 +431,14 @@ namespace MDEN.Managers
             if (reason == "已有玩家点歌数超过新上限，请先移除多余谱面")
             {
                 return I18nManager.T("tenzi.songs_per_player.existing_limit_server");
+            }
+            if (reason == "最大人数不能小于当前房间人数")
+            {
+                return I18nManager.T("room.max_players.existing_limit");
+            }
+            if (reason == "列表长度不能小于当前点歌数量")
+            {
+                return I18nManager.T("room.playlist_size.existing_limit");
             }
 
             if (IsTenziSongsPerPlayerRangeFailure(reason))
@@ -452,6 +480,7 @@ namespace MDEN.Managers
         {
             PushDispatcher.Instance.Register<LobbySyncPush>(OpCodes.LobbySyncPush, OnLobbySync);
             PushDispatcher.Instance.Register<LobbyKickedPush>(OpCodes.LobbyKickedPush, OnLobbyKicked);
+            PushDispatcher.Instance.Register<LobbyHostTransferredPush>(OpCodes.LobbyHostTransferredPush, OnLobbyHostTransferred);
         }
 
         public static void ClearSession()
@@ -654,6 +683,11 @@ namespace MDEN.Managers
             NotifyCurrentLobbyChanged();
             UiNotificationManager.RequestToast(reason);
             UiNotificationManager.RequestKickedToLobbyList();
+        }
+
+        private static void OnLobbyHostTransferred(LobbyHostTransferredPush push)
+        {
+            UiNotificationManager.RequestToast(I18nManager.T("room.host_transferred_to_you"));
         }
 
         private static void NotifyCurrentLobbyChanged()

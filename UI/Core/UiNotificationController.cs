@@ -15,6 +15,8 @@ namespace MDEN.UI.Core
             UiNotificationManager.ToastRequested += HandleToastRequested;
             UiNotificationManager.ConfirmRequested += HandleConfirmRequested;
             UiNotificationManager.KickedToLobbyListRequested += HandleKickedToLobbyListRequested;
+            UiNotificationManager.CloudProgressStarted += HandleCloudProgressStarted;
+            UiNotificationManager.CloudProgressFinished += HandleCloudProgressFinished;
             _initialized = true;
         }
 
@@ -24,6 +26,8 @@ namespace MDEN.UI.Core
             UiNotificationManager.ToastRequested -= HandleToastRequested;
             UiNotificationManager.ConfirmRequested -= HandleConfirmRequested;
             UiNotificationManager.KickedToLobbyListRequested -= HandleKickedToLobbyListRequested;
+            UiNotificationManager.CloudProgressStarted -= HandleCloudProgressStarted;
+            UiNotificationManager.CloudProgressFinished -= HandleCloudProgressFinished;
             _initialized = false;
         }
 
@@ -45,6 +49,16 @@ namespace MDEN.UI.Core
                 RoomHudController.Refresh();
                 WindowStackController.OpenWindow(new RoomListWindow());
             });
+        }
+
+        private static void HandleCloudProgressStarted(int operationId, string message)
+        {
+            CloudSyncIndicator.Start(operationId, message);
+        }
+
+        private static void HandleCloudProgressFinished(int operationId, bool success)
+        {
+            CloudSyncIndicator.Finish(operationId, success);
         }
     }
 }

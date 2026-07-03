@@ -18,6 +18,9 @@ namespace MDEN.UI.Core
         private const float CapsuleHeight = 56f;
         private const float CapsuleGap = 12f;
         private const float ListViewportHeight = 780f;
+        private static readonly TimeSpan OpenedInLobbyMaxAge = TimeSpan.FromSeconds(20);
+        private const int GoodPingThresholdMs = 80;
+        private const int MediumPingThresholdMs = 180;
         private const int MaxRoomNameLength = 16;
         private const int MaxPlayerNameLength = 18;
         private const string InputBlockReason = "NodePlayersOverlay";
@@ -27,18 +30,42 @@ namespace MDEN.UI.Core
         private static RectTransform _listRoot;
         private static Text _messageText;
         private static ScrollRect _scrollRect;
+        private static int? _openedLobbyId;
+        private static DateTime _openedAtUtc;
+        private static int _generation;
+        private static bool _initialized;
         private static readonly HashSet<string> InvitedUids = new HashSet<string>();
         private static Sprite _roundedSprite;
+
+        public static void Initialize()
+        {
+            if (_initialized) return;
+            LobbyManager.CurrentLobbyChanged += HandleLobbyChanged;
+            ConnectionManager.StateChanged += HandleConnectionStateChanged;
+            _initialized = true;
+        }
+
+        public static void Deinitialize()
+        {
+            if (!_initialized) return;
+            LobbyManager.CurrentLobbyChanged -= HandleLobbyChanged;
+            ConnectionManager.StateChanged -= HandleConnectionStateChanged;
+            _initialized = false;
+            Destroy();
+        }
 
         public static void Show()
         {
             Destroy();
             InvitedUids.Clear();
+            _generation++;
+            _openedLobbyId = LobbyManager.CurrentLobby?.Id;
+            _openedAtUtc = DateTime.UtcNow;
             CreateRoot();
             CreateTitle();
             CreateListRoot();
             SetMessage(I18nManager.T("node.players.loading"));
-            _ = RefreshAsync();
+            _ = RefreshAsync(_generation);
         }
 
         public static void Destroy()
@@ -53,20 +80,61 @@ namespace MDEN.UI.Core
             _viewportRoot = null;
             _messageText = null;
             _scrollRect = null;
+            _openedLobbyId = null;
+            _generation++;
             NativeInputBlocker.Clear(InputBlockReason);
         }
 
-        private static async System.Threading.Tasks.Task RefreshAsync()
+        private static async System.Threading.Tasks.Task RefreshAsync(int generation)
         {
             try
             {
                 var players = await SocialManager.GetNodePlayersAsync();
-                MainThreadDispatcher.Enqueue(() => RenderPlayers(players));
+                MainThreadDispatcher.Enqueue(() =>
+                {
+                    if (!IsCurrentGeneration(generation)) return;
+                    RenderPlayers(players);
+                });
             }
             catch (Exception ex)
             {
-                MainThreadDispatcher.Enqueue(() => SetMessage(I18nManager.Tf("node.players.load_failed", ex.Message)));
+                MainThreadDispatcher.Enqueue(() =>
+                {
+                    if (!IsCurrentGeneration(generation)) return;
+                    SetMessage(I18nManager.Tf("node.players.load_failed", ex.Message));
+                });
             }
+        }
+
+        private static void HandleLobbyChanged(MDEN.Protocol.Messages.Lobby.LobbySyncPush lobby)
+        {
+            if (_root == null) return;
+            if (ShouldCloseForLobbyChange(lobby))
+            {
+                Destroy();
+            }
+        }
+
+        private static void HandleConnectionStateChanged(ConnectionLifecycleState state)
+        {
+            if (state != ConnectionLifecycleState.Connected)
+            {
+                Destroy();
+            }
+        }
+
+        private static bool ShouldCloseForLobbyChange(MDEN.Protocol.Messages.Lobby.LobbySyncPush lobby)
+        {
+            if (lobby?.IsPlaying == true) return true;
+            if (!_openedLobbyId.HasValue) return lobby != null;
+            if (lobby == null) return true;
+            if (lobby.Id != _openedLobbyId.Value) return true;
+            return DateTime.UtcNow - _openedAtUtc > OpenedInLobbyMaxAge;
+        }
+
+        private static bool IsCurrentGeneration(int generation)
+        {
+            return _root != null && _generation == generation;
         }
 
         private static void CreateRoot()
@@ -245,7 +313,15 @@ namespace MDEN.UI.Core
             nameRect.anchorMin = new Vector2(0f, 0f);
             nameRect.anchorMax = new Vector2(1f, 1f);
             nameRect.offsetMin = new Vector2(318f, 0f);
-            nameRect.offsetMax = new Vector2(-240f, 0f);
+            nameRect.offsetMax = new Vector2(-330f, 0f);
+
+            var ping = CreateText(rect, "Ping", BuildPingText(player), 22, TextAnchor.MiddleCenter);
+            var pingRect = ping.rectTransform;
+            pingRect.anchorMin = new Vector2(1f, 0f);
+            pingRect.anchorMax = new Vector2(1f, 1f);
+            pingRect.pivot = new Vector2(1f, 0.5f);
+            pingRect.anchoredPosition = new Vector2(-218f, 0f);
+            pingRect.sizeDelta = new Vector2(86f, 0f);
 
             CreateInviteButton(rect, player);
         }
@@ -344,6 +420,19 @@ namespace MDEN.UI.Core
                 PlayerStatus.SinglePlaying => ColorText(I18nManager.T("node.players.status.single"), Constants.ColorRed),
                 _ => ColorText(I18nManager.Tf("node.players.status.room", Truncate(player?.LobbyName, MaxRoomNameLength)), Constants.ColorYellow)
             };
+        }
+
+        private static string BuildPingText(NodePlayerEntry player)
+        {
+            var ping = player?.PingMS ?? 0;
+            return ColorText($"{ping}ms", GetPingColor(ping));
+        }
+
+        private static string GetPingColor(ushort ping)
+        {
+            if (ping <= GoodPingThresholdMs) return Constants.ColorSoftGreen;
+            if (ping <= MediumPingThresholdMs) return Constants.ColorYellow;
+            return Constants.ColorRed;
         }
 
         private static Text CreateText(Transform parent, string name, string value, int fontSize, TextAnchor alignment)

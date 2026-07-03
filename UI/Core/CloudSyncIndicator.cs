@@ -47,15 +47,29 @@ namespace MDEN.UI.Core
             }
         }
 
-        public static void Start(string text)
+        public static int Start(string text)
         {
             var operationId = Interlocked.Increment(ref _operationId);
+            MainThreadDispatcher.Enqueue(() => StartOnMainThread(text, operationId));
+            return operationId;
+        }
+
+        public static void Start(int operationId, string text)
+        {
+            if (operationId <= 0) return;
+            Interlocked.Exchange(ref _operationId, operationId);
             MainThreadDispatcher.Enqueue(() => StartOnMainThread(text, operationId));
         }
 
         public static void Finish(bool success)
         {
             var operationId = Volatile.Read(ref _operationId);
+            Finish(operationId, success);
+        }
+
+        public static void Finish(int operationId, bool success)
+        {
+            if (operationId <= 0) return;
             MainThreadDispatcher.Enqueue(() => FinishOnMainThread(success, operationId));
         }
 

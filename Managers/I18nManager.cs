@@ -163,6 +163,7 @@ namespace MDEN.Managers
             Register("server.join.button", "- 加入服务器 -", "- Join Server -", "- 加入伺服器 -", "- サーバー参加 -", "- 서버 참가 -");
             Register("server.join.desc", "临时加入私人服务器", "Temporarily join a private server", "暫時加入私人伺服器", "プライベートサーバーに一時参加します", "개인 서버에 임시로 참가합니다");
             Register("server.fetching", "正在获取节点...", "Fetching servers...", "正在取得節點...", "ノード取得中...", "서버 목록 가져오는 중...");
+            Register("server.joining_node", "正在加入节点", "Joining node", "正在加入節點", "ノードに参加中", "노드 참가 중");
             Register("server.offline", "获取信息失败或服务器离线", "Failed to fetch info or server is offline", "取得資訊失敗或伺服器離線", "情報取得に失敗したかサーバーがオフラインです", "정보를 가져오지 못했거나 서버가 오프라인입니다");
             Register("server.stats", "版本: <color={0}>{1}</color>\n当前在线: <color={2}>{3}</color> 人\n房间数量: <color={4}>{5}</color> 个", "Version: <color={0}>{1}</color>\nOnline: <color={2}>{3}</color>\nRooms: <color={4}>{5}</color>", "版本: <color={0}>{1}</color>\n目前在線: <color={2}>{3}</color> 人\n房間數量: <color={4}>{5}</color> 個", "バージョン: <color={0}>{1}</color>\nオンライン: <color={2}>{3}</color>人\nルーム数: <color={4}>{5}</color>", "버전: <color={0}>{1}</color>\n현재 접속: <color={2}>{3}</color>명\n방 수: <color={4}>{5}</color>개");
             Register("server.missing", "节点不存在", "Server does not exist", "節點不存在", "ノードが存在しません", "서버가 없습니다");
@@ -270,6 +271,10 @@ namespace MDEN.Managers
             Register("room.setting.desc", "当前: {0}\n点击切换为{1}", "Current: {0}\nClick to switch to {1}", "目前: {0}\n點擊切換為{1}", "現在: {0}\nクリックで {1} に切り替え", "현재: {0}\n클릭하면 {1}(으)로 전환");
             Register("room.setting_failed", "设置失败：{0}", "Setting failed: {0}", "設定失敗：{0}", "設定に失敗しました：{0}", "설정 실패: {0}");
             Register("room.settlement.desc", "当前: {0}\n点击{1}每五首结算", "Current: {0}\nClick to {1} settlement every five songs", "目前: {0}\n點擊{1}每五首結算", "現在: {0}\nクリックで5曲ごとのリザルトを{1}", "현재: {0}\n클릭하면 5곡마다 정산을 {1}");
+            Register("room.players.desc", "当前最大人数: {0}\n点击后输入人数，范围 2-10", "Current max players: {0}\nClick to enter a value from 2 to 10", "目前最多人數: {0}\n點擊後輸入人數，範圍 2-10", "現在の最大人数: {0}\nクリックして 2-10 の範囲で入力します", "현재 최대 인원: {0}\n클릭해서 2-10 범위로 입력하세요");
+            Register("room.playlist_size.desc", "当前列表长度: {0}\n点击后输入歌曲列表长度，范围 2-32", "Current playlist size: {0}\nClick to enter a value from 2 to 32", "目前列表長度: {0}\n點擊後輸入歌曲列表長度，範圍 2-32", "現在のプレイリスト長: {0}\nクリックして 2-32 の範囲で入力します", "현재 목록 길이: {0}\n클릭해서 2-32 범위로 입력하세요");
+            Register("room.max_players.existing_limit", "最大人数不能小于当前房间人数", "Max players cannot be lower than the current player count", "最多人數不能小於目前房間人數", "最大人数は現在の参加人数より少なくできません", "최대 인원은 현재 방 인원보다 적을 수 없습니다");
+            Register("room.playlist_size.existing_limit", "列表长度不能小于当前点歌数量", "Playlist size cannot be lower than the current playlist count", "列表長度不能小於目前點歌數量", "プレイリスト長は現在の曲数より少なくできません", "목록 길이는 현재 선택된 곡 수보다 작을 수 없습니다");
             Register("room.unlock.button", "- 手动解锁 -", "- Unlock -", "- 手動解鎖 -", "- 手動解除 -", "- 수동 잠금 해제 -");
             Register("room.lock.button", "- 手动上锁 -", "- Lock -", "- 手動上鎖 -", "- 手動ロック -", "- 수동 잠금 -");
             Register("room.unlock.desc", "解锁后其他玩家可以加入房间", "Other players can join after unlocking", "解鎖後其他玩家可以加入房間", "解除すると他のプレイヤーが参加できます", "잠금을 해제하면 다른 플레이어가 참가할 수 있습니다");
@@ -284,6 +289,7 @@ namespace MDEN.Managers
             Register("room.host_only", "只有房主能进行该操作", "Only the host can do this", "只有房主能進行該操作", "ホストのみ操作できます", "방장만 이 작업을 할 수 있습니다");
             Register("room.rules_locked", "游戏准备或进行中，不能修改房间规则", "Room rules cannot be changed during preparation or play", "遊戲準備或進行中，不能修改房間規則", "準備中またはプレイ中はルールを変更できません", "준비 중이거나 게임 중에는 방 규칙을 변경할 수 없습니다");
             Register("room.stop_first", "请先停止游戏", "Please stop the game first", "請先停止遊戲", "先にゲームを停止してください", "먼저 게임을 중지하세요");
+            Register("room.host_transferred_to_you", "你已成为房主！", "You are now the host!", "你已成為房主！", "あなたがホストになりました！", "방장이 되었습니다!");
             Register("room.leaving", "Leaving lobby...", "Leaving lobby...", "正在離開房間...", "ルーム退出中...", "방 나가는 중...");
 
             Register("player.info.title", "玩家信息", "Player Info", "玩家資訊", "プレイヤー情報", "플레이어 정보");
@@ -421,6 +427,8 @@ namespace MDEN.Managers
             Register("ready.stop", "停止游戏", "Stop Game", "停止遊戲", "ゲーム停止", "게임 중지");
             Register("ready.equip", "使用推荐", "Use Recommended", "使用推薦", "おすすめ使用", "추천 사용");
             Register("ready.equipped", "已选择", "Selected", "已選擇", "選択済み", "선택됨");
+            Register("ready.equip_failed", "使用推荐失败：{0}", "Failed to apply recommendation: {0}", "使用推薦失敗：{0}", "おすすめ設定の適用に失敗しました：{0}", "추천 적용 실패: {0}");
+            Register("ready.equip_verify_failed", "游戏没有接受推荐配置，请稍后重试", "The game did not accept the recommended config. Please try again later.", "遊戲沒有接受推薦配置，請稍後重試", "ゲームが推奨設定を反映しませんでした。後でもう一度お試しください", "게임이 추천 설정을 적용하지 않았습니다. 잠시 후 다시 시도하세요.");
             Register("ready.waiting_chart", "等待歌曲", "Waiting for song", "等待歌曲", "曲待ち", "곡 대기");
             Register("ready.cancel", "取消准备", "Cancel Ready", "取消準備", "準備解除", "준비 취소");
             Register("ready.rookie_jump", "跳转选择难度", "Choose Difficulty", "跳轉選擇難度", "難易度選択へ", "난이도 선택으로");

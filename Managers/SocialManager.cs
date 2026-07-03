@@ -1,3 +1,4 @@
+using System;
 using System.Threading.Tasks;
 using MDEN.Network;
 using MDEN.Protocol;
@@ -9,6 +10,14 @@ namespace MDEN.Managers
 {
     public static class SocialManager
     {
+        private static readonly TimeSpan NodePlayersCacheTtl = TimeSpan.FromSeconds(5);
+        private static readonly object NodePlayersCacheLock = new object();
+        private static string _nodePlayersCacheKey;
+        private static DateTime _nodePlayersCacheUtc;
+        private static NodePlayerEntry[] _nodePlayersCache;
+        private static string _nodePlayersRequestKey;
+        private static Task<NodePlayerEntry[]> _nodePlayersRequestTask;
+
         public static void Init()
         {
             PushDispatcher.Instance.Register<FriendNotifyPush>(OpCodes.FriendNotifyPush, OnFriendNotify);
@@ -18,15 +27,35 @@ namespace MDEN.Managers
         public static Task<NodePlayerEntry[]> GetNodePlayersAsync()
         {
             ConnectionManager.EnsureCanSendRequest();
-            return GetNodePlayersCoreAsync();
+            var cacheKey = GetNodePlayersCacheKey();
+            if (TryGetCachedNodePlayers(cacheKey, out var players))
+            {
+                return Task.FromResult(players);
+            }
+
+            lock (NodePlayersCacheLock)
+            {
+                if (_nodePlayersRequestTask != null &&
+                    !_nodePlayersRequestTask.IsCompleted &&
+                    _nodePlayersRequestKey == cacheKey)
+                {
+                    return _nodePlayersRequestTask;
+                }
+
+                _nodePlayersRequestKey = cacheKey;
+                _nodePlayersRequestTask = GetNodePlayersCoreAsync(cacheKey);
+                return _nodePlayersRequestTask;
+            }
         }
 
-        private static async Task<NodePlayerEntry[]> GetNodePlayersCoreAsync()
+        private static async Task<NodePlayerEntry[]> GetNodePlayersCoreAsync(string cacheKey)
         {
             var response = await NetworkClient.Instance.SendRequestAsync<GetNodePlayersRequest, GetNodePlayersResponse>(
                 OpCodes.GetNodePlayersReq,
                 new GetNodePlayersRequest());
-            return response?.Players ?? new NodePlayerEntry[0];
+            var players = response?.Players ?? new NodePlayerEntry[0];
+            CacheNodePlayers(cacheKey, players);
+            return players;
         }
 
         public static Task<SendLobbyInviteResponse> SendLobbyInviteAsync(string targetUid)
@@ -44,6 +73,54 @@ namespace MDEN.Managers
             _ = NetworkClient.Instance.TrySendNotifyAsync(
                 OpCodes.PlayerPresenceNotify,
                 new PlayerPresenceNotify { Status = (byte)status });
+        }
+
+        public static void ClearNodePlayersCache()
+        {
+            lock (NodePlayersCacheLock)
+            {
+                _nodePlayersCacheKey = null;
+                _nodePlayersCacheUtc = default;
+                _nodePlayersCache = null;
+                _nodePlayersRequestKey = null;
+                _nodePlayersRequestTask = null;
+            }
+        }
+
+        private static bool TryGetCachedNodePlayers(string cacheKey, out NodePlayerEntry[] players)
+        {
+            lock (NodePlayersCacheLock)
+            {
+                if (_nodePlayersCache != null &&
+                    _nodePlayersCacheKey == cacheKey &&
+                    DateTime.UtcNow - _nodePlayersCacheUtc <= NodePlayersCacheTtl)
+                {
+                    players = _nodePlayersCache;
+                    return true;
+                }
+            }
+
+            players = null;
+            return false;
+        }
+
+        private static void CacheNodePlayers(string cacheKey, NodePlayerEntry[] players)
+        {
+            lock (NodePlayersCacheLock)
+            {
+                _nodePlayersCacheKey = cacheKey;
+                _nodePlayersCacheUtc = DateTime.UtcNow;
+                _nodePlayersCache = players ?? new NodePlayerEntry[0];
+            }
+        }
+
+        private static string GetNodePlayersCacheKey()
+        {
+            var lobby = LobbyManager.CurrentLobby;
+            var lobbyId = lobby?.Id.ToString() ?? "none";
+            var lobbyState = lobby?.IsPlaying == true ? "playing" : "idle";
+            var localState = PlayerManager.IsSinglePlaying ? "solo" : "online";
+            return $"{ConnectionManager.CurrentServerAddress}|{lobbyId}|{lobbyState}|{localState}";
         }
 
         public static Task<FriendRequestResp> SendFriendRequestAsync(string friendUid)

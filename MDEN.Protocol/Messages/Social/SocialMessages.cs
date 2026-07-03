@@ -51,6 +51,7 @@ namespace MDEN.Protocol.Messages.Social
         public byte Status { get; set; }
         public int LobbyId { get; set; }
         public string LobbyName { get; set; }
+        public ushort PingMS { get; set; }
     }
 
     public class SendLobbyInviteRequest

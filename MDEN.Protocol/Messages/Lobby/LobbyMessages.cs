@@ -94,6 +94,10 @@ namespace MDEN.Protocol.Messages.Lobby
         public byte Goal { get; set; }
         public bool UpdateSettlementEnabled { get; set; }
         public bool SettlementEnabled { get; set; }
+        public bool UpdateMaxPlayers { get; set; }
+        public ushort MaxPlayers { get; set; }
+        public bool UpdatePlaylistSize { get; set; }
+        public ushort PlaylistSize { get; set; }
         public bool UpdatePlayMode { get; set; }
         public byte PlayMode { get; set; }
         public bool UpdateTenziSongsPerPlayer { get; set; }
@@ -187,5 +191,9 @@ namespace MDEN.Protocol.Messages.Lobby
     public class LobbyKickedPush
     {
         public string Reason { get; set; }
+    }
+
+    public class LobbyHostTransferredPush
+    {
     }
 }

@@ -143,7 +143,7 @@ namespace MDEN.UI.Windows
 
             _isRefreshingNodes = true;
             IDisposable uiLock = WindowStackController.LockUI(I18nManager.T("server.fetching"));
-            CloudSyncIndicator.Start(I18nManager.T("server.fetching"));
+            var cloudOperationId = UiNotificationManager.RequestCloudProgress(I18nManager.T("server.fetching"));
 
             try
             {
@@ -196,7 +196,7 @@ namespace MDEN.UI.Windows
                 _officialNodeDisplayData = displayData;
                 _officialNodePlainNames = plainNames;
                 _customServerStatusDescriptions = customStatusDescriptions;
-                MainThreadDispatcher.Enqueue(() => CloudSyncIndicator.Finish(true));
+                UiNotificationManager.FinishCloudProgress(cloudOperationId, true);
 
             }
             catch (Exception e)
@@ -206,7 +206,7 @@ namespace MDEN.UI.Windows
                 _officialNodeDisplayData = new List<Tuple<string, string>>();
                 _officialNodePlainNames = new List<string>();
                 _customServerStatusDescriptions = new Dictionary<string, string>();
-                MainThreadDispatcher.Enqueue(() => CloudSyncIndicator.Finish(false));
+                UiNotificationManager.FinishCloudProgress(cloudOperationId, false);
             }
             finally
             {

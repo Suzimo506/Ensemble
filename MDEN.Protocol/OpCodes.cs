@@ -93,6 +93,7 @@ namespace MDEN.Protocol
         public const ushort LobbySyncPush = 0x0800;
         public const ushort LobbyAllReturnedPush = 0x0801;
         public const ushort LobbyKickedPush = 0x0802;
+        public const ushort LobbyHostTransferredPush = 0x0803;
 
         // === 喵斯兔联机大厅 (0x0900 ~ 0x09FF) ===
         public const ushort MdtObserveReq = 0x0900;

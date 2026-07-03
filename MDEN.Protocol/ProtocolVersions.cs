@@ -2,6 +2,6 @@ namespace MDEN.Protocol
 {
     public static class ProtocolVersions
     {
-        public const int Current = 9;
+        public const int Current = 10;
     }
 }

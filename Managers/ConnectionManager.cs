@@ -36,12 +36,16 @@ namespace MDEN.Managers
 
         public static async Task<LoginResponse> ConnectAndLoginAsync(string address, string serverDisplayName = null, bool isOfficialServer = false)
         {
+            var cloudOperationId = UiNotificationManager.RequestCloudProgress(I18nManager.T("server.joining_node"));
             try
             {
-                return await ConnectAndLoginAsync(address, serverDisplayName, isOfficialServer, false);
+                var response = await ConnectAndLoginAsync(address, serverDisplayName, isOfficialServer, false);
+                UiNotificationManager.FinishCloudProgress(cloudOperationId, true);
+                return response;
             }
             catch (Exception ex)
             {
+                UiNotificationManager.FinishCloudProgress(cloudOperationId, false);
                 UiNotificationManager.RequestToast(FormatConnectFailureMessage(ex));
                 throw;
             }
@@ -238,6 +242,7 @@ namespace MDEN.Managers
         {
             IsLoggedIn = false;
             SessionToken = null;
+            SocialManager.ClearNodePlayersCache();
             PlayerManager.ClearSession();
             LobbyManager.ClearSession();
         }
