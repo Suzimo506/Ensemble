@@ -35,6 +35,7 @@ namespace MDEN.UI.Core
             }
 
             if (_resultPreviewHeld) return;
+            if (TenziDrawController.IsDrawResultHidden(lobby)) return;
 
             PreviewCurrentLockedLobby(lobby);
         }
@@ -46,6 +47,8 @@ namespace MDEN.UI.Core
             {
                 return;
             }
+
+            if (TenziDrawController.IsDrawResultHidden(lobby)) return;
 
             var entry = PlaylistManager.GetCurrentPlaylistEntry();
             if (entry == null || string.IsNullOrWhiteSpace(entry.Entry))
@@ -79,6 +82,8 @@ namespace MDEN.UI.Core
 
         private static void PreviewCurrentLockedLobby(LobbySyncPush lobby)
         {
+            if (TenziDrawController.IsDrawResultHidden(lobby)) return;
+
             var entry = PlaylistManager.GetCurrentPlaylistEntry();
             if (entry == null || string.IsNullOrWhiteSpace(entry.Entry))
             {
@@ -173,6 +178,8 @@ namespace MDEN.UI.Core
                     HoldPreviewUntilResultPanelCloses();
                     yield break;
                 }
+
+                if (TenziDrawController.IsDrawResultHidden(LobbyManager.CurrentLobby)) yield break;
 
                 var entry = PlaylistManager.GetCurrentPlaylistEntry();
                 if (entry == null || entry.Entry != entryText) yield break;

@@ -100,7 +100,7 @@ namespace MDEN.UI.Windows
             }
 
             Close();
-            TenziDrawController.NotifyWindowClosed(this);
+            TenziDrawController.NotifyDrawCompleted(this);
             Dispose();
         }
 

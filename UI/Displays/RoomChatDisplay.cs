@@ -1099,6 +1099,17 @@ namespace MDEN.UI.Displays
                 }
             }
 
+            if (msg.Message == "PlayerHiddenChart" && !string.IsNullOrWhiteSpace(msg.ExtraData))
+            {
+                var hidden = ParsePlayerHiddenChart(msg);
+                if (hidden.HasValue)
+                {
+                    var playerName = hidden.Value.PlayerName;
+                    var chartName = FormatMissingChartNameForDisplay(hidden.Value.ChartName);
+                    return $"{SystemPrefix()} {ColorText(EscapeRichText(playerName), GetMessageAuthorColor(hidden.Value.Uid, playerName, hidden.Value.PlayerColor))} {I18nManager.Tf("chat.player_hidden_chart", chartName)}";
+                }
+            }
+
             if (msg.Message == "PlayerJoinedLobby")
             {
                 var player = ParsePlayerEventData(msg);
@@ -1254,7 +1265,8 @@ namespace MDEN.UI.Displays
 
         private void CreateChatGuideBody(RectTransform parent)
         {
-            var body = CreateChatGuideText(parent, "Body", I18nManager.T("chat.guide.body"), 28, TextAnchor.UpperLeft);
+            var guideText = I18nManager.T("chat.guide.body") + "\n\n" + I18nManager.T("chat.guide.node_players");
+            var body = CreateChatGuideText(parent, "Body", guideText, 28, TextAnchor.UpperLeft);
             body.color = new Color(0.94f, 0.92f, 1f, 1f);
             body.lineSpacing = 1.08f;
             body.resizeTextForBestFit = true;
@@ -1501,6 +1513,23 @@ namespace MDEN.UI.Displays
             }
 
             return (parts[0], DecodeEntryPart(string.Join("#", parts, 1, parts.Length - 1)), null, 0);
+        }
+
+        private static (string Uid, string PlayerName, string PlayerColor, string ChartName)? ParsePlayerHiddenChart(ChatPushMsg msg)
+        {
+            if (string.IsNullOrWhiteSpace(msg?.ExtraData)) return null;
+
+            var parts = msg.ExtraData.Split('#');
+            if (parts.Length < 4) return null;
+
+            if (parts.Length >= 7 &&
+                ChartSelectionRules.IsValidChartKey(parts[3]) &&
+                int.TryParse(parts[4], out _))
+            {
+                return (parts[0], parts[1], parts[2], DecodeEntryPart(parts[6]));
+            }
+
+            return (parts[0], parts[1], parts[2], DecodeEntryPart(string.Join("#", parts, 3, parts.Length - 3)));
         }
 
         private static (string Uid, string Text)? ParsePlayerEventData(ChatPushMsg msg)
@@ -1753,6 +1782,14 @@ namespace MDEN.UI.Displays
             if (!string.IsNullOrEmpty(normalized)) return normalized;
 
             return GetPlayerColor(msg?.AuthorUid, msg?.AuthorName);
+        }
+
+        private string GetMessageAuthorColor(string uid, string fallbackName, string fallbackColor)
+        {
+            var normalized = NormalizeHexColor(fallbackColor);
+            if (!string.IsNullOrEmpty(normalized)) return normalized;
+
+            return GetPlayerColor(uid, fallbackName);
         }
 
         private string FindPlayerUidByName(string playerName)

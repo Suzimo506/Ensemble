@@ -249,9 +249,14 @@ namespace MDEN.UI.Displays
                 RecommendedConfigManager.Request(entry);
             }
 
-            var chartTitle = entry == null ? I18nManager.T("ready.waiting_chart") : entry.DisplayName;
+            var hideTenziResult = TenziDrawController.IsDrawResultHidden(lobby);
+            var chartTitle = entry == null
+                ? I18nManager.T("ready.waiting_chart")
+                : hideTenziResult
+                    ? I18nManager.T("ready.hidden_chart")
+                    : entry.DisplayName;
             var recommended = RecommendedConfigManager.GetDisplayText(entry);
-            _message.text = BuildMessageText(lobby, chartTitle, recommended, entry);
+            _message.text = BuildMessageText(lobby, chartTitle, recommended, entry, hideTenziResult);
 
             bool isReady = PlaylistManager.IsLocalPlayerReady();
             _buttonMainText.text = lobby.IsPlaying
@@ -506,9 +511,11 @@ namespace MDEN.UI.Displays
             MainThreadDispatcher.Enqueue(() => ShowText.ShowInfo(I18nManager.T("ready.chart_not_found")));
         }
 
-        private static string BuildMessageText(LobbySyncPush lobby, string chartTitle, string recommended, PlaylistEntryViewModel entry)
+        private static string BuildMessageText(LobbySyncPush lobby, string chartTitle, string recommended, PlaylistEntryViewModel entry, bool hideTenziResult)
         {
-            var ownerName = string.IsNullOrWhiteSpace(entry?.OwnerName) ? I18nManager.T("common.unknown") : entry.OwnerName;
+            var ownerName = hideTenziResult || string.IsNullOrWhiteSpace(entry?.OwnerName)
+                ? I18nManager.T("common.unknown")
+                : entry.OwnerName;
             var ownerColor = GetOwnerColor(lobby, ownerName);
 
             return $"<color=#F8DC51>{I18nManager.T("ready.next")}</color>\n" +
