@@ -676,14 +676,12 @@ namespace MDEN.Managers
         private static void OnLobbyKicked(LobbyKickedPush push)
         {
             var kickedMessage = I18nManager.T("lobby.kicked");
-            var reason = string.IsNullOrWhiteSpace(push?.Reason) ? kickedMessage : push.Reason;
             ResetPendingLobbySync();
             _pendingJoinLobbyId = null;
             CurrentLobby = null;
             BattleManager.Reset();
             NotifyCurrentLobbyChanged();
-            UiNotificationManager.RequestCloudNotice(kickedMessage);
-            UiNotificationManager.RequestToast(reason);
+            UiNotificationManager.RequestToast(kickedMessage);
             UiNotificationManager.RequestKickedToLobbyList();
         }
 

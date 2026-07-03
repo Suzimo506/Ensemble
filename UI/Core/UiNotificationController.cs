@@ -17,7 +17,6 @@ namespace MDEN.UI.Core
             UiNotificationManager.KickedToLobbyListRequested += HandleKickedToLobbyListRequested;
             UiNotificationManager.CloudProgressStarted += HandleCloudProgressStarted;
             UiNotificationManager.CloudProgressFinished += HandleCloudProgressFinished;
-            UiNotificationManager.CloudNoticeRequested += HandleCloudNoticeRequested;
             _initialized = true;
         }
 
@@ -29,7 +28,6 @@ namespace MDEN.UI.Core
             UiNotificationManager.KickedToLobbyListRequested -= HandleKickedToLobbyListRequested;
             UiNotificationManager.CloudProgressStarted -= HandleCloudProgressStarted;
             UiNotificationManager.CloudProgressFinished -= HandleCloudProgressFinished;
-            UiNotificationManager.CloudNoticeRequested -= HandleCloudNoticeRequested;
             _initialized = false;
         }
 
@@ -61,11 +59,6 @@ namespace MDEN.UI.Core
         private static void HandleCloudProgressFinished(int operationId, bool success)
         {
             CloudSyncIndicator.Finish(operationId, success);
-        }
-
-        private static void HandleCloudNoticeRequested(int operationId, string message)
-        {
-            CloudSyncIndicator.ShowNotice(operationId, message);
         }
     }
 }
