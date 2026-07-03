@@ -703,6 +703,37 @@ namespace MDEN.Managers
                    push.Revision <= latestRevision;
         }
 
+        public static void ApplyFetchedAvatarData(string uid, string avatarName, string avatarData)
+        {
+            if (CurrentLobby?.PlayerDetails == null ||
+                string.IsNullOrWhiteSpace(uid) ||
+                string.IsNullOrWhiteSpace(avatarName) ||
+                string.IsNullOrWhiteSpace(avatarData))
+            {
+                return;
+            }
+
+            var changed = false;
+            foreach (var player in CurrentLobby.PlayerDetails)
+            {
+                if (player == null ||
+                    !string.Equals(player.Uid, uid, StringComparison.Ordinal) ||
+                    !string.Equals(player.AvatarName, avatarName, StringComparison.Ordinal) ||
+                    !string.IsNullOrWhiteSpace(player.AvatarData))
+                {
+                    continue;
+                }
+
+                player.AvatarData = avatarData;
+                changed = true;
+            }
+
+            if (changed)
+            {
+                NotifyCurrentLobbyChanged();
+            }
+        }
+
         private static void PreserveCachedAvatarData(LobbySyncPush previous, LobbySyncPush next)
         {
             if (previous?.PlayerDetails == null || next?.PlayerDetails == null) return;

@@ -69,8 +69,9 @@ namespace MDEN.Patches
             if (ShouldCheckNativeResultFallback())
             {
                 RecoverNativeResultInputIfReady();
-                TryFinishNativeResultByEnter();
             }
+
+            TryFinishNativeResultByEnter();
 
             if (!IsMultiplayerBattleContext) return;
             if (Time.frameCount < _nextPauseButtonHideFrame) return;
@@ -364,6 +365,7 @@ namespace MDEN.Patches
 
         private static void TryFinishNativeResultByEnter()
         {
+            if (!Input.GetKeyDown(KeyCode.Return) && !Input.GetKeyDown(KeyCode.KeypadEnter)) return;
             if (!LobbyManager.IsInLobby) return;
             if (!BattleResultFlowManager.CanExitBattleResult) return;
             if (ShouldHoldFailedBattleResult())
@@ -373,7 +375,6 @@ namespace MDEN.Patches
             }
 
             if (SettlementOverlayController.IsAnyMdenOverlayActive) return;
-            if (!Input.GetKeyDown(KeyCode.Return) && !Input.GetKeyDown(KeyCode.KeypadEnter)) return;
             if (!SettlementOverlayController.IsNativeBattleResultPanelVisible()) return;
 
             try

@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Security.Cryptography;
+using System.Threading.Tasks;
+using MDEN.UI.Core;
 using UnityEngine;
 
 namespace MDEN.Managers
@@ -19,9 +21,14 @@ namespace MDEN.Managers
         private const int MaxSourceDimension = 2048;
         private const int MaxAvatarPngBytes = 49152;
         private const int MaxLibraryItems = 128;
+        private static readonly TimeSpan RemoteAvatarCacheTtl = TimeSpan.FromMinutes(10);
+        private static readonly TimeSpan RemoteAvatarRetryDelay = TimeSpan.FromSeconds(30);
 
         private static readonly Dictionary<string, Sprite> SpriteCache = new Dictionary<string, Sprite>();
         private static readonly Dictionary<string, PreviewCacheEntry> PreviewCache = new Dictionary<string, PreviewCacheEntry>(StringComparer.OrdinalIgnoreCase);
+        private static readonly Dictionary<string, RemoteAvatarCacheEntry> RemoteAvatarCache = new Dictionary<string, RemoteAvatarCacheEntry>(StringComparer.OrdinalIgnoreCase);
+        private static readonly HashSet<string> RemoteAvatarRequests = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        private static readonly object RemoteAvatarLock = new object();
         private static readonly int[] AvatarEncodeSizes = { AvatarSize, 128, 96, 80, MinAvatarSize };
         private static Sprite _defaultSprite;
 
@@ -51,7 +58,11 @@ namespace MDEN.Managers
 
             if (!TryGetCustomAvatarBytes(normalizedName, avatarData, out var avatarBytes))
             {
-                return GetDefaultAvatarSprite();
+                var remoteAvatarData = ResolveRemoteAvatarData(uid, normalizedName, null);
+                if (!TryGetCustomAvatarBytes(normalizedName, remoteAvatarData, out avatarBytes))
+                {
+                    return GetDefaultAvatarSprite();
+                }
             }
 
             var sprite = CreateSpriteFromImageBytes(avatarBytes, normalizedName);
@@ -92,6 +103,105 @@ namespace MDEN.Managers
                 ClientLogManager.Warning($"Read local avatar failed: {ex.Message}");
                 return null;
             }
+        }
+
+        private static string ResolveRemoteAvatarData(string uid, string avatarName, string avatarData)
+        {
+            if (!string.IsNullOrWhiteSpace(avatarData)) return avatarData;
+            if (string.IsNullOrWhiteSpace(uid) || string.Equals(uid, PlayerManager.CurrentUid, StringComparison.Ordinal)) return avatarData;
+
+            var cacheKey = BuildRemoteAvatarCacheKey(uid, avatarName);
+            lock (RemoteAvatarLock)
+            {
+                if (RemoteAvatarCache.TryGetValue(cacheKey, out var entry) &&
+                    !string.IsNullOrWhiteSpace(entry.AvatarData) &&
+                    DateTime.UtcNow - entry.FetchedUtc <= RemoteAvatarCacheTtl)
+                {
+                    return entry.AvatarData;
+                }
+            }
+
+            RequestRemoteAvatarData(uid, avatarName, cacheKey);
+            return avatarData;
+        }
+
+        private static void RequestRemoteAvatarData(string uid, string avatarName, string cacheKey)
+        {
+            if (!ConnectionManager.CanSendRequests) return;
+
+            var now = DateTime.UtcNow;
+            lock (RemoteAvatarLock)
+            {
+                if (RemoteAvatarRequests.Contains(cacheKey)) return;
+                if (RemoteAvatarCache.TryGetValue(cacheKey, out var entry))
+                {
+                    if (!string.IsNullOrWhiteSpace(entry.AvatarData) &&
+                        now - entry.FetchedUtc <= RemoteAvatarCacheTtl)
+                    {
+                        return;
+                    }
+
+                    if (entry.FailedUtc.HasValue &&
+                        now - entry.FailedUtc.Value <= RemoteAvatarRetryDelay)
+                    {
+                        return;
+                    }
+                }
+
+                RemoteAvatarRequests.Add(cacheKey);
+            }
+
+            _ = FetchRemoteAvatarDataAsync(uid, avatarName, cacheKey);
+        }
+
+        private static async Task FetchRemoteAvatarDataAsync(string uid, string avatarName, string cacheKey)
+        {
+            try
+            {
+                var profile = await PlayerManager.GetProfileAsync(uid);
+                var avatarData = string.Equals(profile?.AvatarName, avatarName, StringComparison.OrdinalIgnoreCase)
+                    ? profile.AvatarData
+                    : null;
+                if (!string.IsNullOrWhiteSpace(avatarData) &&
+                    !TryDecodeAvatarData(avatarName, avatarData, out _))
+                {
+                    avatarData = null;
+                }
+
+                lock (RemoteAvatarLock)
+                {
+                    RemoteAvatarCache[cacheKey] = string.IsNullOrWhiteSpace(avatarData)
+                        ? RemoteAvatarCacheEntry.Failed(DateTime.UtcNow)
+                        : RemoteAvatarCacheEntry.Success(avatarData, DateTime.UtcNow);
+                }
+
+                if (!string.IsNullOrWhiteSpace(avatarData))
+                {
+                    var fetchedData = avatarData;
+                    MainThreadDispatcher.Enqueue(() => LobbyManager.ApplyFetchedAvatarData(uid, avatarName, fetchedData));
+                }
+            }
+            catch (Exception ex)
+            {
+                lock (RemoteAvatarLock)
+                {
+                    RemoteAvatarCache[cacheKey] = RemoteAvatarCacheEntry.Failed(DateTime.UtcNow);
+                }
+
+                ClientLogManager.Warning($"Fetch remote avatar failed: {ex.Message}");
+            }
+            finally
+            {
+                lock (RemoteAvatarLock)
+                {
+                    RemoteAvatarRequests.Remove(cacheKey);
+                }
+            }
+        }
+
+        private static string BuildRemoteAvatarCacheKey(string uid, string avatarName)
+        {
+            return uid + "|" + avatarName;
         }
 
         public static string ImportAvatarFromPath(string sourcePath)
@@ -901,6 +1011,30 @@ namespace MDEN.Managers
             public long Length { get; }
             public long LastWriteTicks { get; }
             public Texture2D Texture { get; }
+        }
+
+        private sealed class RemoteAvatarCacheEntry
+        {
+            private RemoteAvatarCacheEntry(string avatarData, DateTime fetchedUtc, DateTime? failedUtc)
+            {
+                AvatarData = avatarData;
+                FetchedUtc = fetchedUtc;
+                FailedUtc = failedUtc;
+            }
+
+            public string AvatarData { get; }
+            public DateTime FetchedUtc { get; }
+            public DateTime? FailedUtc { get; }
+
+            public static RemoteAvatarCacheEntry Success(string avatarData, DateTime fetchedUtc)
+            {
+                return new RemoteAvatarCacheEntry(avatarData, fetchedUtc, null);
+            }
+
+            public static RemoteAvatarCacheEntry Failed(DateTime failedUtc)
+            {
+                return new RemoteAvatarCacheEntry(null, default, failedUtc);
+            }
         }
 
         private static void TryCreateDirectory(string path)
