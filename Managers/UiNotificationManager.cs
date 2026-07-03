@@ -10,6 +10,7 @@ namespace MDEN.Managers
         public static event Action KickedToLobbyListRequested;
         public static event Action<int, string> CloudProgressStarted;
         public static event Action<int, bool> CloudProgressFinished;
+        public static event Action<int, string> CloudNoticeRequested;
 
         private static int _cloudProgressOperationId;
 
@@ -40,6 +41,13 @@ namespace MDEN.Managers
         {
             if (operationId <= 0) return;
             CloudProgressFinished?.Invoke(operationId, success);
+        }
+
+        public static int RequestCloudNotice(string message)
+        {
+            var operationId = Interlocked.Increment(ref _cloudProgressOperationId);
+            CloudNoticeRequested?.Invoke(operationId, message ?? string.Empty);
+            return operationId;
         }
     }
 }

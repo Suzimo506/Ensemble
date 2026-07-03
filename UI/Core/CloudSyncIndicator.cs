@@ -73,6 +73,13 @@ namespace MDEN.UI.Core
             MainThreadDispatcher.Enqueue(() => FinishOnMainThread(success, operationId));
         }
 
+        public static void ShowNotice(int operationId, string text)
+        {
+            if (operationId <= 0) return;
+            Interlocked.Exchange(ref _operationId, operationId);
+            MainThreadDispatcher.Enqueue(() => ShowNoticeOnMainThread(text, operationId));
+        }
+
         private static void StartOnMainThread(string text, int operationId)
         {
             if (operationId != _operationId) return;
@@ -90,6 +97,26 @@ namespace MDEN.UI.Core
             SetActive(_failed, false);
             SetActive(_pending, true);
             SetActive(_message, true);
+        }
+
+        private static void ShowNoticeOnMainThread(string text, int operationId)
+        {
+            if (operationId != _operationId) return;
+
+            Initialize();
+            if (_message == null) return;
+
+            if (_pendingText != null)
+            {
+                _pendingText.text = string.IsNullOrEmpty(text) ? I18nManager.T("cloud.syncing") : text;
+            }
+
+            CancelHide();
+            SetActive(_completed, false);
+            SetActive(_failed, false);
+            SetActive(_pending, true);
+            SetActive(_message, true);
+            HideLaterAsync(operationId);
         }
 
         private static void FinishOnMainThread(bool success, int operationId)
