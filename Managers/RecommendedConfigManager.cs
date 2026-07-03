@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using Il2CppAssets.Scripts.Database;
 using Il2CppAssets.Scripts.PeroTools.Commons;
 using Il2CppAssets.Scripts.PeroTools.Managers;
+using MDEN.UI.Core;
 using MelonLoader;
 
 namespace MDEN.Managers
@@ -15,10 +16,12 @@ namespace MDEN.Managers
     {
         private static readonly HttpClient Client = new HttpClient();
         private static readonly object SyncRoot = new object();
+        private static readonly TimeSpan FailedRetryDelay = TimeSpan.FromSeconds(10);
         private static RecommendedConfig _current;
         private static string _currentEntryKey;
         private static string _loadingEntryKey;
         private static string _lastRequestedEntryKey;
+        private static DateTime _lastFailedRequestUtc;
 
         public static RecommendedConfig Current
         {
@@ -47,9 +50,19 @@ namespace MDEN.Managers
             var key = GetRecommendationKey(entry);
             lock (SyncRoot)
             {
-                if (_lastRequestedEntryKey == key) return;
+                var canRetryFailedRequest = false;
+                if (_lastRequestedEntryKey == key)
+                {
+                    canRetryFailedRequest = _currentEntryKey == key &&
+                                            _current == null &&
+                                            _loadingEntryKey == null &&
+                                            _lastFailedRequestUtc != default &&
+                                            DateTime.UtcNow - _lastFailedRequestUtc >= FailedRetryDelay;
+                    if (!canRetryFailedRequest) return;
+                }
+
                 _lastRequestedEntryKey = key;
-                if (_currentEntryKey == key || _loadingEntryKey == key) return;
+                if (!canRetryFailedRequest && (_currentEntryKey == key || _loadingEntryKey == key)) return;
                 _loadingEntryKey = key;
                 _currentEntryKey = null;
                 _current = null;
@@ -73,10 +86,14 @@ namespace MDEN.Managers
             var current = Current;
             if (current == null) return;
 
-            DataHelper.selectedRoleIndex = current.GirlIndex;
-            DataHelper.selectedElfinIndex = current.ElfinIndex;
+            await MainThreadDispatcher.InvokeAsync(() => ApplySelection(current));
 
-            var selection = GameAccountManager.RefreshSelectionSnapshot();
+            var selection = await MainThreadDispatcher.InvokeAsync(() => GameAccountManager.RefreshSelectionSnapshot());
+            if (selection.GirlIndex != current.GirlIndex || selection.ElfinIndex != current.ElfinIndex)
+            {
+                throw new InvalidOperationException(I18nManager.T("ready.equip_verify_failed"));
+            }
+
             await PlayerManager.SyncSelectionAsync(selection);
         }
 
@@ -105,6 +122,7 @@ namespace MDEN.Managers
                     _current = config;
                     _currentEntryKey = key;
                     _loadingEntryKey = null;
+                    _lastFailedRequestUtc = default;
                 }
             }
             catch (Exception ex)
@@ -115,6 +133,7 @@ namespace MDEN.Managers
                     {
                         _currentEntryKey = key;
                         _loadingEntryKey = null;
+                        _lastFailedRequestUtc = DateTime.UtcNow;
                     }
                 }
 
@@ -127,7 +146,10 @@ namespace MDEN.Managers
             if (IsCustomEntry(entry))
             {
                 using var response = await Client.GetAsync($"https://api.mdmc.moe/v3/sheets/{entry.ChartKey}/scores?limit=1");
-                if (!response.IsSuccessStatusCode) return null;
+                if (!response.IsSuccessStatusCode)
+                {
+                    throw new HttpRequestException($"MDMC recommendation API returned {(int)response.StatusCode}");
+                }
 
                 var body = await response.Content.ReadFromJsonAsync<Dictionary<string, JsonElement>>();
                 if (body == null || !body.TryGetValue("scores", out var scoresElement)) return null;
@@ -146,7 +168,10 @@ namespace MDEN.Managers
 
             var difficulty = Math.Max(0, entry.Difficulty - 1);
             using var rankResponse = await Client.GetAsync($"https://api.musedash.moe/rank/{musicInfo.uid}/{difficulty}/all");
-            if (!rankResponse.IsSuccessStatusCode) return null;
+            if (!rankResponse.IsSuccessStatusCode)
+            {
+                throw new HttpRequestException($"Muse Dash rank API returned {(int)rankResponse.StatusCode}");
+            }
 
             var ranks = await rankResponse.Content.ReadFromJsonAsync<List<List<JsonElement>>>();
             if (ranks == null || ranks.Count == 0 || ranks[0].Count < 8) return null;
@@ -172,6 +197,28 @@ namespace MDEN.Managers
         private static string GetRecommendationKey(PlaylistEntryViewModel entry)
         {
             return $"{entry.ChartKey}#{entry.Difficulty}";
+        }
+
+        private static void ApplySelection(RecommendedConfig current)
+        {
+            DataHelper.selectedRoleIndex = current.GirlIndex;
+            DataHelper.selectedElfinIndex = current.ElfinIndex;
+
+            try
+            {
+                var levelConfig = GlobalDataBase.s_DbLevelConfig;
+                if (levelConfig != null)
+                {
+                    levelConfig.curLevelConfigState = 0;
+                    levelConfig.ResetCurLevelConfig();
+                }
+            }
+            catch (Exception ex)
+            {
+                MDEN.Managers.ClientLogManager.Warning($"Reset level config after applying recommendation failed: {ex.Message}");
+            }
+
+            RoomHudController.RequestRefresh();
         }
 
         private static string GetGirlName(int girlId)

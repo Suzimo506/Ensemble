@@ -30,6 +30,7 @@ namespace MDEN.Bootstrap
             BattleHudController.Initialize();
             SettlementHudController.Initialize();
             RoomHudController.Initialize();
+            NodePlayersOverlay.Initialize();
             ClientLogManager.Msg("Initialization complete.");
         }
 
@@ -55,24 +56,25 @@ namespace MDEN.Bootstrap
         {
             MainThreadWatchdog.Heartbeat("OnUpdate.Begin");
             PerfTrace.BeginFrame();
-            MainThreadWatchdog.Heartbeat("MainThreadDispatcher.ProcessQueue");
+            MainThreadWatchdog.SetStage("MainThreadDispatcher.ProcessQueue");
             MainThreadDispatcher.ProcessQueue();
 
             if (!BattleManager.IsActiveMultiplayerBattle)
             {
-                MainThreadWatchdog.Heartbeat("PlayerManager.SyncCurrentSelectionIfChanged");
+                MainThreadWatchdog.SetStage("PlayerManager.SyncCurrentSelectionIfChanged");
                 PlayerManager.SyncCurrentSelectionIfChanged();
             }
 
-            MainThreadWatchdog.Heartbeat("BattleFlowPatch.UpdateBattleUiState");
+            MainThreadWatchdog.SetStage("BattleFlowPatch.UpdateBattleUiState");
             Patches.BattleFlowPatch.UpdateBattleUiState();
-            MainThreadWatchdog.Heartbeat("SettlementOverlayController.Update");
+            MainThreadWatchdog.SetStage("SettlementOverlayController.Update");
             SettlementOverlayController.Update();
-            MainThreadWatchdog.Heartbeat("RoomHudController.Update");
+            MainThreadWatchdog.SetStage("RoomHudController.Update");
             RoomHudController.Update();
 
-            MainThreadWatchdog.Heartbeat("PerfTrace.UpdateReport");
+            MainThreadWatchdog.SetStage("PerfTrace.UpdateReport");
             PerfTrace.UpdateReport();
+            MainThreadWatchdog.SetStage("OnUpdate.End");
             MainThreadWatchdog.Heartbeat("OnUpdate.End");
         }
 
@@ -82,11 +84,13 @@ namespace MDEN.Bootstrap
             SettlementOverlayController.ClearAll();
             PerfTrace.SetGameMain(false);
             RoomHudController.SetBattleSceneActive(false);
+            NodePlayersOverlay.Destroy();
             BattleHudController.Deinitialize();
             SettlementHudController.Deinitialize();
             MuseDashToolStatusListener.Shutdown();
             UiNotificationController.Deinitialize();
             RoomHudController.Deinitialize();
+            NodePlayersOverlay.Deinitialize();
             MainThreadWatchdog.Shutdown();
             ConnectionManager.Disconnect();
         }
@@ -94,6 +98,7 @@ namespace MDEN.Bootstrap
         private static void HandleUiSceneLoaded()
         {
             WindowStackController.ForceUnlock();
+            NodePlayersOverlay.Destroy();
             NativeInputBlocker.ClearAll();
             SettlementOverlayController.Reset();
             BattleHealthBarController.Reset();
@@ -119,6 +124,7 @@ namespace MDEN.Bootstrap
         {
             WindowStackController.ForceUnlock();
             CustomAlbumsWindowGuard.CloseIfOpen("GameMain scene load");
+            NodePlayersOverlay.Destroy();
             NativeInputBlocker.ClearAll();
             SettlementOverlayController.Reset();
             BattleHealthBarController.Reset();

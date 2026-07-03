@@ -8,7 +8,11 @@ namespace MDEN.UI.Core
     internal static class StageDesignerTextController
     {
         private const string StageDesignerPath = "UI/Standerd/PnlPreparation/TxtStageDesigner";
+        private const string PreparationPanelPath = "UI/Standerd/PnlPreparation";
+        private const int MissingPreparationLookupRetryFrames = 30;
+        private static GameObject _preparationPanel;
         private static RectTransform _target;
+        private static int _nextPreparationLookupFrame;
         private static Vector2 _anchorMin;
         private static Vector2 _anchorMax;
         private static Vector2 _pivot;
@@ -132,8 +136,18 @@ namespace MDEN.UI.Core
 
         private static bool IsPreparationVisible()
         {
-            var preparation = GameObject.Find("UI/Standerd/PnlPreparation");
+            var preparation = GetPreparationPanel();
             return preparation != null && preparation.activeInHierarchy;
+        }
+
+        private static GameObject GetPreparationPanel()
+        {
+            if (_preparationPanel != null) return _preparationPanel;
+            if (Time.frameCount < _nextPreparationLookupFrame) return null;
+
+            _nextPreparationLookupFrame = Time.frameCount + MissingPreparationLookupRetryFrames;
+            _preparationPanel = GameObject.Find(PreparationPanelPath);
+            return _preparationPanel;
         }
     }
 }

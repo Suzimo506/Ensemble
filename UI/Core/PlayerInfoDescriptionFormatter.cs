@@ -35,7 +35,9 @@ namespace MDEN.UI.Core
         {
             if (player?.Uid == PlayerManager.CurrentUid)
             {
-                return PlayerManager.CurrentProfile?.TotalMultiplayerGames ?? player.TotalMultiplayerGames;
+                return Math.Max(
+                    player.TotalMultiplayerGames,
+                    PlayerManager.CurrentProfile?.TotalMultiplayerGames ?? 0);
             }
 
             return player?.TotalMultiplayerGames ?? 0;

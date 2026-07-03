@@ -121,8 +121,8 @@ namespace MDEN.UI.Windows
                 var obj = new ForumObject(
                     new LocalString(BuildTitle(i, -1, false)),
                     new LocalString(BuildDescription(i, -1, false)));
-                obj.Texture = ResourceManager.GetSprite("RoomList.png")?.texture ??
-                              ResourceManager.GetRandomBannerTexture();
+                obj.Texture = ResourceManager.GetRandomBannerTexture() ??
+                              ResourceManager.GetSprite("RoomList.png")?.texture;
                 _window.ForumObjects.Add(obj);
                 _objects.Add(obj);
             }

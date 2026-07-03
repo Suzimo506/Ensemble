@@ -99,6 +99,13 @@ namespace MDEN.UI.Core
                 return;
             }
 
+            if (ShouldSkipRoomHudForBattleScene())
+            {
+                DeferRoomHudRefresh();
+                MultiplayerBattleController.OnLobbyChanged();
+                return;
+            }
+
             var isNewLobbyEntry = lobby != null && _entranceTrackedLobbyId != lobby.Id;
             if (lobby == null)
             {
@@ -188,6 +195,12 @@ namespace MDEN.UI.Core
         public static void Update()
         {
             if (IsPopupSuppressed)
+            {
+                RestoreNativeInput();
+                return;
+            }
+
+            if (ShouldSkipRoomHudForBattleScene())
             {
                 RestoreNativeInput();
                 return;
@@ -327,6 +340,11 @@ namespace MDEN.UI.Core
             if (_battleSceneActive) return true;
 
             return !RoomSceneOverlay.IsHomeVisible;
+        }
+
+        private static bool ShouldSkipRoomHudForBattleScene()
+        {
+            return _battleSceneActive && LobbyManager.CurrentLobby?.IsPlaying == true;
         }
 
         private static void DeferRoomHudRefresh()

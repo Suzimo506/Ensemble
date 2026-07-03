@@ -26,6 +26,7 @@ namespace MDEN.UI.Displays
         private InputField _inputField;
         private Button _clearButton;
         private Button _worldMuteButton;
+        private Image _worldMuteBackground;
         private Text _worldMuteLabel;
         private Image _worldMuteIndicator;
         private Text _worldMuteCheckMark;
@@ -277,6 +278,7 @@ namespace MDEN.UI.Displays
             _inputField = null;
             _clearButton = null;
             _worldMuteButton = null;
+            _worldMuteBackground = null;
             _worldMuteLabel = null;
             _worldMuteIndicator = null;
             _worldMuteCheckMark = null;
@@ -426,14 +428,30 @@ namespace MDEN.UI.Displays
             toggleRect.pivot = new Vector2(0f, 1f);
             toggleRect.sizeDelta = new Vector2(WorldMuteToggleWidth, WorldMuteToggleHeight);
 
-            var toggleImage = toggleObj.AddComponent<Image>();
-            toggleImage.type = _btnBaseSprite == null ? Image.Type.Simple : Image.Type.Sliced;
-            toggleImage.sprite = _btnBaseSprite;
+            var hitImage = toggleObj.AddComponent<Image>();
+            hitImage.type = Image.Type.Simple;
+            hitImage.sprite = null;
+            hitImage.color = new Color(1f, 1f, 1f, 0f);
 
             _worldMuteButton = toggleObj.AddComponent<Button>();
             _worldMuteButton.transition = Selectable.Transition.None;
-            _worldMuteButton.targetGraphic = toggleImage;
+            _worldMuteButton.targetGraphic = null;
             _worldMuteButton.onClick.AddListener((UnityAction)new Action(ToggleWorldChannelMuted));
+
+            var backgroundObj = new GameObject("Background");
+            var backgroundRect = backgroundObj.AddComponent<RectTransform>();
+            backgroundRect.SetParent(toggleObj.transform, false);
+            backgroundRect.localScale = Vector3.one;
+            backgroundRect.anchorMin = Vector2.zero;
+            backgroundRect.anchorMax = Vector2.one;
+            backgroundRect.offsetMin = Vector2.zero;
+            backgroundRect.offsetMax = Vector2.zero;
+
+            _worldMuteBackground = backgroundObj.AddComponent<Image>();
+            _worldMuteBackground.type = _btnBaseSprite == null ? Image.Type.Simple : Image.Type.Sliced;
+            _worldMuteBackground.sprite = _btnBaseSprite;
+            _worldMuteBackground.color = WorldMuteToggleColor;
+            _worldMuteBackground.raycastTarget = false;
 
             var indicatorObj = new GameObject("Indicator");
             var indicatorRect = indicatorObj.AddComponent<RectTransform>();
@@ -553,10 +571,15 @@ namespace MDEN.UI.Displays
                     : new Color(1f, 1f, 1f, 0f);
             }
 
-            var image = _worldMuteButton?.targetGraphic as Image;
-            if (image != null)
+            if (_worldMuteBackground != null)
             {
-                image.color = WorldMuteToggleColor;
+                _worldMuteBackground.color = WorldMuteToggleColor;
+            }
+
+            var hitImage = _worldMuteButton?.GetComponent<Image>();
+            if (hitImage != null)
+            {
+                hitImage.color = new Color(1f, 1f, 1f, 0f);
             }
         }
 

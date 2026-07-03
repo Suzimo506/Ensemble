@@ -26,8 +26,11 @@ namespace MDEN.Patches
         private const int FailedBattleEndWaitTimeoutMs = 3720000;
         private const int PauseButtonHideIntervalFrames = 30;
         private const int PauseButtonLookupRetryFrames = 120;
+        private const int NativeResultActiveLookupIntervalFrames = 15;
+        private const int NativeResultIdleLookupIntervalFrames = 120;
         private static readonly System.TimeSpan WaitingHintCooldown = System.TimeSpan.FromSeconds(2.5);
         private static int _nextPauseButtonHideFrame;
+        private static int _nextNativeResultLookupFrame;
         private static GameObject _pauseButton;
         private static int _nextVictoryPanelLookupFrame;
         private static PnlVictory _pnlVictory;
@@ -39,6 +42,7 @@ namespace MDEN.Patches
         {
             BattleManager.MarkMultiplayerBattleStarting();
             _nextPauseButtonHideFrame = 0;
+            _nextNativeResultLookupFrame = 0;
             _nextVictoryPanelLookupFrame = 0;
             _pauseButton = null;
             _pnlVictory = null;
@@ -51,6 +55,7 @@ namespace MDEN.Patches
             BattleManager.MarkMultiplayerBattleEnded();
             BattleResultFlowManager.Reset();
             _nextPauseButtonHideFrame = 0;
+            _nextNativeResultLookupFrame = 0;
             _nextVictoryPanelLookupFrame = 0;
             _pauseButton = null;
             _pnlVictory = null;
@@ -61,8 +66,12 @@ namespace MDEN.Patches
         internal static void UpdateBattleUiState()
         {
             TryShowBattleResultByKeyboard();
-            RecoverNativeResultInputIfReady();
-            TryFinishNativeResultByEnter();
+            if (ShouldCheckNativeResultFallback())
+            {
+                RecoverNativeResultInputIfReady();
+                TryFinishNativeResultByEnter();
+            }
+
             if (!IsMultiplayerBattleContext) return;
             if (Time.frameCount < _nextPauseButtonHideFrame) return;
 
@@ -70,6 +79,22 @@ namespace MDEN.Patches
             _nextPauseButtonHideFrame = Time.frameCount + (foundPauseButton
                 ? PauseButtonHideIntervalFrames
                 : PauseButtonLookupRetryFrames);
+        }
+
+        private static bool ShouldCheckNativeResultFallback()
+        {
+            if (!LobbyManager.IsInLobby) return false;
+            if (Time.frameCount < _nextNativeResultLookupFrame) return false;
+
+            var resultFlowRelevant =
+                BattleResultFlowManager.IsBattleResultFlowPending ||
+                BattleManager.HasReportedBattleFinished ||
+                !BattleResultFlowManager.CanExitBattleResult;
+            var interval = resultFlowRelevant
+                ? NativeResultActiveLookupIntervalFrames
+                : NativeResultIdleLookupIntervalFrames;
+            _nextNativeResultLookupFrame = Time.frameCount + interval;
+            return resultFlowRelevant || IsMultiplayerBattleContext;
         }
 
         public static void SceneLoaded()
@@ -348,8 +373,8 @@ namespace MDEN.Patches
             }
 
             if (SettlementOverlayController.IsAnyMdenOverlayActive) return;
-            if (!SettlementOverlayController.IsNativeBattleResultPanelVisible()) return;
             if (!Input.GetKeyDown(KeyCode.Return) && !Input.GetKeyDown(KeyCode.KeypadEnter)) return;
+            if (!SettlementOverlayController.IsNativeBattleResultPanelVisible()) return;
 
             try
             {

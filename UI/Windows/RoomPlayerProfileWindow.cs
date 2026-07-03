@@ -213,7 +213,7 @@ namespace MDEN.UI.Windows
 
         private int GetTotalMultiplayerGames()
         {
-            return _profile?.TotalMultiplayerGames ?? _player.TotalMultiplayerGames;
+            return Math.Max(_profile?.TotalMultiplayerGames ?? 0, _player.TotalMultiplayerGames);
         }
 
         private string GetDisplayName()
@@ -248,7 +248,11 @@ namespace MDEN.UI.Windows
         {
             if (_profile != null)
             {
-                return AvatarManager.GetAvatarTexture(_profile.Uid, _profile.AvatarName, _profile.AvatarData);
+                var avatarData = string.IsNullOrWhiteSpace(_profile.AvatarData) &&
+                    _profile.AvatarName == _player?.AvatarName
+                    ? _player.AvatarData
+                    : _profile.AvatarData;
+                return AvatarManager.GetAvatarTexture(_profile.Uid, _profile.AvatarName, avatarData);
             }
 
             return AvatarManager.GetAvatarTexture(_player?.Uid, _player?.AvatarName, _player?.AvatarData);

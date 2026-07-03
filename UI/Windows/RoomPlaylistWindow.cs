@@ -103,7 +103,8 @@ namespace MDEN.UI.Windows
         private ForumObject AddButton(string title, string desc)
         {
             var obj = new ForumObject(new LocalString(title), new LocalString(desc));
-            obj.Texture = ResourceManager.GetSprite("RoomList.png")?.texture;
+            obj.Texture = ResourceManager.GetRandomBannerTexture() ??
+                          ResourceManager.GetSprite("RoomList.png")?.texture;
             _window.ForumObjects.Add(obj);
             return obj;
         }

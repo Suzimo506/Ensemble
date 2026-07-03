@@ -30,6 +30,8 @@ namespace MDEN.UI.Core
 
         public static void Update()
         {
+            if (!IsAnyMdenOverlayActive) return;
+
             BattleResultBannerDisplay.Update();
             SettlementResultDialog.Update();
         }
@@ -80,10 +82,10 @@ namespace MDEN.UI.Core
             var rankKeyPressed = ConsumeRankKeyDown();
             if (!LobbyManager.IsInLobby) return;
             if (IsAnyMdenOverlayActive) return;
+            if (!rankKeyPressed) return;
 
             var lastSnapshot = getLastSnapshot?.Invoke() ?? Array.Empty<BattlePlayerEntry>();
             if (lastSnapshot.Length == 0) return;
-            if (!rankKeyPressed) return;
 
             if (BattleResultFlowManager.IsBattleResultFlowPending)
             {

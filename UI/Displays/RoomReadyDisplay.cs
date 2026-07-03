@@ -366,7 +366,7 @@ namespace MDEN.UI.Displays
                 IDisposable uiLock = WindowStackController.LockUI(I18nManager.T("common.applying"));
                 try
                 {
-                await RecommendedConfigManager.ApplyCurrentAsync();
+                    await RecommendedConfigManager.ApplyCurrentAsync();
                 }
                 finally
                 {
@@ -376,6 +376,7 @@ namespace MDEN.UI.Displays
             catch (Exception ex)
             {
                 MDEN.Managers.ClientLogManager.Warning($"Apply recommended config failed: {ex.Message}");
+                MainThreadDispatcher.Enqueue(() => ShowText.ShowInfo(I18nManager.Tf("ready.equip_failed", ex.Message)));
             }
             finally
             {

@@ -23,6 +23,8 @@ namespace MDEN.UI.Windows
         private ForumObject _btnTenziSongsPerPlayer;
         private ForumObject _btnGoal;
         private ForumObject _btnSettlement;
+        private ForumObject _btnMaxPlayers;
+        private ForumObject _btnPlaylistSize;
         private ForumObject _btnJoinLock;
         private ForumObject _btnPassword;
         private readonly Dictionary<ForumObject, PlayerSyncEntry> _playerItems = new Dictionary<ForumObject, PlayerSyncEntry>();
@@ -263,6 +265,18 @@ namespace MDEN.UI.Windows
 
             if (lobby?.HostUid == PlayerManager.CurrentUid)
             {
+                _btnMaxPlayers = new ForumObject(
+                    new LocalString(I18nManager.T("create.players.title")),
+                    new LocalString(I18nManager.Tf("room.players.desc", Highlight(lobby.MaxPlayers.ToString(), Constants.ColorYellow))));
+                _btnMaxPlayers.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("PlayerCard.png")?.texture;
+                _window.ForumObjects.Add(_btnMaxPlayers);
+
+                _btnPlaylistSize = new ForumObject(
+                    new LocalString(I18nManager.T("create.playlist_size.title")),
+                    new LocalString(I18nManager.Tf("room.playlist_size.desc", Highlight(lobby.PlaylistSize.ToString(), Constants.ColorYellow))));
+                _btnPlaylistSize.Texture = ResourceManager.GetRandomBannerTexture() ?? ResourceManager.GetSprite("RoomList.png")?.texture;
+                _window.ForumObjects.Add(_btnPlaylistSize);
+
                 _btnJoinLock = new ForumObject(
                     new LocalString(lobby.JoinLocked ? I18nManager.T("room.unlock.button") : I18nManager.T("room.lock.button")),
                     new LocalString(lobby.JoinLocked ? I18nManager.T("room.unlock.desc") : I18nManager.T("room.lock.desc")));
@@ -277,6 +291,8 @@ namespace MDEN.UI.Windows
             }
             else
             {
+                _btnMaxPlayers = null;
+                _btnPlaylistSize = null;
                 _btnJoinLock = null;
                 _btnPassword = null;
             }
@@ -543,6 +559,24 @@ namespace MDEN.UI.Windows
                 return;
             }
 
+            if (button == _btnMaxPlayers)
+            {
+                var lobby = LobbyManager.CurrentLobby;
+                if (!CanChangeRoomRules(lobby)) return;
+
+                ShowMaxPlayersInput(lobby);
+                return;
+            }
+
+            if (button == _btnPlaylistSize)
+            {
+                var lobby = LobbyManager.CurrentLobby;
+                if (!CanChangeRoomRules(lobby)) return;
+
+                ShowPlaylistSizeInput(lobby);
+                return;
+            }
+
             if (button == _btnJoinLock)
             {
                 var lobby = LobbyManager.CurrentLobby;
@@ -636,6 +670,60 @@ namespace MDEN.UI.Windows
             input.Show();
         }
 
+        private void ShowMaxPlayersInput(LobbySyncPush lobby)
+        {
+            if (lobby == null) return;
+
+            ShowNumberInput(
+                I18nManager.T("create.players.title"),
+                2,
+                10,
+                value =>
+                {
+                    var playerCount = GetPlayerCount(LobbyManager.CurrentLobby ?? lobby);
+                    if (value < playerCount)
+                    {
+                        Il2CppAssets.Scripts.UI.Controls.ShowText.ShowInfo(I18nManager.T("room.max_players.existing_limit"));
+                        MainThreadDispatcher.Enqueue(RebuildWindow);
+                        return;
+                    }
+
+                    _ = UpdateLobbySettingsAsync(
+                        () => LobbyManager.SetMaxPlayersAsync((ushort)value),
+                        LocalLobbySettingsChange.ForMaxPlayers(
+                            LobbyManager.CurrentLobby?.JoinLocked == true,
+                            (ushort)value));
+                });
+        }
+
+        private void ShowPlaylistSizeInput(LobbySyncPush lobby)
+        {
+            if (lobby == null) return;
+
+            ShowNumberInput(
+                I18nManager.T("create.playlist_size.title"),
+                2,
+                32,
+                value =>
+                {
+                    var currentLobby = LobbyManager.CurrentLobby ?? lobby;
+                    var playlistCount = GetPlaylistCount(currentLobby);
+                    if (value < playlistCount)
+                    {
+                        Il2CppAssets.Scripts.UI.Controls.ShowText.ShowInfo(I18nManager.T("room.playlist_size.existing_limit"));
+                        MainThreadDispatcher.Enqueue(RebuildWindow);
+                        return;
+                    }
+
+                    _ = UpdateLobbySettingsAsync(
+                        () => LobbyManager.SetPlaylistSizeAsync((ushort)value),
+                        LocalLobbySettingsChange.ForPlaylistSize(
+                            currentLobby.JoinLocked,
+                            (ushort)value,
+                            LobbyPlayModeRules.NormalizeTenziSongsPerPlayer(currentLobby.TenziSongsPerPlayer, (ushort)value)));
+                });
+        }
+
         private void ShowTenziSongsPerPlayerInput(LobbySyncPush lobby)
         {
             if (lobby == null) return;
@@ -670,6 +758,29 @@ namespace MDEN.UI.Windows
                     LocalLobbySettingsChange.ForTenziSongsPerPlayer(
                         LobbyManager.CurrentLobby?.JoinLocked == true,
                         (byte)parsed));
+            };
+            input.Show();
+        }
+
+        private void ShowNumberInput(string fieldName, int min, int max, Action<int> applyValue)
+        {
+            if (_window != null)
+            {
+                _window.ForceClose();
+            }
+
+            var input = new InputWindow();
+            input.OnCompletion += (w) =>
+            {
+                var value = input.Result?.Trim();
+                if (!TryParseNumberInRange(value, min, max, out var parsed))
+                {
+                    Il2CppAssets.Scripts.UI.Controls.ShowText.ShowInfo(I18nManager.Tf("create.number_range", fieldName, min, max));
+                    MainThreadDispatcher.Enqueue(RebuildWindow);
+                    return;
+                }
+
+                applyValue(parsed);
             };
             input.Show();
         }
@@ -726,6 +837,19 @@ namespace MDEN.UI.Windows
                 lobby.SettlementEnabled = change.SettlementEnabled;
             }
 
+            if (change.UpdateMaxPlayers)
+            {
+                lobby.MaxPlayers = change.MaxPlayers;
+            }
+
+            if (change.UpdatePlaylistSize)
+            {
+                lobby.PlaylistSize = change.PlaylistSize;
+                lobby.TenziSongsPerPlayer = LobbyPlayModeRules.NormalizeTenziSongsPerPlayer(
+                    change.TenziSongsPerPlayer,
+                    change.PlaylistSize);
+            }
+
             if (change.UpdatePlayMode)
             {
                 lobby.PlayMode = change.PlayMode;
@@ -757,6 +881,10 @@ namespace MDEN.UI.Windows
             public byte Goal { get; private set; }
             public bool UpdateSettlementEnabled { get; private set; }
             public bool SettlementEnabled { get; private set; }
+            public bool UpdateMaxPlayers { get; private set; }
+            public ushort MaxPlayers { get; private set; }
+            public bool UpdatePlaylistSize { get; private set; }
+            public ushort PlaylistSize { get; private set; }
             public bool UpdatePlayMode { get; private set; }
             public byte PlayMode { get; private set; }
             public bool UpdateTenziSongsPerPlayer { get; private set; }
@@ -794,6 +922,27 @@ namespace MDEN.UI.Windows
                     JoinLocked = joinLocked,
                     UpdateSettlementEnabled = true,
                     SettlementEnabled = settlementEnabled
+                };
+            }
+
+            public static LocalLobbySettingsChange ForMaxPlayers(bool joinLocked, ushort maxPlayers)
+            {
+                return new LocalLobbySettingsChange
+                {
+                    JoinLocked = joinLocked,
+                    UpdateMaxPlayers = true,
+                    MaxPlayers = maxPlayers
+                };
+            }
+
+            public static LocalLobbySettingsChange ForPlaylistSize(bool joinLocked, ushort playlistSize, byte tenziSongsPerPlayer)
+            {
+                return new LocalLobbySettingsChange
+                {
+                    JoinLocked = joinLocked,
+                    UpdatePlaylistSize = true,
+                    PlaylistSize = playlistSize,
+                    TenziSongsPerPlayer = tenziSongsPerPlayer
                 };
             }
 
